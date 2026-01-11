@@ -1,3 +1,4 @@
-node_modules
+console/node_modules
+web-panel/node_modules
 
-manual.txt
+console/manual.txt
