@@ -2,10 +2,12 @@ import { useNavigate } from 'react-router-dom';
 import { getUser, clearUser } from '../../utils/auth';
 import { useState, useContext } from 'react';
 import { SettingsContext } from '../../contexts/SettingsContext';
+import { useCart } from '../../contexts/CartContext';
 
 function HomePage() {
   const navigate = useNavigate();
   const { lang, setLang, theme, setTheme, t } = useContext(SettingsContext);
+  const { totalItems, addItem } = useCart();
   const [navQuery, setNavQuery] = useState('');
 
   const imageStyle = {
@@ -29,45 +31,6 @@ function HomePage() {
 
   return (
     <div>
-      <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
-        <div className="container">
-          <a className="navbar-brand" href="#" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
-            <img src="https://getbootstrap.com/docs/4.0/assets/brand/bootstrap-solid.svg" width="30" height="30" className="d-inline-block align-top me-2" alt="" />
-            Project Name
-          </a>
-
-          <div className="d-flex align-items-center ms-auto">
-            <button className="btn btn-link me-3 text-decoration-none" onClick={() => navigate('/search')}>{t('courses')}</button>
-
-            <form className="d-flex me-3" onSubmit={(e) => { e.preventDefault(); navigate(`/search?q=${encodeURIComponent(navQuery)}`); }}>
-              <input className="form-control me-2" type="search" placeholder={t('searchPlaceholder')} value={navQuery} onChange={(e) => setNavQuery(e.target.value)} />
-              <button className="btn btn-outline-success" type="submit">{t('search')}</button>
-            </form>
-
-            <div className="me-3 d-flex align-items-center">
-              <select className="form-select form-select-sm me-2" value={lang} onChange={(e) => setLang(e.target.value)} aria-label="Language">
-                <option value="en">EN</option>
-                <option value="uk">UA</option>
-              </select>
-            </div>
-
-            {(() => {
-              const u = getUser();
-              return u ? (
-                <>
-                  <button className="btn btn-outline-secondary me-2" onClick={() => navigate('/account')}>{t('account')}</button>
-                  <button className="btn btn-danger" onClick={() => { clearUser(); navigate('/'); }}>{t('logout')}</button>
-                </>
-              ) : (
-                <>
-                  <button onClick={() => navigate('/login')} className="btn btn-outline-primary me-2">{t('login')}</button>
-                  <button onClick={() => navigate('/register')} className="btn btn-primary">{t('signup')}</button>
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      </nav>
 
       <header className="hero py-5">
         <div className="container d-flex flex-column flex-md-row align-items-center">
@@ -112,7 +75,10 @@ function HomePage() {
                   <div className="card-body d-flex flex-column">
                     <h5 className="card-title">{c.title}</h5>
                     <p className="card-text">{t('courseCardText').replace('{title}', c.title)}</p>
-                    <a href="#" className="btn btn-primary mt-auto">{t('goToCourse')}</a>
+                    <div className="mt-auto d-flex gap-2">
+                      <a href="#" className="btn btn-primary">{t('goToCourse')}</a>
+                      <button className="btn btn-outline-success" onClick={(e) => { e.preventDefault(); addItem({ id: c.title, title: c.title, price: 19.99, img: c.img, description: `${c.title} course` }, 1); }}>Add to cart</button>
+                    </div>
                   </div>
                 </div>
               </div>

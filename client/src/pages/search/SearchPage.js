@@ -2,11 +2,13 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getUser, clearUser, setUser as setUserStorage } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
+import { useCart } from '../../contexts/CartContext';
 
 function SearchPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState(getUser());
   const { lang, setLang, theme, setTheme, t } = useContext(SettingsContext);
+  const { addItem } = useCart();
 
   useEffect(() => {
     const u = getUser();
@@ -91,41 +93,6 @@ function SearchPage() {
 
   return (
     <div>
-      <nav className="navbar navbar-expand-lg navbar-light" style={{ backgroundColor: '#fafafa' }}>
-        <div className="container-fluid">
-          <a className="navbar-brand" href="#" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
-            <img src="https://getbootstrap.com/docs/4.0/assets/brand/bootstrap-solid.svg" width="30" height="30" className="d-inline-block align-top me-2" alt="" />
-            Project Name
-          </a>
-          <div className="d-flex align-items-center ms-auto">
-            <button className="btn btn-link me-3 text-decoration-none" onClick={() => navigate('/search')}>{t('courses')}</button>
-
-            <form className="d-flex me-3" onSubmit={(e) => { e.preventDefault(); navigate(`/search?q=${encodeURIComponent(navQuery)}`); }}>
-              <input className="form-control me-2" type="search" placeholder={t('searchPlaceholder')} value={navQuery} onChange={(e) => setNavQuery(e.target.value)} />
-              <button className="btn btn-outline-success" type="submit">{t('search')}</button>
-            </form>
-
-            <div className="me-3 d-flex align-items-center">
-              <select className="form-select form-select-sm me-2" value={lang} onChange={(e) => setLang(e.target.value)} aria-label="Language">
-                <option value="en">EN</option>
-                <option value="uk">UA</option>
-              </select>
-            </div>
-
-            {user ? (
-              <>
-                <button className="btn btn-outline-secondary me-2" onClick={() => navigate('/account')}>{t('account')}</button>
-                <button className="btn btn-danger" onClick={() => { clearUser(); navigate('/'); }}>{t('logout')}</button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => navigate('/login')} className="btn btn-outline-primary me-3">{t('login')}</button>
-                <button onClick={() => navigate('/register')} className="btn btn-primary">{t('signup')}</button>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
 
       <div className="container my-4">
         <div className="row">
@@ -191,6 +158,8 @@ function SearchPage() {
                               alert(t('alreadyEnrolled'));
                             }
                           }}>{t('enroll')}</button>
+
+                          <button className="btn btn-sm btn-outline-success me-2" onClick={() => addItem({ id: course.id, title: course.title, price: course.price, img: course.img, description: course.title }, 1)}>Add to cart</button>
                         </div>
                         <div className="fw-bold">${course.price.toFixed(2)}</div>
                       </div>

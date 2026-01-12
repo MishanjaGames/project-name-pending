@@ -24,25 +24,6 @@ function AccountPage() {
 
   return (
     <div>
-      <nav className="navbar navbar-light bg-white shadow-sm">
-        <div className="container">
-          <a className="navbar-brand" href="#" onClick={(e) => { e.preventDefault(); navigate('/'); }}>Project Name</a>
-          <div className="d-flex align-items-center">
-            <button className="btn btn-outline-secondary me-2" onClick={() => navigate('/')}>{t('home')}</button>
-
-            <select className="form-select form-select-sm me-2" value={lang} onChange={(e) => setLang(e.target.value)} aria-label="Language">
-              <option value="en">EN</option>
-              <option value="uk">UA</option>
-            </select>
-
-            <button className="theme-toggle me-2" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} title="Toggle theme">{theme === 'dark' ? '🌙' : '☀️'}</button>
-
-            <div className="me-3 text-muted small">Theme: <strong className="ms-1">{theme}</strong></div>
-
-            <button className="btn btn-danger ms-2" onClick={handleLogout}>{t('logout')}</button>
-          </div>
-        </div>
-      </nav>
 
       <div className="container my-4">
         <div className="row">
@@ -52,6 +33,10 @@ function AccountPage() {
               <p className="mb-1"><strong>{t('fullName')}:</strong> {user.name}</p>
               <p className="mb-1"><strong>{t('emailAddress')}:</strong> {user.email}</p>
               <p className="mb-1"><strong>{t('coursesEnrolled')}:</strong> {enrollments.length}</p>
+              <div className="mt-3">
+                <button className="btn btn-outline-secondary btn-sm me-2" onClick={() => navigate('/settings')}>{t('settings')}</button>
+                <button className="btn btn-danger btn-sm ms-2" onClick={handleLogout}>{t('logout')}</button>
+              </div>
             </div>
           </div>
 
