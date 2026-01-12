@@ -36,3 +36,65 @@
     transform: rotate(360deg);
   }
 }
+
+/* Landing page styles */
+:root{
+  --bg: #ffffff;
+  --text: #212529;
+  --muted: #6c757d;
+  --card-bg: #ffffff;
+  --navbar-bg: #ffffff;
+}
+
+body.theme-dark{
+  --bg: #0f1720;
+  --text: #e6eef6;
+  --muted: #9aa3ad;
+  --card-bg: #111820;
+  --navbar-bg: #0b1320;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+.navbar, .card, .footer, .feature-card {
+  background-color: var(--card-bg) !important;
+  color: var(--text) !important;
+}
+
+.hero {
+  background: linear-gradient(90deg, rgba(255,255,255,1) 0%, rgba(250,250,255,1) 100%);
+}
+.hero-title {
+  font-size: 2rem;
+  font-weight: 700;
+}
+@media(min-width:768px){
+  .hero-title { font-size: 2.5rem; }
+}
+.feature-card { background: var(--card-bg); }
+.footer a{ text-decoration: none; }
+.hero-media img{ max-height: 350px; object-fit: cover; }
+
+/* small style for theme toggle */
+.theme-toggle { cursor: pointer; border: none; background: transparent; padding: 6px 10px; border-radius: 6px; }
+.theme-toggle:hover { background: rgba(0,0,0,0.04); }
+.theme-dark .theme-toggle:hover { background: rgba(255,255,255,0.04); }
+
+/* Dark theme stronger overrides to handle Bootstrap utility classes and inline backgrounds */
+body.theme-dark { background-color: var(--bg) !important; color: var(--text) !important; }
+.theme-dark .bg-white { background-color: var(--card-bg) !important; color: var(--text) !important; }
+.theme-dark .navbar-light.bg-white { background-color: var(--navbar-bg) !important; color: var(--text) !important; }
+.theme-dark .hero { background: linear-gradient(90deg, var(--bg) 0%, var(--card-bg) 100%) !important; }
+.theme-dark .text-muted { color: var(--muted) !important; }
+.theme-dark .text-light { color: var(--text) !important; }
+.theme-dark .card, .theme-dark .card-body { background-color: var(--card-bg) !important; color: var(--text) !important; }
+.theme-dark .feature-card { background: var(--card-bg) !important; color: var(--text) !important; }
+.theme-dark a { color: var(--text) !important; }
+
+/* helper class for pages that used a light wrapper */
+.page-bg { background-color: var(--bg); color: var(--text); }
+.page-bg .card { background-color: var(--card-bg); color: var(--text); }
+.page-bg .text-muted { color: var(--muted); }
