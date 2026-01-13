@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { getUser, clearUser } from '../../utils/auth';
+import { getUser, clearUser, promoteToTeacher } from '../../utils/auth';
 import { useContext } from 'react';
 import { SettingsContext } from '../../contexts/SettingsContext';
 
@@ -34,6 +34,16 @@ function AccountPage() {
               <p className="mb-1"><strong>{t('emailAddress')}:</strong> {user.email}</p>
               <p className="mb-1"><strong>{t('coursesEnrolled')}:</strong> {enrollments.length}</p>
               <div className="mt-3">
+                { (user.role === 'teacher' || user.isTeacher) && (
+                  <button className="btn btn-success btn-sm me-2" onClick={() => navigate('/instructor/add-course')}>{t('course.addCourseButton')}</button>
+                ) }
+                { !(user.role === 'teacher' || user.isTeacher) && (
+                  <button className="btn btn-outline-secondary btn-sm me-2" onClick={() => {
+                    if (!window.confirm(t('teacher.confirmGrant'))) return;
+                    try { promoteToTeacher(); window.location.reload(); } catch (e) { alert(e.message || 'Error'); }
+                  }}>{t('teacher.grantDev')}</button>
+                )}
+                <button className="btn btn-primary btn-sm me-2" onClick={() => navigate('/apply-teacher')}>{t('teacher.applyButton')}</button>
                 <button className="btn btn-outline-secondary btn-sm me-2" onClick={() => navigate('/settings')}>{t('settings')}</button>
                 <button className="btn btn-danger btn-sm ms-2" onClick={handleLogout}>{t('logout')}</button>
               </div>

@@ -3,6 +3,8 @@ import LoginPage from './pages/login/LoginPage';
 import HomePage from './pages/home/HomePage';
 import SignUpPage from './pages/register/RegisterPage';
 import SearchPage from './pages/search/SearchPage';
+import TeacherRegisterPage from './pages/register/TeacherRegisterPage';
+import AddCoursePage from './pages/instructor/AddCoursePage';
 import AccountPage from './pages/account/AccountPage';
 import CartPage from './pages/cart/CartPage';
 import SettingsPage from './pages/settings/SettingsPage';
@@ -24,6 +26,8 @@ function App() {
             <Route path="/account" element={<AccountPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/cart" element={<CartPage />} />
+            <Route path="/apply-teacher" element={<TeacherRegisterPage />} />
+            <Route path="/instructor/add-course" element={<AddCoursePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
