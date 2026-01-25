@@ -1,14 +1,12 @@
 import { useNavigate } from 'react-router-dom';
-import { getUser, clearUser } from '../../utils/auth';
-import { useState, useContext } from 'react';
+import { useContext } from 'react';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import { useCart } from '../../contexts/CartContext';
 
 function HomePage() {
   const navigate = useNavigate();
-  const { lang, setLang, theme, setTheme, t } = useContext(SettingsContext);
-  const { totalItems, addItem } = useCart();
-  const [navQuery, setNavQuery] = useState('');
+  const { t } = useContext(SettingsContext);
+  const { addItem } = useCart();
 
   const imageStyle = {
     width: '100%',
@@ -17,46 +15,60 @@ function HomePage() {
   };
 
   const features = [
-    { titleKey: 'feature1Title', descKey: 'feature1Desc' },
-    { titleKey: 'feature2Title', descKey: 'feature2Desc' },
-    { titleKey: 'feature3Title', descKey: 'feature3Desc' }
+    { icon: 'bi-laptop', titleKey: 'feature1Title', descKey: 'feature1Desc', color: 'text-primary' },
+    { icon: 'bi-people-fill', titleKey: 'feature2Title', descKey: 'feature2Desc', color: 'text-success' },
+    { icon: 'bi-alarm', titleKey: 'feature3Title', descKey: 'feature3Desc', color: 'text-warning' }
   ];
 
+  // Заменил попугаев на IT картинки
   const courses = [
-    { title: 'C++', img: 'https://bigzoo.com.ua/image/cache/catalog/Animals/Popugai/malenkiye/volnistyye/volnistyy_goluboy1-750x750-product_thumb.jpg' },
-    { title: 'JavaScript', img: 'https://www.rodyna.in.ua/wp-content/uploads/2018/09/%D0%92%D1%96%D0%B4%D0%B2%D0%B0%D0%B6%D0%BD%D0%B0-%D0%BA%D0%B2%D1%96%D1%82%D0%BA%D0%B0_6_1.jpg' },
-    { title: 'Python', img: 'https://justzoo.com.ua/image/cache/catalog/image/cache/catalog/blog/a661e463c551a01ef4b1d01b4b22dfb6-890x0.webp' },
-    { title: 'Java', img: 'https://bigzoo.com.ua/image/cache/catalog/Animals/Popugai/sredniye/Ozherelovyye/ozherelovyy_zelenyy_na_dokorm2-750x750-product_thumb.jpg' }
+    { id: 1, title: 'C++ Masterclass', img: 'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?w=500&q=80', price: 19.99 },
+    { id: 2, title: 'Modern JavaScript', img: 'https://images.unsplash.com/photo-1627398242450-270fc0780444?w=500&q=80', price: 24.99 },
+    { id: 3, title: 'Python for Data', img: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500&q=80', price: 22.99 },
+    { id: 4, title: 'Java Enterprise', img: 'https://images.unsplash.com/photo-1532619675605-1ede6c2ed2b0?w=500&q=80', price: 29.99 }
   ];
 
   return (
-    <div>
-
-      <header className="hero py-5">
-        <div className="container d-flex flex-column flex-md-row align-items-center">
-          <div className="hero-text me-md-5">
-            <h1 className="hero-title">{t('heroTitle')}</h1>
-            <p className="lead text-muted">{t('heroLead')}</p>
-            <div className="mt-4">
-              <button className="btn btn-primary btn-lg me-3" onClick={() => navigate('/register')}>{t('getStarted')}</button>
-              <a href="#features" className="btn btn-outline-secondary btn-lg">{t('learnMore')}</a>
+    <div className="homepage-wrapper">
+      
+      {/* HERO SECTION */}
+      <header className="hero-section py-5 mb-5">
+        <div className="container h-100">
+          <div className="row align-items-center h-100">
+            <div className="col-lg-6 my-4">
+              <h1 className="display-4 fw-bold mb-3">{t('heroTitle')}</h1>
+              <p className="lead mb-4 opacity-75">{t('heroLead')}</p>
+              <div className="d-flex gap-3">
+                <button className="btn btn-primary btn-lg px-4 shadow-sm" onClick={() => navigate('/search')}>{t('getStarted')}</button>
+                <button className="btn btn-outline-dark btn-lg px-4" onClick={() => {
+                  const el = document.getElementById('features');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}>{t('learnMore')}</button>
+              </div>
             </div>
-          </div>
-
-          <div className="hero-media mt-4 mt-md-0 flex-fill">
-            <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&q=80&auto=format&fit=crop" alt="Learning" className="img-fluid rounded shadow" />
+            <div className="col-lg-6">
+              <img 
+                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&q=80" 
+                alt="Learning" 
+                className="img-fluid rounded-4 shadow-lg hero-img" 
+              />
+            </div>
           </div>
         </div>
       </header>
 
-      <section id="features" className="py-5 bg-light">
+      {/* FEATURES SECTION */}
+      <section id="features" className="py-5">
         <div className="container">
-          <div className="row text-center">
+          <div className="row g-4 justify-content-center">
             {features.map((f, idx) => (
-              <div className="col-12 col-md-4 mb-4" key={idx}>
-                <div className="p-4 feature-card h-100 rounded shadow-sm">
-                  <h5>{t(f.titleKey)}</h5>
-                  <p className="text-muted">{t(f.descKey)}</p>
+              <div className="col-md-4" key={idx}>
+                <div className="card h-100 border-0 shadow-sm feature-card text-center p-4">
+                  <div className={`mb-3 display-4 ${f.color}`}>
+                    <i className={`bi ${f.icon}`}></i>
+                  </div>
+                  <h5 className="fw-bold">{t(f.titleKey)}</h5>
+                  <p className="text-muted small">{t(f.descKey)}</p>
                 </div>
               </div>
             ))}
@@ -64,20 +76,40 @@ function HomePage() {
         </div>
       </section>
 
-      <main className="py-5">
+      {/* POPULAR COURSES */}
+      <main className="py-5 bg-opacity-10">
         <div className="container">
-          <h2 className="mb-4">{t('popularCourses')}</h2>
+          <div className="d-flex justify-content-between align-items-end mb-4">
+            <h2 className="fw-bold mb-0">{t('popularCourses')}</h2>
+            <button className="btn btn-link text-decoration-none" onClick={() => navigate('/search')}>{t('all')} &rarr;</button>
+          </div>
+          
           <div className="row g-4">
-            {courses.map((c, idx) => (
-              <div className="col-12 col-md-6 col-lg-3" key={idx}>
-                <div className="card h-100">
-                  <img src={c.img} className="card-img-top" alt={`${c.title} Course`} style={imageStyle} />
+            {courses.map((c) => (
+              <div className="col-12 col-md-6 col-lg-3" key={c.id}>
+                <div className="card h-100 border-0 shadow-sm course-card">
+                  <div className="position-relative overflow-hidden rounded-top">
+                    <img src={c.img} className="card-img-top course-img" alt={c.title} style={imageStyle} />
+                    <div className="course-overlay">
+                      <button className="btn btn-light btn-sm rounded-pill" onClick={() => navigate('/search')}>{t('preview')}</button>
+                    </div>
+                  </div>
                   <div className="card-body d-flex flex-column">
-                    <h5 className="card-title">{c.title}</h5>
-                    <p className="card-text">{t('courseCardText').replace('{title}', c.title)}</p>
-                    <div className="mt-auto d-flex gap-2">
-                      <a href="#" className="btn btn-primary">{t('goToCourse')}</a>
-                      <button className="btn btn-outline-success" onClick={(e) => { e.preventDefault(); addItem({ id: c.title, title: c.title, price: 19.99, img: c.img, description: `${c.title} course` }, 1); }}>Add to cart</button>
+                    <h6 className="card-title fw-bold">{c.title}</h6>
+                    <p className="card-text text-muted small flex-grow-1">
+                      {t('courseCardText').replace('{{title}}', c.title)}
+                    </p>
+                    <div className="d-flex justify-content-between align-items-center mt-3">
+                      <span className="fw-bold text-primary">${c.price}</span>
+                      <button 
+                        className="btn btn-sm btn-outline-primary rounded-pill" 
+                        onClick={(e) => { 
+                          e.preventDefault(); 
+                          addItem({ id: c.id, title: c.title, price: c.price, img: c.img }, 1); 
+                        }}
+                      >
+                        <i className="bi bi-cart-plus me-1"></i> Add
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -87,12 +119,21 @@ function HomePage() {
         </div>
       </main>
 
-      <footer className="footer bg-dark text-light py-4">
-        <div className="container d-flex flex-column flex-md-row justify-content-between align-items-center">
-          <div>© {new Date().getFullYear()} Project Name</div>
-          <div>
-            <a href="#" className="text-light me-3">{t('privacy')}</a>
-            <a href="#" className="text-light">{t('terms')}</a>
+      {/* FOOTER */}
+      <footer className="footer py-5 mt-5 border-top">
+        <div className="container text-center text-md-start">
+          <div className="row">
+            <div className="col-md-6 mb-3">
+              <h5 className="fw-bold">Project Name</h5>
+              <p className="text-muted small">Best platform to learn coding.</p>
+            </div>
+            <div className="col-md-6 text-md-end">
+              <a href="#" className="text-muted text-decoration-none me-3">{t('privacy')}</a>
+              <a href="#" className="text-muted text-decoration-none">{t('terms')}</a>
+            </div>
+          </div>
+          <div className="text-center mt-4 text-muted small">
+            © {new Date().getFullYear()} Project Name. All rights reserved.
           </div>
         </div>
       </footer>

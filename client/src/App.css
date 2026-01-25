@@ -1,100 +1,186 @@
-.App {
-  text-align: center;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-}
-
-.App-link {
-  color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Landing page styles */
-:root{
+:root {
   --bg: #ffffff;
   --text: #212529;
   --muted: #6c757d;
   --card-bg: #ffffff;
   --navbar-bg: #ffffff;
+  --input-bg: #ffffff;
+  --input-border: #ced4da;
 }
 
-body.theme-dark{
-  --bg: #0f1720;
-  --text: #e6eef6;
-  --muted: #9aa3ad;
-  --card-bg: #111820;
-  --navbar-bg: #0b1320;
+/* Переменные для ТЕМНОЙ темы */
+body.theme-dark {
+  --bg: #0d1117;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --card-bg: #161b22;
+  --navbar-bg: #161b22;
+  --input-bg: #0d1117;
+  --input-border: #30363d;
 }
 
+/* Глобальные стили */
 body {
+  background-color: var(--bg);
+  color: var(--text);
+  transition: background-color 0.3s, color 0.3s;
+  min-height: 100vh;
+}
+
+/* === УСИЛЕНИЕ ДЛЯ ТЕМНОЙ ТЕМЫ === */
+
+body.theme-dark .navbar {
+  background-color: var(--navbar-bg) !important;
+  border-bottom: 1px solid #30363d;
+}
+
+body.theme-dark .card {
+  background-color: var(--card-bg);
+  color: var(--text);
+  border-color: #30363d;
+}
+
+body.theme-dark .list-group-item {
+  background-color: var(--card-bg);
+  color: var(--text);
+  border-color: #30363d;
+}
+
+/* --- ИСПРАВЛЕНИЕ ПОЛЕЙ ВВОДА (ГЛАВНОЕ) --- */
+/* Красим все инпуты, селекты и "прилипшие" иконки */
+body.theme-dark .form-control, 
+body.theme-dark .form-select,
+body.theme-dark .input-group-text {
+  background-color: var(--input-bg) !important; /* Темный фон */
+  border-color: var(--input-border) !important;
+  color: var(--text) !important; /* Белый текст */
+}
+
+/* Цвет плейсхолдера (подсказки) */
+body.theme-dark .form-control::placeholder {
+  color: var(--muted) !important;
+  opacity: 0.7;
+}
+
+/* Убираем белую обводку при фокусе, делаем её синей */
+body.theme-dark .form-control:focus, 
+body.theme-dark .form-select:focus {
+  background-color: var(--input-bg) !important;
+  color: var(--text) !important;
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+}
+
+/* Исправляем кнопки внутри input-group (например, "+/-" в корзине) */
+body.theme-dark .input-group .btn-outline-secondary {
+  border-color: var(--input-border);
+  color: var(--text);
+}
+body.theme-dark .input-group .btn-outline-secondary:hover {
+  background-color: rgba(255,255,255,0.1);
+}
+
+/* Дропдауны */
+body.theme-dark .dropdown-menu {
+  background-color: var(--card-bg);
+  border-color: #30363d;
+}
+body.theme-dark .dropdown-item {
+  color: var(--text);
+}
+body.theme-dark .dropdown-item:hover {
+  background-color: #30363d;
+  color: #fff;
+}
+body.theme-dark .dropdown-divider {
+  border-top-color: #30363d;
+}
+
+/* Ссылки */
+body.theme-dark a {
+  color: #58a6ff;
+}
+body.theme-dark .text-muted {
+  color: var(--muted) !important;
+}
+
+/* --- СТИЛИ ГЛАВНОЙ СТРАНИЦЫ --- */
+
+.hero-section {
+  background: linear-gradient(135deg, rgba(13, 110, 253, 0.1) 0%, rgba(255,255,255,0) 100%);
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+body.theme-dark .btn-outline-dark {
+  color: #f8f9fa;
+  border-color: #f8f9fa;
+}
+body.theme-dark .btn-outline-dark:hover {
+  background-color: #f8f9fa;
+  color: #000;
+}
+
+.feature-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background-color: var(--card-bg);
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+}
+
+.course-card {
+  transition: all 0.3s ease;
+  overflow: hidden;
+  background-color: var(--card-bg);
+}
+
+.course-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15) !important;
+}
+
+.course-img {
+  transition: transform 0.5s ease;
+}
+
+.course-card:hover .course-img {
+  transform: scale(1.05);
+}
+
+.footer {
   background-color: var(--bg);
   color: var(--text);
 }
 
-.navbar, .card, .footer, .feature-card {
-  background-color: var(--card-bg) !important;
+body.theme-dark .hero-section {
+  background: linear-gradient(135deg, rgba(13, 110, 253, 0.2) 0%, rgba(0,0,0,0) 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+body.theme-dark .shadow-sm {
+  box-shadow: 0 .125rem .25rem rgba(0,0,0,0.5) !important;
+}
+
+body.theme-dark .card {
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+body.theme-dark .btn-light, 
+body.theme-dark .bg-light {
+  background-color: rgba(255, 255, 255, 0.05) !important;
   color: var(--text) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.hero {
-  background: linear-gradient(90deg, rgba(255,255,255,1) 0%, rgba(250,250,255,1) 100%);
+/* При наведении делаем чуть светлее */
+body.theme-dark .btn-light:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
-.hero-title {
-  font-size: 2rem;
-  font-weight: 700;
+
+/* Исправление футера карточки профиля (белая полоса снизу) */
+body.theme-dark .card-footer.bg-white {
+  background-color: var(--card-bg) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
-@media(min-width:768px){
-  .hero-title { font-size: 2.5rem; }
-}
-.feature-card { background: var(--card-bg); }
-.footer a{ text-decoration: none; }
-.hero-media img{ max-height: 350px; object-fit: cover; }
-
-/* small style for theme toggle */
-.theme-toggle { cursor: pointer; border: none; background: transparent; padding: 6px 10px; border-radius: 6px; }
-.theme-toggle:hover { background: rgba(0,0,0,0.04); }
-.theme-dark .theme-toggle:hover { background: rgba(255,255,255,0.04); }
-
-/* Dark theme stronger overrides to handle Bootstrap utility classes and inline backgrounds */
-body.theme-dark { background-color: var(--bg) !important; color: var(--text) !important; }
-.theme-dark .bg-white { background-color: var(--card-bg) !important; color: var(--text) !important; }
-.theme-dark .navbar-light.bg-white { background-color: var(--navbar-bg) !important; color: var(--text) !important; }
-.theme-dark .hero { background: linear-gradient(90deg, var(--bg) 0%, var(--card-bg) 100%) !important; }
-.theme-dark .text-muted { color: var(--muted) !important; }
-.theme-dark .text-light { color: var(--text) !important; }
-.theme-dark .card, .theme-dark .card-body { background-color: var(--card-bg) !important; color: var(--text) !important; }
-.theme-dark .feature-card { background: var(--card-bg) !important; color: var(--text) !important; }
-.theme-dark a { color: var(--text) !important; }
-
-/* helper class for pages that used a light wrapper */
-.page-bg { background-color: var(--bg); color: var(--text); }
-.page-bg .card { background-color: var(--card-bg); color: var(--text); }
-.page-bg .text-muted { color: var(--muted); }
