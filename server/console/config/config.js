@@ -1,0 +1,8 @@
+module.exports = {
+    PORT: 4040,
+    PASSWORD_LENGTH: 16,
+    DB_URL: "mongodb+srv://mishanja:qwerty123@cluster0.oewbabf.mongodb.net/?appName=Cluster0",
+    //DB_URL: "mongodb+srv://api:4p1$ecr3t@cc3s5@bcdb01.zdhpsso.mongodb.net/?appName=BCDB01",
+    JWT_SALT: 13764,
+    JWT_SECRET: 'Z3H@u8E#375Q[hKxAprDFGmERb05'
+}
