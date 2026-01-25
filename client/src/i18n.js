@@ -2,7 +2,6 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 
-// Твои переводы из SettingsContext
 const resources = {
   en: {
     translation: {
@@ -23,7 +22,7 @@ const resources = {
       signup: 'Sign up',
       filters: 'Filters',
       title: 'Search',
-      type: 'Type',
+      type: 'Direction',
       author: 'Author',
       priceRange: 'Price range',
       clear: 'Clear',
@@ -134,7 +133,7 @@ const resources = {
       signup: 'Реєстрація',
       filters: 'Фільтри',
       title: 'Пошук',
-      type: 'Тип',
+      type: 'Напрям',
       author: 'Автор',
       priceRange: 'Ціновий діапазон',
       clear: 'Очистити',

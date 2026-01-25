@@ -49,12 +49,12 @@ function SearchPage() {
   };
 
   const allCourses = [
-    { id: 1, title: 'C++: Complete Guide', author: 'Yuri Popov', type: 'Programming', level: 'Junior', price: 10.99, img: 'https://bigzoo.com.ua/image/cache/catalog/Animals/Popugai/malenkiye/volnistyye/volnistyy_goluboy1-750x750-product_thumb.jpg' },
-    { id: 2, title: 'Full JavaScript Course', author: 'Anna Ivanova', type: 'Programming', level: 'Middle', price: 9.99, img: 'https://www.rodyna.in.ua/wp-content/uploads/2018/09/%D0%92%D1%96%D0%B4%D0%B2%D0%B0%D0%B6%D0%BD%D0%B0-%D0%BA%D0%B2%D1%96%D1%82%D0%BA%D0%B0_6_1.jpg' },
-    { id: 3, title: 'Python for Data Science', author: 'John Doe', type: 'Data Science', level: 'Senior', price: 12.99, img: 'https://justzoo.com.ua/image/cache/catalog/image/cache/catalog/blog/a661e463c551a01ef4b1d01b4b22dfb6-890x0.webp' },
-    { id: 4, title: 'Java Masterclass', author: 'Roman S', type: 'Programming', level: 'Junior', price: 9.99, img: 'https://bigzoo.com.ua/image/cache/catalog/Animals/Popugai/sredniye/Ozherelovyye/ozherelovyy_zelenyy_na_dokorm2-750x750-product_thumb.jpg' },
-    { id: 5, title: 'Unreal Engine - C++', author: 'Yuri Popov', type: 'Game Dev', level: 'Middle', price: 10.99, img: 'https://images.unsplash.com/photo-1589578527966-26190b2be3f3?w=800' },
-    { id: 6, title: 'Unity 2D Platformer', author: 'Anvar Abdusatarov', type: 'Game Dev', level: 'Junior', price: 9.99, img: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800' }
+    { id: 1, title: 'C++: Complete Guide', author: 'Yuri Popov', type: 'Programming', level: 'Junior', price: 10.99, img: 'https://th.bing.com/th/id/OIP.ViNMzZEPRvADF6WtX6rQsgHaDt?w=326&h=175&c=7&r=0&o=7&pid=1.7&rm=3' },
+    { id: 2, title: 'Full JavaScript Course', author: 'Anna Ivanova', type: 'Programming', level: 'Middle', price: 9.99, img: 'https://miro.medium.com/v2/resize:fit:1200/1*LyZcwuLWv2FArOumCxobpA.png' },
+    { id: 3, title: 'Python for Data Science', author: 'John Doe', type: 'Data Science', level: 'Senior', price: 12.99, img: 'https://media.geeksforgeeks.org/wp-content/cdn-uploads/20230318230239/Python-Data-Science-Tutorial.jpg' },
+    { id: 4, title: 'Java Masterclass', author: 'Roman S', type: 'Programming', level: 'Junior', price: 9.99, img: 'https://delta-dev-software.fr/wp-content/uploads/2023/10/java-hd-wallpaper-java-images-1024x614.jpg' },
+    { id: 5, title: 'Unreal Engine - C++', author: 'Yuri Popov', type: 'Game Dev', level: 'Middle', price: 10.99, img: 'https://tse2.mm.bing.net/th/id/OIP.xi-iuyaQmrP-0VFlB3mfZgHaEK?rs=1&pid=ImgDetMain&o=7&rm=3' },
+    { id: 6, title: 'Unity 2D Platformer', author: 'Anvar Abdusatarov', type: 'Game Dev', level: 'Junior', price: 9.99, img: 'https://th.bing.com/th/id/R.3d74254da9870098646ac98726cd6924?rik=C7cRmg4v7F5iYA&pid=ImgRaw&r=0' }
   ];
 
   const maxDataPrice = Math.ceil(Math.max(...allCourses.map(c => c.price)));
