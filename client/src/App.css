@@ -174,7 +174,7 @@ body.theme-dark .bg-light {
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* При наведении делаем чуть светлее */
+/* При наведении чуть светлее */
 body.theme-dark .btn-light:hover {
   background-color: rgba(255, 255, 255, 0.1) !important;
 }

@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { setUser } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
 
+/*
+  Auth:{token,tokenType} - будет приходить в ответе от бэка при регистрации/логине
+  Token:{userId,email,role} - содержание токена
+*/
+
+
 function SignUpPage() {
   const navigate = useNavigate();
   const { t } = useContext(SettingsContext);
@@ -42,12 +48,12 @@ function SignUpPage() {
 
           <div>
             <div className="mb-3">
-              <label htmlFor="fullName" className="form-label">{t('fullName')}</label>
+              <label htmlFor="nickName" className="form-label">{t('nickName')}</label>
               <input
                 type="text"
                 className="form-control form-control-lg"
-                id="fullName"
-                placeholder={t('fullName')}
+                id="nickName"
+                placeholder={t('nickName')}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
