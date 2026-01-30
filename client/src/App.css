@@ -167,6 +167,7 @@ body.theme-dark .card {
   border: 1px solid rgba(255,255,255,0.1);
 }
 
+/* Исправление белых кнопок (меню аккаунта) в темной теме */
 body.theme-dark .btn-light, 
 body.theme-dark .bg-light {
   background-color: rgba(255, 255, 255, 0.05) !important;
@@ -174,13 +175,45 @@ body.theme-dark .bg-light {
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* При наведении чуть светлее */
 body.theme-dark .btn-light:hover {
   background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Исправление футера карточки профиля (белая полоса снизу) */
 body.theme-dark .card-footer.bg-white {
   background-color: var(--card-bg) !important;
   border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* --- СТИЛИЗАЦИЯ НАВИГАЦИИ (NAVBAR) --- */
+
+/* Общие правила для ссылок в навбаре */
+.navbar-brand, .btn-link {
+  transition: color 0.2s ease-in-out;
+  text-decoration: none !important;
+}
+
+/* 1. СВЕТЛАЯ ТЕМА (Light Theme) */
+/* Стандартное состояние: Черный/Серый */
+.navbar-light .navbar-brand,
+.navbar-light .btn-link {
+  color: #212529 !important;
+}
+
+/* При наведении: Синий */
+.navbar-light .navbar-brand:hover,
+.navbar-light .btn-link:hover {
+  color: #0d6efd !important;
+}
+
+/* 2. ТЕМНАЯ ТЕМА (Dark Theme) */
+/* Стандартное состояние: Белый */
+body.theme-dark .navbar-dark .navbar-brand,
+body.theme-dark .navbar-dark .btn-link {
+  color: #ffffff !important;
+}
+
+/* При наведении: Ярко-синий (для контраста на темном) */
+body.theme-dark .navbar-dark .navbar-brand:hover,
+body.theme-dark .navbar-dark .btn-link:hover {
+  color: #58a6ff !important;
 }
