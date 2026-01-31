@@ -14,5 +14,6 @@ const controller = require('../controllers/auth')
 
 router.post('/login', controller.login)
 router.post('/register', controller.register)
+router.post('/validate', controller.validate)
 
 module.exports = router

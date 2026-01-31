@@ -1,4 +1,4 @@
-const mongoose = require('mongoose')
+const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const userSchema = new Schema({
@@ -27,7 +27,6 @@ const userSchema = new Schema({
     role: {
         ref: 'roles',
         type: Schema.Types.ObjectId,
-        default: '6976a61c9ff34d288d8de7f1',
         required: false
     },
     email: {
@@ -43,13 +42,18 @@ const userSchema = new Schema({
         type: String,
         required: false
     },
+    courses: [{
+        ref: 'courses',
+        type: Schema.Types.ObjectId,
+        required: false
+    }],
     createdAt: {
         type: Date,
-        default: Date.now
+        default: Date.now()
     },
     updatedAt: {
         type: Date,
-        default: Date.now
+        default: Date.now()
     }
 })
 

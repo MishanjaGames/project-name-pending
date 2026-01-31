@@ -37,7 +37,7 @@ module.exports.create = async (req, res) => {
 
     try {
         const role = await new Roles({
-            name: req.body.name,
+            roleName: req.body.roleName,
             accessLevel: req.body.accessLevel,
             createdAt: Date.now(),
             updatedAt: Date.now()
@@ -71,7 +71,7 @@ module.exports.remove = async (req, res) => {
 module.exports.update = async (req, res) => {
     try {
         const updatedRole = {
-            name: req.body.name,
+            roleName: req.body.roleName,
             accessLevel: req.body.accessLevel,
             updatedAt: Date.now()
         }

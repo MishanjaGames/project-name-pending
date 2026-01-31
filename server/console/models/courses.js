@@ -7,13 +7,20 @@ const courseSchema = new Schema({
         type: Schema.Types.ObjectId,
         required: true
     },
+    status:{
+        type: String,
+        enum: ['editing','on-check','deployed'],
+        required: false,
+        default: 'editing'
+    },
     title: {
         type: String,
         required: true
     },
     description: {
         type: String,
-        required: false
+        required: false,
+        default: ''
     },
     direction: {
         type: String,
@@ -34,11 +41,11 @@ const courseSchema = new Schema({
     }],
     createdAt: {
         type: Date,
-        default: Date.now
+        default: Date.now()
     },
     updatedAt: {
         type: Date,
-        default: Date.now
+        default: Date.now()
     }
 })
 

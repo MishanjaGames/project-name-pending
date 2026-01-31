@@ -1,5 +1,7 @@
 console/node_modules
-web-panel/node_modules
+web-t/node_modules
+web/node_modules
+
+web-panel01
 
 console/manual.txt
-web-panel01

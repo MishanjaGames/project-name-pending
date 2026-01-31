@@ -37,7 +37,6 @@ module.exports.create = async (req, res) => {
 
     try {
         const password = await utils.generatePasswordHash(req.body.password);
-        console.log(password.hash);
         const user = await new Users({
             email: req.body.email,
             passwordHash: password.hash,
@@ -83,6 +82,7 @@ module.exports.update = async (req, res) => {
             email: req.body.email,
             phone: req.body.phone,
             github: req.body.github,
+            courses: req.body.courses,
             updatedAt: Date.now()
         }
 
@@ -95,7 +95,8 @@ module.exports.update = async (req, res) => {
             },
             {
                 new: true
-            })
+            }
+        )
 
         res.status(200).json({ message: 'User updated successfully', data: user })
 
