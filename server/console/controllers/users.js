@@ -1,5 +1,5 @@
 const utils = require('../utils/utils')
-const Users = require('../models/users')
+const Users = require('../models/mongo.users')
 const errorHandler = require('../utils/errorHandler')
 
 module.exports.getCurrent = async (req, res) => {

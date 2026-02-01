@@ -1,10 +1,10 @@
 const mongo = require('mongoose')
-const config = require('../config/config')
+const config = require('../config/cfg')
 
 module.exports.use = () => {
     // mongo.createConnection(config.DB_URL, { dbName: "P_01" })
     console.log('DB_Module> LAUNCHING')
-    this.connect();
+    this.open();
     mongo.connection.on('connected', () => {
         console.log('DB_Module> STATUS: [CONNECTED]')
     })
@@ -17,7 +17,7 @@ module.exports.use = () => {
             console.log('DB_Module> STATUS: [DISCONNECTED]\n' +
                 'DB_Module> STATUS: [CONNECTING...]')
             global.db.status = 'reconnecting'
-            this.connect();
+            this.open();
         }
         else {
             console.log('DB_Module> STATUS: [DISCONNECTED]')
@@ -31,7 +31,7 @@ module.exports.use = () => {
     })
 }
 
-module.exports.connect = (url = config.DB_URL, options = { dbName: "P_01" }) => {
+module.exports.open = (url = config.DB_URL, options = { dbName: "P_01" }) => {
     mongo.connect(url, options)
         .catch(err => console.log('DB_Module> STATUS: ', err))
 }

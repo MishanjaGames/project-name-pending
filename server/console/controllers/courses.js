@@ -1,5 +1,5 @@
 const utils = require('../utils/utils')
-const Courses = require('../models/courses')
+const Courses = require('../models/mongo.courses')
 const errorHandler = require('../utils/errorHandler')
 
 // module.exports.getCurrent = async (req, res) => {

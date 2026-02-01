@@ -1,8 +1,8 @@
 const bcrypt = require('bcrypt')
-const User = require('../models/users')
-const Role = require('../models/roles')
+const User = require('../models/mongo.users')
+const Role = require('../models/mongo.roles')
 const errorHandler = require('../utils/errorHandler')
-const config = require('../config/config')
+const config = require('../config/cfg')
 const utils = require('../utils/utils')
 
 module.exports.login = async (req, res) => {

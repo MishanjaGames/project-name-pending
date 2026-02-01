@@ -31,9 +31,11 @@ function Main({ data, onLogout }) {
 
   const updateInfo = async () => {
     try {
-      const response = await fetch('http://localhost:4040/api/status', {
+      const loginData = localStorage.getItem('token')
+      const response = await fetch('http://localhost:4040/api/utils/status', {
         method: 'GET',
         headers: {
+          'Authorization': `${loginData.split(' ')[0]} ${loginData.split(' ')[1]}`,
           'Content-Type': 'application/json'
         }
       });

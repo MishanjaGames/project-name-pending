@@ -4,8 +4,9 @@ const path = require('path');
 // Dynamic store for API files
 const apiFilesStore = [
     {
-        fullPath: 'D:\\Files\\Education\\projects and else\\project-name-pending\\server\\console\\api\\mongo.js',
-        path: `../api/mongo`
+        config: '../config/cfg.mongo',
+        path: '../api/mongo',
+        fullPath: 'D:\\Files\\Education\\projects and else\\project-name-pending\\server\\console\\api\\mongo.js'
     }
 ];
 
@@ -14,11 +15,13 @@ const apiFilesStore = [
  * @param {string} index - Items index
  * @returns {Object|null} The imported module or null if not found
  */
-function useApi(index) {
+function useAPI(index=0) {
     const file = apiFilesStore[index];
     if (file && file.path) {
         try {
-            global.API = require(file.path)
+            global.API.name = path.basename(file.path)
+            global.API.config = file.config
+            global.API.module = require(file.path)
             return require(file.path);
         } catch (error) {
             console.error(`DB_Handler> Error importing module at index ${index}:`, error);
@@ -33,7 +36,7 @@ function useApi(index) {
  * Loads all files from the api folder and stores them with their file paths
  * @returns {Object} The populated store with all API files
  */
-function loadApi() {
+function loadAPI() {
     const apiFolderPath = path.join(__dirname, '../api');
 
     try {
@@ -75,7 +78,7 @@ function loadApi() {
  * @param {string} fileName - The name of the file (without .js extension)
  * @returns {Object|null} The file info object or null if not found
  */
-function getApi(fileName) {
+function getAPI(fileName) {
     return apiFilesStore[fileName] || null;
 }
 
@@ -83,7 +86,7 @@ function getApi(fileName) {
  * Gets all stored API files
  * @returns {Object} The entire store
  */
-function getAllApi() {
+function getAllAPI() {
     return apiFilesStore;
 }
 
@@ -92,7 +95,7 @@ function getAllApi() {
  * @param {string} fileName - The name of the file (without .js extension)
  * @returns {string|null} The file path or null if not found
  */
-function getApiPath(fileName) {
+function getAPIPath(fileName) {
     const file = apiFilesStore[fileName];
     return file ? file.filePath : null;
 }
@@ -101,15 +104,15 @@ function getApiPath(fileName) {
  * Gets all file paths from the store
  * @returns {Array} Array of file paths
  */
-function getAllApiPaths() {
+function getAllAPIPaths() {
     return Object.values(apiFilesStore).map(file => file.filePath);
 }
 
 module.exports = {
-    loadApi,
-    getApi,
-    getAllApi,
-    getApiPath,
-    getAllApiPaths,
-    useApi
+    loadAPI,
+    getAPI,
+    getAllAPI,
+    getAPIPath,
+    getAllAPIPaths,
+    useAPI
 };

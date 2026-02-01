@@ -1,5 +1,5 @@
 const utils = require('../utils/utils')
-const Roles = require('../models/roles')
+const Roles = require('../models/mongo.roles')
 const errorHandler = require('../utils/errorHandler')
 
 // module.exports.getCurrent = async (req, res) => {
