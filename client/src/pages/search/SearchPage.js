@@ -2,21 +2,25 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Slider from 'rc-slider';
 import 'rc-slider/assets/index.css';
-import { getUser, clearUser, setUser as setUserStorage } from '../../utils/auth';
+import { getUser, setUser as setUserStorage } from '../../utils/auth'; // clearUser убрал, если не используется
 import { SettingsContext } from '../../contexts/SettingsContext';
 import { useCart } from '../../contexts/CartContext';
-
-// Если курс не deployed - не показываем его в результатах поиска
+import { courseService } from '../../api/courseService'; // <--- Импортируем сервис
 
 function SearchPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState(getUser());
-  const { lang, setLang, theme, setTheme, t } = useContext(SettingsContext);
+  const { t } = useContext(SettingsContext);
   const { addItem } = useCart();
 
   // State for view mode: 'grid' or 'list'
   const [viewMode, setViewMode] = useState('grid');
+  
+  // --- НОВОЕ: Состояние для курсов ---
+  const [allCourses, setAllCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  // Проверка авторизации
   useEffect(() => {
     const u = getUser();
     if (!u) {
@@ -26,9 +30,38 @@ function SearchPage() {
     }
   }, []);
 
+  // --- НОВОЕ: Загрузка данных из сервиса ---
+  useEffect(() => {
+    const fetchCourses = async () => {
+      setLoading(true);
+      try {
+        const data = await courseService.getAll();
+        
+        // Маппинг данных (превращаем формат БД в формат, который ждет твой дизайн)
+        const mappedData = data.map(c => ({
+          id: c._id || c.id, // Важно для React ключей
+          title: c.title,
+          author: c.userId?.nickname || c.author || 'Unknown',
+          type: c.direction || 'Programming', // В базе 'direction', в дизайне 'type'
+          level: c.level,
+          price: Number(c.price),
+          img: c.img || c._tempImage // Берем картинку или заглушку
+        }));
+
+        setAllCourses(mappedData);
+      } catch (error) {
+        console.error("Error loading courses:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, []);
+
   const location = useLocation();
   
-  // Этот стейт теперь отвечает за ГЛАВНЫЙ поиск (по названию И автору)
+  // Этот стейт отвечает за поиск (по названию И автору)
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -66,20 +99,13 @@ function SearchPage() {
       case 'Programming': return 'bg-primary';
       case 'Data Science': return 'bg-info text-dark';
       case 'Game Dev': return 'bg-dark';
+      case 'Design': return 'bg-danger'; // Добавил Design, так как он есть в форме создания
       default: return 'bg-secondary';
     }
   };
 
-  const allCourses = [
-    { id: 1, title: 'C++: Complete Guide', author: 'Yuri Popov', type: 'Programming', level: 'Junior', price: 10.99, img: 'https://th.bing.com/th/id/OIP.ViNMzZEPRvADF6WtX6rQsgHaDt?w=326&h=175&c=7&r=0&o=7&pid=1.7&rm=3' },
-    { id: 2, title: 'Full JavaScript Course', author: 'Anna Ivanova', type: 'Programming', level: 'Middle', price: 9.99, img: 'https://miro.medium.com/v2/resize:fit:1200/1*LyZcwuLWv2FArOumCxobpA.png' },
-    { id: 3, title: 'Python for Data Science', author: 'John Doe', type: 'Data Science', level: 'Senior', price: 12.99, img: 'https://media.geeksforgeeks.org/wp-content/cdn-uploads/20230318230239/Python-Data-Science-Tutorial.jpg' },
-    { id: 4, title: 'Java Masterclass', author: 'Roman S', type: 'Programming', level: 'Junior', price: 9.99, img: 'https://delta-dev-software.fr/wp-content/uploads/2023/10/java-hd-wallpaper-java-images-1024x614.jpg' },
-    { id: 5, title: 'Unreal Engine - C++', author: 'Yuri Popov', type: 'Game Dev', level: 'Middle', price: 10.99, img: 'https://tse2.mm.bing.net/th/id/OIP.xi-iuyaQmrP-0VFlB3mfZgHaEK?rs=1&pid=ImgDetMain&o=7&rm=3' },
-    { id: 6, title: 'Unity 2D Platformer', author: 'Anvar Abdusatarov', type: 'Game Dev', level: 'Junior', price: 9.99, img: 'https://th.bing.com/th/id/R.3d74254da9870098646ac98726cd6924?rik=C7cRmg4v7F5iYA&pid=ImgRaw&r=0' }
-  ];
-
-  const maxDataPrice = Math.ceil(Math.max(...allCourses.map(c => c.price)));
+  // Вычисляем макс цену для слайдера на основе загруженных данных
+  const maxDataPrice = allCourses.length > 0 ? Math.ceil(Math.max(...allCourses.map(c => c.price))) : 100;
   const DEFAULT_MAX = maxDataPrice > 0 ? maxDataPrice : 100;
 
   const [typeFilter, setTypeFilter] = useState('all');
@@ -87,7 +113,14 @@ function SearchPage() {
   
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
-  const [sliderValues, setSliderValues] = useState([0, DEFAULT_MAX]);
+  const [sliderValues, setSliderValues] = useState([0, 1000]); // Временно ставим большой диапазон
+
+  // Обновляем слайдер, когда загрузились данные
+  useEffect(() => {
+    if (allCourses.length > 0) {
+      setSliderValues([0, DEFAULT_MAX]);
+    }
+  }, [allCourses, DEFAULT_MAX]);
 
   const clearFilters = () => {
     setSearchQuery('');
@@ -117,16 +150,20 @@ function SearchPage() {
     const normalizedTitle = normalize(c.title || '');
     const normalizedAuthor = normalize(c.author || '');
     
-    // ГЛАВНЫЙ ПОИСК: Ищет совпадение ИЛИ в названии, ИЛИ в авторе
+    // ГЛАВНЫЙ ПОИСК
     const searchMatch = nq === '' || normalizedTitle.includes(nq) || normalizedAuthor.includes(nq);
     
     const typeMatch = tf === 'all' || c.type === tf;
-    const levelMatch = lf === 'all' || c.level === lf;
+    const levelMatch = lf === 'all' || c.level?.toLowerCase() === lf.toLowerCase(); // Приводим к нижнему регистру для надежности
     
     const min = parseFloat(minPrice);
     const max = parseFloat(maxPrice);
-    const minMatch = isNaN(min) ? true : c.price >= min;
-    const maxMatch = isNaN(max) ? true : c.price <= max;
+    // Логика слайдера: берем значения из sliderValues, если инпуты пустые
+    const currentMin = minPrice !== '' ? min : sliderValues[0];
+    const currentMax = maxPrice !== '' ? max : sliderValues[1];
+
+    const minMatch = c.price >= currentMin;
+    const maxMatch = c.price <= currentMax;
     
     const matched = searchMatch && typeMatch && levelMatch && minMatch && maxMatch;
     return { id: c.id, matched };
@@ -143,7 +180,7 @@ function SearchPage() {
     const u = getUser();
     if (!u) { navigate('/login'); return; }
     u.enrolled = u.enrolled || [];
-    if (!u.enrolled.find(x => x.id === course.id)) {
+    if (!u.enrolled.find(x => String(x.id) === String(course.id))) {
       u.enrolled.push({ id: course.id, title: course.title, author: course.author, img: course.img });
       setUserStorage(u);
       setUser(u);
@@ -162,7 +199,7 @@ function SearchPage() {
     <div>
       <div className="container my-4">
         
-        {/* --- НОВАЯ БОЛЬШАЯ СТРОКА ПОИСКА (Под навбаром) --- */}
+        {/* --- ПОИСК --- */}
         <div className="row mb-4">
           <div className="col-12">
             <div className="input-group input-group-lg shadow-sm">
@@ -179,23 +216,21 @@ function SearchPage() {
             </div>
           </div>
         </div>
-        {/* -------------------------------------------------- */}
 
         <div className="row">
           
-          {/* SIDEBAR: Только фильтры (без полей ввода текста) */}
+          {/* SIDEBAR: Фильтры */}
           <aside className="col-12 col-md-4 col-lg-3 mb-4">
             <div className="card p-3 border-0 shadow-sm">
               <h6 className="mb-3 fw-bold text-uppercase text-muted small">{t('filters')}</h6>
               
-              {/* УДАЛЕНЫ ПОЛЯ Title И Author ОТСЮДА */}
-
               <label className="form-label small fw-bold">{t('type')}</label>
               <select className="form-select mb-3" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
                 <option value="all">{t('all')}</option>
                 <option value="Programming">Programming</option>
                 <option value="Data Science">Data Science</option>
                 <option value="Game Dev">Game Dev</option>
+                <option value="Design">Design</option>
               </select>
 
               <label className="form-label small fw-bold">Level</label>
@@ -283,95 +318,106 @@ function SearchPage() {
                 </button>
               </div>
             </div>
-
-            <div className="row g-4">
-              {filtered.map(course => (
-                <div key={course.id} className={viewMode === 'grid' ? "col-12 col-md-6 col-lg-4" : "col-12"}>
-                  
-                  {viewMode === 'grid' ? (
-                    // GRID VIEW CARD
-                    <div 
-                      className="card h-100 course-card border-0 shadow-sm" 
-                      onClick={() => handleCardClick(course.id)} 
-                      style={{ cursor: 'pointer' }} 
-                    >
-                      <div className="position-relative">
-                        <img src={course.img} className="card-img-top course-img" alt={course.title} style={gridImageStyle} />
-                        <div className="position-absolute top-0 end-0 p-2">
-                           <span className={`badge ${getLevelBadgeClass(course.level)} shadow-sm`}>{course.level}</span>
-                        </div>
-                      </div>
-                      
-                      <div className="card-body d-flex flex-column">
-                        <h6 className="card-title fw-bold mb-1">{course.title}</h6>
-                        <p className="text-muted small mb-2">{course.author}</p>
-                        
-                        <div className="mb-3">
-                          <span className={`badge ${getTypeBadgeClass(course.type)}`}>{course.type}</span>
-                        </div>
-                        
-                        <div className="mt-auto d-flex justify-content-between align-items-center">
-                          <div className="d-flex gap-2">
-                            <button className="btn btn-sm btn-primary rounded-pill px-3" onClick={(e) => handleEnroll(e, course)}>{t('enroll')}</button>
-                            <button className="btn btn-sm btn-light rounded-circle border" onClick={(e) => handleAddToCart(e, course)}><i className="bi bi-cart-plus text-primary"></i></button>
-                          </div>
-                          <div className="fw-bold fs-5">${course.price.toFixed(2)}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    // LIST VIEW CARD
-                    <div 
-                      className="card h-100 course-card border-0 shadow-sm"
-                      onClick={() => handleCardClick(course.id)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div className="row g-0 h-100">
-                        <div className="col-md-4 col-lg-3 position-relative">
-                           <img src={course.img} alt={course.title} style={listImageStyle} className="rounded-start course-img" />
-                           <div className="position-absolute top-0 start-0 p-2">
-                              <span className={`badge ${getLevelBadgeClass(course.level)} shadow-sm`}>{course.level}</span>
-                           </div>
-                        </div>
-                        <div className="col-md-8 col-lg-9">
-                          <div className="card-body d-flex flex-column h-100">
-                            <div className="d-flex justify-content-between align-items-start">
-                               <div>
-                                 <h5 className="card-title fw-bold mb-1">{course.title}</h5>
-                                 <p className="text-muted small mb-2">{course.author}</p>
-                                 <span className={`badge ${getTypeBadgeClass(course.type)}`}>{course.type}</span>
-                               </div>
-                               <div className="fw-bold fs-4 text-primary">${course.price.toFixed(2)}</div>
-                            </div>
-
-                            <p className="card-text text-muted mt-3 text-truncate">
-                               Comprehensive course covering all aspects of {course.title}. Perfect for {course.level} developers looking to upgrade their skills.
-                            </p>
-                            
-                            <div className="mt-auto d-flex gap-2">
-                              <button className="btn btn-sm btn-primary rounded-pill px-4" onClick={(e) => handleEnroll(e, course)}>{t('enroll')}</button>
-                              <button className="btn btn-sm btn-outline-secondary rounded-pill px-3" onClick={(e) => handleAddToCart(e, course)}>Add to cart</button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
+            
+            {/* Loading Indicator */}
+            {loading && (
+              <div className="text-center py-5">
+                <div className="spinner-border text-primary" role="status">
+                  <span className="visually-hidden">Loading...</span>
                 </div>
-              ))}
+              </div>
+            )}
 
-              {filtered.length === 0 && (
-                <div className="col-12">
-                  <div className="text-center py-5 text-muted">
-                    <i className="bi bi-search fs-1 mb-3 d-block opacity-50"></i>
-                    <h5>{t('noResults')}</h5>
-                    <p>Try adjusting your search or filters.</p>
-                    <button className="btn btn-outline-primary rounded-pill mt-2" onClick={clearFilters}>{t('clear')}</button>
+            {!loading && (
+              <div className="row g-4">
+                {filtered.map(course => (
+                  <div key={course.id} className={viewMode === 'grid' ? "col-12 col-md-6 col-lg-4" : "col-12"}>
+                    
+                    {viewMode === 'grid' ? (
+                      // GRID VIEW CARD
+                      <div 
+                        className="card h-100 course-card border-0 shadow-sm" 
+                        onClick={() => handleCardClick(course.id)} 
+                        style={{ cursor: 'pointer' }} 
+                      >
+                        <div className="position-relative">
+                          <img src={course.img} className="card-img-top course-img" alt={course.title} style={gridImageStyle} />
+                          <div className="position-absolute top-0 end-0 p-2">
+                             <span className={`badge ${getLevelBadgeClass(course.level)} shadow-sm`}>{course.level}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="card-body d-flex flex-column">
+                          <h6 className="card-title fw-bold mb-1">{course.title}</h6>
+                          <p className="text-muted small mb-2">{course.author}</p>
+                          
+                          <div className="mb-3">
+                            <span className={`badge ${getTypeBadgeClass(course.type)}`}>{course.type}</span>
+                          </div>
+                          
+                          <div className="mt-auto d-flex justify-content-between align-items-center">
+                            <div className="d-flex gap-2">
+                              <button className="btn btn-sm btn-primary rounded-pill px-3" onClick={(e) => handleEnroll(e, course)}>{t('enroll')}</button>
+                              <button className="btn btn-sm btn-light rounded-circle border" onClick={(e) => handleAddToCart(e, course)}><i className="bi bi-cart-plus text-primary"></i></button>
+                            </div>
+                            <div className="fw-bold fs-5">${course.price.toFixed(2)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      // LIST VIEW CARD
+                      <div 
+                        className="card h-100 course-card border-0 shadow-sm"
+                        onClick={() => handleCardClick(course.id)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <div className="row g-0 h-100">
+                          <div className="col-md-4 col-lg-3 position-relative">
+                             <img src={course.img} alt={course.title} style={listImageStyle} className="rounded-start course-img" />
+                             <div className="position-absolute top-0 start-0 p-2">
+                                <span className={`badge ${getLevelBadgeClass(course.level)} shadow-sm`}>{course.level}</span>
+                             </div>
+                          </div>
+                          <div className="col-md-8 col-lg-9">
+                            <div className="card-body d-flex flex-column h-100">
+                              <div className="d-flex justify-content-between align-items-start">
+                                 <div>
+                                   <h5 className="card-title fw-bold mb-1">{course.title}</h5>
+                                   <p className="text-muted small mb-2">{course.author}</p>
+                                   <span className={`badge ${getTypeBadgeClass(course.type)}`}>{course.type}</span>
+                                 </div>
+                                 <div className="fw-bold fs-4 text-primary">${course.price.toFixed(2)}</div>
+                              </div>
+  
+                              <p className="card-text text-muted mt-3 text-truncate">
+                                 Comprehensive course covering all aspects of {course.title}. Perfect for {course.level} developers looking to upgrade their skills.
+                              </p>
+                              
+                              <div className="mt-auto d-flex gap-2">
+                                <button className="btn btn-sm btn-primary rounded-pill px-4" onClick={(e) => handleEnroll(e, course)}>{t('enroll')}</button>
+                                <button className="btn btn-sm btn-outline-secondary rounded-pill px-3" onClick={(e) => handleAddToCart(e, course)}>Add to cart</button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+  
                   </div>
-                </div>
-              )}
-            </div>
+                ))}
+  
+                {filtered.length === 0 && (
+                  <div className="col-12">
+                    <div className="text-center py-5 text-muted">
+                      <i className="bi bi-search fs-1 mb-3 d-block opacity-50"></i>
+                      <h5>{t('noResults')}</h5>
+                      <p>Try adjusting your search or filters.</p>
+                      <button className="btn btn-outline-primary rounded-pill mt-2" onClick={clearFilters}>{t('clear')}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </main>
         </div>
       </div>

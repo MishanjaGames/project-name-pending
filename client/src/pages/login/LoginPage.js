@@ -11,11 +11,20 @@ function LoginPage() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    // Create a demo user and store it
-    const demoUser = { name: email.split('@')[0] || 'User', email, enrolled: [] };
+    
+    // ДЛЯ ТЕСТА РОЛЕЙ:
+    // Если в email есть слово "teacher", даем роль учителя.
+    // Пример: teacher@test.com -> зайдет как Teacher
+    const isTeacher = email.includes('teacher');
+    
+    const demoUser = { 
+      name: email.split('@')[0] || 'User', 
+      email, 
+      role: isTeacher ? 'teacher' : 'user',
+      enrolled: [] 
+    };
+    
     setUser(demoUser);
-    console.log('Login:', demoUser);
-    // navigate to search page
     navigate('/search');
   };
 

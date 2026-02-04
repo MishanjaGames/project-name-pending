@@ -11,6 +11,7 @@ import CartPage from './pages/cart/CartPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import NavBar from './components/NavBar';
 import CoursePage from './pages/course/CoursePage';
+import EditCoursePage from './pages/course/EditCoursePage';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { CartProvider } from './contexts/CartContext';
 
@@ -32,6 +33,7 @@ function App() {
             <Route path="/instructor/add-course" element={<AddCoursePage />} />
             <Route path="/course/:id" element={<CoursePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/instructor/edit-course/:id" element={<EditCoursePage />} />
           </Routes>
         </BrowserRouter>
       </CartProvider>
