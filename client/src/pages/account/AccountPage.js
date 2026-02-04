@@ -8,18 +8,26 @@ function AccountPage() {
   const navigate = useNavigate();
   const { t } = useContext(SettingsContext);
   
-  const [user] = (function(){ try { return [getUser()]; } catch { return [null]; } })();
+  const [user] = (function(){ try { return [getUser()]; } catch (e) { return [null]; } })();
   const [createdCourses, setCreatedCourses] = useState([]);
+  const [stats, setStats] = useState({ courseCount: 0, linkCount: 0 }); // Стейт для статистики
 
-  // Загружаем созданные курсы, если юзер учитель
+  // Загружаем созданные курсы и считаем статистику, если юзер учитель
   useEffect(() => {
     if (user && (user.role === 'teacher' || user.isTeacher)) {
       courseService.getAll().then(allCourses => {
-        // Фильтруем: ищем курсы, где автор ID или автор Name совпадает
+        // Фильтруем курсы текущего пользователя
         const myCourses = allCourses.filter(c => 
           c.userId._id === user.id || c.userId.nickname === user.name
         );
         setCreatedCourses(myCourses);
+
+        // Считаем количество уроков (ссылок) во всех курсах автора
+        const totalLinks = myCourses.reduce((sum, course) => sum + (course.links?.length || 0), 0);
+        setStats({
+          courseCount: myCourses.length,
+          linkCount: totalLinks
+        });
       });
     }
   }, [user]);
@@ -67,7 +75,7 @@ function AccountPage() {
                 </span>
               </div>
             </div>
-            {/* Stats */}
+            {/* Основная статистика (Enrolled/Created) */}
             <div className="card-footer bg-white border-0 p-3 d-flex justify-content-around">
                <div className="text-center">
                  <div className="fw-bold fs-5">{enrollments.length}</div>
@@ -75,23 +83,41 @@ function AccountPage() {
                </div>
                {(user.role === 'teacher' || user.isTeacher) && (
                  <div className="text-center">
-                   <div className="fw-bold fs-5">{createdCourses.length}</div>
+                   <div className="fw-bold fs-5">{stats.courseCount}</div>
                    <div className="text-muted small" style={{ fontSize: '0.75rem' }}>CREATED</div>
                  </div>
                )}
             </div>
           </div>
 
+          {/* ДОПОЛНИТЕЛЬНАЯ СТАТИСТИКА (Вместо пустых прямоугольников) */}
+          {(user.role === 'teacher' || user.isTeacher) && (
+            <div className="row g-3 mb-4">
+              <div className="col-6">
+                <div className="card border-0 shadow-sm bg-success bg-opacity-75 text-white p-3 text-center">
+                  <div className="fs-3 fw-bold">{stats.courseCount}</div>
+                  <div className="small text-uppercase" style={{ fontSize: '0.65rem' }}>My Courses</div>
+                </div>
+              </div>
+              <div className="col-6">
+                <div className="card border-0 shadow-sm bg-danger bg-opacity-75 text-white p-3 text-center">
+                  <div className="fs-3 fw-bold">{stats.linkCount}</div>
+                  <div className="small text-uppercase" style={{ fontSize: '0.65rem' }}>Total Lessons</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Menu */}
           <div className="card border-0 shadow-sm">
             <div className="card-body p-3">
               <div className="d-grid gap-2">
                 {(user.role === 'teacher' || user.isTeacher) ? (
-                  <button className="btn btn-success bg-opacity-10 text-success border-0 text-start p-3 rounded-3 d-flex align-items-center" onClick={() => navigate('/instructor/add-course')}>
-                    <i className="bi bi-plus-circle-fill me-3 fs-5"></i>
-                    <div>
+                  <button className="btn btn-success border-0 text-start p-3 rounded-3 d-flex align-items-center shadow-sm" onClick={() => navigate('/instructor/add-course')}>
+                    <i className="bi bi-plus-circle-fill me-3 fs-5 text-white"></i>
+                    <div className="text-white">
                       <div className="fw-bold">{t('course.addCourseButton')}</div>
-                      <div className="small opacity-75">Create new content</div>
+                      <div className="small text-white-50">Create new content</div>
                     </div>
                   </button>
                 ) : (
@@ -104,7 +130,7 @@ function AccountPage() {
                   </button>
                 )}
                 
-                {/* DEV BUTTON: GRANT ROLE */}
+                {/* Кнопка для разработчика */}
                 {user.role !== 'teacher' && (
                   <button className="btn btn-light text-start p-3 rounded-3 d-flex align-items-center" onClick={() => {
                       if (!window.confirm(t('teacher.confirmGrant'))) return;
@@ -116,9 +142,9 @@ function AccountPage() {
                 )}
 
                 <hr className="my-2 opacity-50"/>
-                <button className="btn btn-danger bg-opacity-10 text-danger border-0 text-start p-3 rounded-3 d-flex align-items-center" onClick={handleLogout}>
-                   <i className="bi bi-box-arrow-right me-3 fs-5"></i>
-                   <span className="fw-bold">{t('logout')}</span>
+                <button className="btn btn-danger border-0 text-start p-3 rounded-3 d-flex align-items-center shadow-sm" onClick={handleLogout}>
+                  <i className="bi bi-box-arrow-right me-3 fs-5 text-white"></i>
+                  <span className="fw-bold text-white">{t('logout')}</span>
                 </button>
               </div>
             </div>
@@ -128,7 +154,7 @@ function AccountPage() {
         {/* RIGHT COLUMN */}
         <div className="col-12 col-lg-8">
           
-          {/* Блок созданных курсов (ТОЛЬКО ДЛЯ УЧИТЕЛЯ) */}
+          {/* Блок созданных курсов */}
           {(user.role === 'teacher' || user.isTeacher) && (
             <div className="card border-0 shadow-sm mb-4">
               <div className="card-header bg-transparent border-0 pt-4 px-4">
@@ -167,8 +193,6 @@ function AccountPage() {
                                <span>${c.price}</span>
                             </div>
                           </div>
-                          
-                          {/* --- ВОТ СЮДА МЫ ВСТАВИЛИ НОВЫЙ БЛОК КНОПОК --- */}
                           <div className="d-flex gap-2">
                             <button 
                               className="btn btn-sm btn-outline-secondary" 
@@ -180,7 +204,6 @@ function AccountPage() {
                             >
                                <i className="bi bi-pencil"></i>
                             </button>
-
                             <button 
                               className="btn btn-sm btn-outline-danger" 
                               onClick={(e) => { 
@@ -196,8 +219,6 @@ function AccountPage() {
                                <i className="bi bi-trash"></i>
                             </button>
                           </div>
-                          {/* --- КОНЕЦ ВСТАВКИ --- */}
-
                         </div>
                       </div>
                     ))}
@@ -207,7 +228,7 @@ function AccountPage() {
             </div>
           )}
 
-          {/* Блок купленных курсов (My Learning) */}
+          {/* Блок купленных курсов */}
           <div className="card border-0 shadow-sm">
              <div className="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
                 <h5 className="fw-bold mb-0">My Learning</h5>

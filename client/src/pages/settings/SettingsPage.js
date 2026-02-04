@@ -1,155 +1,74 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUser, setUser } from '../../utils/auth';
+import { getUser, setUser as setUserStorage } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
 
-function SettingsPage() {
+export default function SettingsPage() {
+  const { t } = useContext(SettingsContext);
   const navigate = useNavigate();
-  const { theme, setTheme, t } = useContext(SettingsContext);
-  const [user, setUserState] = useState(() => getUser() || { name: '', email: '' });
-  
-  const [name, setName] = useState(user.name || '');
-  const [email, setEmail] = useState(user.email || '');
-  const [localTheme, setLocalTheme] = useState(theme || 'light');
+  const user = getUser();
 
-  useEffect(() => {
-    setLocalTheme(theme);
-  }, [theme]);
+  // Инициализируем стейт полями из схемы mongo.users.js
+  const [formData, setFormData] = useState({
+    nickname: user?.name || '',
+    email: user?.email || '',
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    phone: user?.phone || '',
+    github: user?.github || ''
+  });
 
-  const save = () => {
-    const updated = { ...(user || {}), name, email };
-    setUser(updated);
-    setUserState(updated);
-    
-    setTheme(localTheme);
-    
-    alert(t('Settings saved') || 'Settings saved');
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    // Обновляем данные в localStorage
+    const updatedUser = { ...user, ...formData, name: formData.nickname };
+    setUserStorage(updatedUser);
+    alert('Profile updated successfully!');
+    navigate('/account');
   };
 
   return (
-    <div className="container py-5" style={{ maxWidth: '800px' }}>
-      
-      {/* HEADER */}
-      <div className="d-flex justify-content-between align-items-center mb-5">
-        <div>
-          <h2 className="fw-bold mb-1">{t('settings')}</h2>
-          <p className="text-muted mb-0">Manage your profile and preferences</p>
-        </div>
-        <button className="btn btn-outline-secondary rounded-pill px-4" onClick={() => navigate(-1)}>
-          <i className="bi bi-arrow-left me-2"></i> Back
-        </button>
-      </div>
-
-      <div className="row g-4">
-        
-        {/* LEFT COLUMN: PROFILE */}
-        <div className="col-12 col-md-7">
-          <div className="card border-0 shadow-sm h-100">
-            <div className="card-header bg-transparent border-0 pt-4 px-4 pb-0">
-              <h5 className="fw-bold mb-0">
-                <i className="bi bi-person-vcard me-2 text-primary"></i> 
-                Profile Information
-              </h5>
+    <div className="container py-5" style={{ maxWidth: '600px' }}>
+      <div className="card border-0 shadow-sm p-4">
+        <h3 className="fw-bold mb-4">{t('settings')}</h3>
+        <form onSubmit={handleSave}>
+          <div className="row g-3">
+            <div className="col-md-6">
+              <label className="form-label small fw-bold">Nickname</label>
+              <input name="nickname" className="form-control" value={formData.nickname} onChange={handleChange} />
             </div>
-            <div className="card-body p-4">
-              <div className="mb-3">
-                <label className="form-label text-muted small fw-bold text-uppercase">Full Name</label>
-                <div className="input-group">
-                  <span className="input-group-text border-end-0"><i className="bi bi-person"></i></span>
-                  <input 
-                    className="form-control border-start-0 ps-0" 
-                    value={name} 
-                    onChange={(e) => setName(e.target.value)} 
-                    placeholder="John Doe"
-                  />
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="form-label text-muted small fw-bold text-uppercase">Email Address</label>
-                <div className="input-group">
-                  <span className="input-group-text border-end-0"><i className="bi bi-envelope"></i></span>
-                  <input 
-                    className="form-control border-start-0 ps-0" 
-                    value={email} 
-                    onChange={(e) => setEmail(e.target.value)} 
-                    placeholder="name@example.com"
-                  />
-                </div>
-              </div>
-
-              <div className="d-flex gap-2">
-                <button className="btn btn-primary px-4 rounded-pill shadow-sm" onClick={save}>
-                  <i className="bi bi-check-lg me-2"></i> Save Changes
-                </button>
-                <button 
-                  className="btn btn-light px-4 rounded-pill" 
-                  onClick={() => { setName(user.name || ''); setEmail(user.email || ''); setLocalTheme(theme); }}
-                >
-                  Reset
-                </button>
-              </div>
+            <div className="col-md-6">
+              <label className="form-label small fw-bold">Email</label>
+              <input name="email" className="form-control" value={formData.email} disabled />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label small fw-bold">First Name</label>
+              <input name="firstName" className="form-control" value={formData.firstName} onChange={handleChange} />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label small fw-bold">Last Name</label>
+              <input name="lastName" className="form-control" value={formData.lastName} onChange={handleChange} />
+            </div>
+            <div className="col-12">
+              <label className="form-label small fw-bold">Phone Number</label>
+              <input name="phone" className="form-control" value={formData.phone} onChange={handleChange} placeholder="+380..." />
+            </div>
+            <div className="col-12">
+              <label className="form-label small fw-bold">GitHub Profile (URL)</label>
+              <input name="github" className="form-control" value={formData.github} onChange={handleChange} />
             </div>
           </div>
-        </div>
-
-        {/* RIGHT COLUMN: APPEARANCE */}
-        <div className="col-12 col-md-5">
-          <div className="card border-0 shadow-sm h-100">
-            <div className="card-header bg-transparent border-0 pt-4 px-4 pb-0">
-              <h5 className="fw-bold mb-0">
-                <i className="bi bi-palette me-2 text-primary"></i> 
-                Appearance
-              </h5>
-            </div>
-            <div className="card-body p-4">
-              <label className="form-label text-muted small fw-bold text-uppercase">Interface Theme</label>
-              
-              <div className="d-grid gap-2">
-                <div 
-                  className={`btn text-start p-3 border ${localTheme === 'light' ? 'border-primary bg-primary bg-opacity-10' : ''}`}
-                  onClick={() => setLocalTheme('light')}
-                  style={{ borderRadius: '12px', cursor: 'pointer' }}
-                >
-                  <div className="d-flex align-items-center">
-                    <i className="bi bi-sun fs-4 me-3 text-warning"></i>
-                    <div>
-                      <div className="fw-bold">Light Mode</div>
-                      <div className="small text-muted">Default clear look</div>
-                    </div>
-                    {localTheme === 'light' && <i className="bi bi-check-circle-fill ms-auto text-primary"></i>}
-                  </div>
-                </div>
-
-                <div 
-                  className={`btn text-start p-3 border ${localTheme === 'dark' ? 'border-primary bg-primary bg-opacity-10' : ''}`}
-                  onClick={() => setLocalTheme('dark')}
-                  style={{ borderRadius: '12px', cursor: 'pointer' }}
-                >
-                  <div className="d-flex align-items-center">
-                    <i className="bi bi-moon-stars fs-4 me-3 text-info"></i>
-                    <div>
-                      <div className="fw-bold">Dark Mode</div>
-                      <div className="small text-muted">Easy on the eyes</div>
-                    </div>
-                    {localTheme === 'dark' && <i className="bi bi-check-circle-fill ms-auto text-primary"></i>}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 pt-3 border-top">
-                <small className="text-muted d-block lh-sm">
-                  <i className="bi bi-info-circle me-1"></i>
-                  Theme updates are applied immediately after clicking "Save Changes".
-                </small>
-              </div>
-            </div>
+          <div className="d-flex justify-content-end gap-2 mt-4">
+            <button type="button" className="btn btn-light" onClick={() => navigate('/account')}>Cancel</button>
+            <button type="submit" className="btn btn-primary px-4">Save Changes</button>
           </div>
-        </div>
-        
+        </form>
       </div>
     </div>
   );
 }
-
-export default SettingsPage;

@@ -12,6 +12,7 @@ import SettingsPage from './pages/settings/SettingsPage';
 import NavBar from './components/NavBar';
 import CoursePage from './pages/course/CoursePage';
 import EditCoursePage from './pages/course/EditCoursePage';
+import ProtectedRoute from './components/ProtectedRoute';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { CartProvider } from './contexts/CartContext';
 
@@ -30,10 +31,24 @@ function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/apply-teacher" element={<TeacherRegisterPage />} />
-            <Route path="/instructor/add-course" element={<AddCoursePage />} />
+            <Route 
+              path="/instructor/add-course" 
+              element={
+                <ProtectedRoute roleRequired="teacher">
+                  <AddCoursePage />
+                </ProtectedRoute>
+              } 
+            />
             <Route path="/course/:id" element={<CoursePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
-            <Route path="/instructor/edit-course/:id" element={<EditCoursePage />} />
+            <Route 
+              path="/instructor/edit-course/:id" 
+              element={
+                <ProtectedRoute roleRequired="teacher">
+                  <EditCoursePage />
+                </ProtectedRoute>
+              } 
+            />
           </Routes>
         </BrowserRouter>
       </CartProvider>
