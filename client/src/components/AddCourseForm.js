@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SettingsContext } from '../contexts/SettingsContext';
 import { getUser } from '../utils/auth';
@@ -18,6 +18,28 @@ export default function AddCourseForm() {
     links: ''
   });
 
+  const [imgFile, setImgFile] = useState(null);
+  const [imgPreview, setImgPreview] = useState('');
+  const [videoFiles, setVideoFiles] = useState([null]);
+  const [videoPreviews, setVideoPreviews] = useState(['']);
+  const [learnList, setLearnList] = useState(['']);
+  const imgRef = useRef(null);
+  const videoUrlsRef = useRef([]);
+
+  useEffect(() => {
+    return () => {
+      // revoke object URLs
+      if (videoUrlsRef.current.length) {
+        videoUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
+        videoUrlsRef.current = [];
+      }
+      if (imgRef.current) {
+        URL.revokeObjectURL(imgRef.current);
+        imgRef.current = null;
+      }
+    };
+  }, []);
+
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
@@ -25,12 +47,103 @@ export default function AddCourseForm() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleImageSelect = (e) => {
+    const file = e.target.files && e.target.files[0];
+    setImgFile(file || null);
+    if (imgRef.current) { URL.revokeObjectURL(imgRef.current); imgRef.current = null; }
+    if (file) {
+      const obj = URL.createObjectURL(file);
+      imgRef.current = obj;
+      setImgPreview(obj);
+    } else {
+      setImgPreview('');
+    }
+  };
+
+  const handleVideoSelect = (index, e) => {
+    const file = e.target.files && e.target.files[0];
+    setVideoFiles(prev => {
+      const copy = prev.slice();
+      copy[index] = file || null;
+      return copy;
+    });
+
+    setVideoPreviews(prev => {
+      const copy = prev.slice();
+      // revoke old preview if blob
+      if (copy[index] && copy[index].startsWith && copy[index].startsWith('blob:')) {
+        try { URL.revokeObjectURL(copy[index]); } catch(_) {}
+      }
+      if (file) {
+        const obj = URL.createObjectURL(file);
+        copy[index] = obj;
+      } else {
+        copy[index] = '';
+      }
+      return copy;
+    });
+  };
+
+  const addVideoItem = () => {
+    setVideoFiles(prev => ([...prev, null]));
+    setVideoPreviews(prev => ([...prev, '']));
+  };
+
+  const removeVideoItem = (index) => {
+    setVideoFiles(prev => prev.filter((_,i)=>i!==index));
+    setVideoPreviews(prev => {
+      const copy = prev.slice();
+      if (copy[index] && copy[index].startsWith && copy[index].startsWith('blob:')) {
+        try { URL.revokeObjectURL(copy[index]); } catch(_) {}
+      }
+      copy.splice(index,1);
+      return copy;
+    });
+  };
+
+  const handleLearnChange = (index, value) => {
+    setLearnList(prev => prev.map((v,i) => i===index?value:v));
+  };
+
+  const addLearnItem = () => setLearnList(prev => ([...prev, '']));
+  const removeLearnItem = (index) => setLearnList(prev => prev.filter((_,i)=>i!==index));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     
     try {
-      await courseService.create(formData, user);
+      // Convert files to Data URLs to simulate upload in mock service
+      const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+        if (!file) return resolve(null);
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const dataToSend = { ...formData };
+      // attach learn list
+      dataToSend.whatYouWillLearn = learnList.filter(s => s && s.trim());
+
+      if (imgFile) {
+        dataToSend._tempImage = await fileToDataUrl(imgFile);
+      }
+
+      // handle multiple videos: convert selected files to data URLs
+      const videosToSave = [];
+      for (let i=0;i<videoPreviews.length;i++) {
+        const file = videoFiles[i];
+        if (file) {
+          const data = await fileToDataUrl(file);
+          videosToSave.push(data);
+        } else if (videoPreviews[i]) {
+          videosToSave.push(videoPreviews[i]);
+        }
+      }
+      if (videosToSave.length) dataToSend._tempVideos = videosToSave;
+
+      await courseService.create(dataToSend, user);
       alert(t('course.success') || 'Course created successfully!');
       navigate('/account');
     } catch (error) {
@@ -115,7 +228,7 @@ export default function AddCourseForm() {
       </div>
 
       {/* Links */}
-      <div className="mb-4">
+      {/* <div className="mb-4">
         <label className="form-label">Materials/Links (comma separated)</label>
         <input 
           name="links" 
@@ -124,7 +237,81 @@ export default function AddCourseForm() {
           value={formData.links} 
           onChange={handleChange} 
         />
-        <div className="form-text">Paste URLs to videos or repositories.</div>
+        <div className="form-text small text-muted">Paste URLs to videos or repositories.</div>
+      </div> */}
+      {/* Upload cover image */}
+      <div className="mb-3">
+        <label className="form-label fw-bold">Upload cover image</label>
+        <input type="file" accept="image/*" className="form-control" onChange={handleImageSelect} />
+        <div className="form-text small text-muted">Select an image file from your computer.</div>
+      </div>
+      {/* Image Preview */}
+      <div className="mb-4">
+        <label className="form-label">Image Preview</label>
+        <div 
+          className='rounded shadow-sm overflow-hidden border d-flex align-items-center justify-content-center'
+          style={{
+            minHeight: '120px',
+            height: 'auto', 
+            alignItems: 'center', 
+            display: 'flex', 
+            justifyContent: 'center', 
+            backgroundColor: '#2a2a2a'  
+          }}
+        >
+          {imgPreview ? (
+            <img 
+              src={imgPreview}
+              alt="Course Preview"
+              className="img-fluid w-100 h-100"
+              style={{height: 'auto', display: 'block'}}
+              onError={(e) => {e.target.src = 'https://www.freeiconspng.com/uploads/error-icon-15.png'}}
+            />
+          ) : (
+            <div className="text-center text-secondary">
+              <i className="bi bi-image fs-2 d-block"></i>
+              <span style={{fontSize: '0.7rem'}}>No image uploaded</span>
+            </div>
+          )}
+        </div>
+      </div>  
+
+      {/* Video upload */}
+      <div className="mb-4">
+        <label className="form-label fw-bold">Lesson videos</label>
+        <div className="d-grid gap-3 mb-3">
+          {videoPreviews.map((preview, idx) => (
+            <div key={idx} className="border rounded p-3" style={{backgroundColor: '#2a2a2a'}}>
+              <div className="mb-2 d-flex justify-content-between align-items-center">
+                <small className="text-secondary">Video #{idx + 1}</small>
+                <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => removeVideoItem(idx)} disabled={videoPreviews.length === 1}>Remove</button>
+              </div>
+              <input type="file" accept="video/*" className="form-control form-control-dark mb-2" onChange={(e) => handleVideoSelect(idx, e)} />
+              {preview ? (
+                <video src={preview} controls style={{width: '100%', maxHeight: '240px'}} />
+              ) : (
+                <div className="text-secondary small text-center py-4">
+                  <i className="bi bi-film"></i> Select a video file
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <button type="button" className="btn btn-sm btn-outline-primary" onClick={addVideoItem}>Add video</button>
+      </div>
+
+      {/* What you'll learn editor */}
+      <div className="mb-4">
+        <label className="form-label fw-bold">What you'll learn</label>
+        <div className="d-grid gap-2">
+          {learnList.map((item, idx) => (
+            <div className="input-group" key={idx}>
+              <input type="text" className="form-control" value={item} onChange={(e)=>handleLearnChange(idx, e.target.value)} placeholder={`Point ${idx+1}`} />
+              <button type="button" className="btn btn-outline-danger" onClick={()=>removeLearnItem(idx)} disabled={learnList.length===1}>Remove</button>
+            </div>
+          ))}
+          <button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={addLearnItem}>Add point</button>
+        </div>
       </div>
 
       <div className="d-flex justify-content-end gap-2">

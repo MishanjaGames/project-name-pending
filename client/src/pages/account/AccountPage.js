@@ -16,10 +16,17 @@ function AccountPage() {
   useEffect(() => {
     if (user && (user.role === 'teacher' || user.isTeacher)) {
       courseService.getAll().then(allCourses => {
-        // Фильтруем курсы текущего пользователя
-        const myCourses = allCourses.filter(c => 
-          c.userId._id === user.id || c.userId.nickname === user.name
-        );
+        // Фильтруем курсы текущего пользователя.
+        // Сопоставляем по id (если есть) или по nickname (для старых записей).
+        const myCourses = allCourses.filter(c => {
+          const courseOwnerId = String(c.userId?._id || c.userId || '');
+          const currentUserId = String(user._id || user.id || user.email || '');
+          const sameById = courseOwnerId && courseOwnerId === currentUserId;
+          const courseOwnerNick = String(c.userId?.nickname || '').toLowerCase();
+          const userName = String(user.name || '').toLowerCase();
+          const sameByNick = courseOwnerNick && courseOwnerNick === userName;
+          return sameById || sameByNick;
+        });
         setCreatedCourses(myCourses);
 
         // Считаем количество уроков (ссылок) во всех курсах автора
@@ -89,24 +96,6 @@ function AccountPage() {
                )}
             </div>
           </div>
-
-          {/* ДОПОЛНИТЕЛЬНАЯ СТАТИСТИКА (Вместо пустых прямоугольников) */}
-          {(user.role === 'teacher' || user.isTeacher) && (
-            <div className="row g-3 mb-4">
-              <div className="col-6">
-                <div className="card border-0 shadow-sm bg-success bg-opacity-75 text-white p-3 text-center">
-                  <div className="fs-3 fw-bold">{stats.courseCount}</div>
-                  <div className="small text-uppercase" style={{ fontSize: '0.65rem' }}>My Courses</div>
-                </div>
-              </div>
-              <div className="col-6">
-                <div className="card border-0 shadow-sm bg-danger bg-opacity-75 text-white p-3 text-center">
-                  <div className="fs-3 fw-bold">{stats.linkCount}</div>
-                  <div className="small text-uppercase" style={{ fontSize: '0.65rem' }}>Total Lessons</div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Menu */}
           <div className="card border-0 shadow-sm">

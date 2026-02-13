@@ -7,7 +7,10 @@ export function getUser() {
 }
 
 export function setUser(user) {
-  localStorage.setItem('user', JSON.stringify(user));
+  // Ensure mock user has an id field used by other parts of the app
+  const idVal = user._id || user.id || user.email || ('u_' + Date.now());
+  const normalized = { ...user, _id: idVal, id: idVal };
+  localStorage.setItem('user', JSON.stringify(normalized));
 }
 
 export function promoteToTeacher() {

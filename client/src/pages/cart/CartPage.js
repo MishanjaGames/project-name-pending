@@ -28,6 +28,14 @@ function CartPage() {
     }
   };
 
+  const checkoutHandler = () => {
+  const userData = prompt(`Enter your payment details for $${finalPrice.toFixed(2)}:`);
+  
+  if (userData) {
+    console.log("User entered:", userData);
+    alert("Payment successful! (Simulated)");
+  }
+};
   // Итоговая цена
   const finalPrice = Math.max(0, totalPrice - autoDiscountAmount - promoDiscount);
 
@@ -204,7 +212,7 @@ function CartPage() {
 
                 <button 
                   className="btn btn-primary w-100 py-3 rounded-pill shadow fw-bold mb-3" 
-                  onClick={() => alert(`Checkout for $${finalPrice.toFixed(2)} not implemented`)}
+                  onClick={() => checkoutHandler()}
                 >
                   Checkout Now
                 </button>

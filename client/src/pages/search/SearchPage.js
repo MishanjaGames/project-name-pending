@@ -341,7 +341,7 @@ function SearchPage() {
                         style={{ cursor: 'pointer' }} 
                       >
                         <div className="position-relative">
-                          <img src={course.img} className="card-img-top course-img" alt={course.title} style={gridImageStyle} />
+                          <img src={course.img} className="card-img-top course-img" alt={course.title} style={gridImageStyle} onError={(e) => { e.target.src = 'https://via.placeholder.com/300x200?text=No+Image'; }} />
                           <div className="position-absolute top-0 end-0 p-2">
                              <span className={`badge ${getLevelBadgeClass(course.level)} shadow-sm`}>{course.level}</span>
                           </div>

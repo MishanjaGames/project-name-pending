@@ -1,9 +1,9 @@
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let COURSES = [
-  // --- КУРСЫ, КОТОРЫЕ ЕСТЬ В ПОИСКЕ/НА ГЛАВНОЙ ---
+  // --- КУРСЫ ---
   { 
-    _id: '1', // ID как строка для надежности
+    _id: '1',
     userId: { _id: 'u1', nickname: 'Yuri Popov' }, 
     status: 'deployed',
     title: 'C++: Complete Guide', 
@@ -25,7 +25,7 @@ let COURSES = [
     level: 'middle', 
     price: 9.99, 
     links: [],
-    _tempImage: 'https://images.unsplash.com/photo-1627398242450-270fc0780444?w=500&q=80',
+    _tempImage: 'https://cdn.cases.media/image/wide/a48810a2-e1fc-4ccd-ba88-9fcf143f3855.png',
     createdAt: new Date().toISOString()
   },
   { 
@@ -81,7 +81,7 @@ let COURSES = [
     createdAt: new Date().toISOString()
   },
 
-  // --- ТЕСТОВЫЕ КУРСЫ ДЛЯ РАЗРАБОТКИ ---
+  // --- ТЕСТОВЫЕ КУРСЫ  ---
   {
     _id: '65a123abc456', 
     userId: { _id: 'u1', nickname: 'Yuri Popov' },
@@ -98,7 +98,7 @@ let COURSES = [
 ];
 
 export const courseService = {
-  // Получить все курсы (возвращаем ВСЕ, включая черновики, чтобы видеть свои созданные)
+  // Получить все курсы
   getAll: async () => {
     await delay(600);
     return COURSES;
@@ -107,7 +107,6 @@ export const courseService = {
   // Получить один курс по ID
   getById: async (id) => {
     await delay(400);
-    // Приводим к строке, чтобы '1' == 1 сработало корректно
     return COURSES.find(c => String(c._id) === String(id));
   },
 
@@ -124,10 +123,14 @@ export const courseService = {
       direction: courseData.direction,
       level: courseData.level,
       price: Number(courseData.price),
-      links: courseData.links ? courseData.links.split(',').map(s => s.trim()) : [],
+      links: courseData.links ? (Array.isArray(courseData.links) ? courseData.links : courseData.links.split(',').map(s => s.trim())) : [],
+      // teacher-defined learn list
+      whatYouWillLearn: courseData.whatYouWillLearn || [],
+      // support uploaded image/video data URLs in mock
+      _tempVideos: courseData._tempVideos || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      _tempImage: 'https://via.placeholder.com/400x250?text=New+Course' 
+      _tempImage: courseData._tempImage || 'https://via.placeholder.com/400x250?text=New+Course' 
     };
 
     COURSES.push(newCourse);

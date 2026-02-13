@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import { useCart } from '../../contexts/CartContext';
 import { getUser, setUser as setUserStorage } from '../../utils/auth';
-import { courseService } from '../../api/courseService'; // <--- Импортируем сервис
+import { courseService } from '../../api/courseService';
 
 function CoursePage() {
   const { id } = useParams();
@@ -14,7 +14,6 @@ function CoursePage() {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ЗАГРУЗКА ДАННЫХ ИЗ СЕРВИСА
   useEffect(() => {
     const fetchCourse = async () => {
       setLoading(true);
@@ -109,30 +108,52 @@ function CoursePage() {
           {/* LEFT COLUMN */}
           <div className="col-lg-8">
             
-            {/* What you'll learn (Пока статика, т.к. в базе этого поля нет) */}
+            {/* What you'll learn */}
             <div className="card border-0 shadow-sm mb-5">
               <div className="card-body p-4">
-                <h4 className="fw-bold mb-4">What you'll learn</h4>
-                <div className="row g-3">
-                  <div className="col-md-6 d-flex gap-2">
-                    <i className="bi bi-check-lg text-success fs-5"></i>
-                    <span>Master the core concepts of {course.title}</span>
-                  </div>
-                  <div className="col-md-6 d-flex gap-2">
-                    <i className="bi bi-check-lg text-success fs-5"></i>
-                    <span>Build real-world projects</span>
+                  <h4 className="fw-bold mb-4">What you'll learn</h4>
+                  <div className="row g-3">
+                    {course.whatYouWillLearn && course.whatYouWillLearn.length > 0 ? (
+                      course.whatYouWillLearn.map((item, idx) => (
+                        <div className="col-md-6 d-flex gap-2" key={idx}>
+                          <i className="bi bi-check-lg text-success fs-5"></i>
+                          <span>{item}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <>
+                        <div className="col-md-6 d-flex gap-2">
+                          <i className="bi bi-check-lg text-success fs-5"></i>
+                          <span>Master the core concepts of {course.title}</span>
+                        </div>
+                        <div className="col-md-6 d-flex gap-2">
+                          <i className="bi bi-check-lg text-success fs-5"></i>
+                          <span>Build real-world projects</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-              </div>
             </div>
 
             {/* Course Content (Берем из links) */}
             <h4 className="fw-bold mb-3">Course Materials</h4>
             <div className="card border-0 shadow-sm mb-5">
               <ul className="list-group list-group-flush">
+                {/* Render uploaded videos first if any */}
+                {course._tempVideos && course._tempVideos.length > 0 ? (
+                  course._tempVideos.map((v, idx) => (
+                    <li className="list-group-item py-3" key={'v-'+idx}>
+                      <div className="mb-2 fw-bold">Lesson Video #{idx + 1}</div>
+                      <video src={v} controls style={{ width: '100%', maxHeight: '360px' }} />
+                    </li>
+                  ))
+                ) : null}
+
+                {/* Then render external links */}
                 {course.links && course.links.length > 0 ? (
                   course.links.map((link, idx) => (
-                    <li className="list-group-item d-flex justify-content-between align-items-center py-3" key={idx}>
+                    <li className="list-group-item d-flex justify-content-between align-items-center py-3" key={'l-'+idx}>
                       <div className="d-flex align-items-center gap-3">
                         <i className="bi bi-link-45deg text-primary fs-4"></i>
                         <a href={link} target="_blank" rel="noopener noreferrer" className="text-decoration-none text-dark">
@@ -141,9 +162,9 @@ function CoursePage() {
                       </div>
                     </li>
                   ))
-                ) : (
-                  <li className="list-group-item py-3 text-muted">No links provided for this course.</li>
-                )}
+                ) : (!course._tempVideos || course._tempVideos.length === 0) ? (
+                  <li className="list-group-item py-3 text-muted">No links or videos provided for this course.</li>
+                ) : null}
               </ul>
             </div>
 
@@ -185,8 +206,6 @@ function CoursePage() {
 
                 <p className="text-center text-muted small mb-4">30-Day Money-Back Guarantee</p>
                 
-                {/* Скрываем для создателя курса или показываем кнопки редактирования */}
-                {/* TODO: Можно добавить кнопки Edit/Delete здесь, если user.id === course.userId._id */}
               </div>
             </div>
           </div>
