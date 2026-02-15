@@ -3,5 +3,9 @@ web-t/node_modules
 web/node_modules
 
 web-panel01
+storage
+*.zip
+*.rar
 
 console/manual.txt
+console/login_data.json

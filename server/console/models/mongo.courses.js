@@ -7,9 +7,8 @@ const courseSchema = new Schema({
         type: Schema.Types.ObjectId,
         required: true
     },
-    status:{
+    status: {
         type: String,
-        enum: ['editing','on-check','deployed'],
         required: false,
         default: 'editing'
     },
@@ -22,13 +21,16 @@ const courseSchema = new Schema({
         required: false,
         default: ''
     },
+    skills: [{
+        type: String,
+        required: false
+    }],
     direction: {
         type: String,
         required: true
     },
     level: {
         type: String,
-        enum: ['junior', 'middle', 'senior'],
         required: true
     },
     price: {
@@ -36,8 +38,32 @@ const courseSchema = new Schema({
         required: true
     },
     links: [{
-        type: String,
-        required: false
+        type: {
+            type: String,
+            required: false,
+            enum: ['image', 'video', 'document', 'other']
+        },
+        url: {
+            type: String,
+            required: false,
+            description: 'Full path including filename and extension (e.g., /api/manage/courses/456/thumbnail.jpg)'
+        },
+        filename: {
+            type: String,
+            required: false,
+            description: 'Original filename with extension'
+        },
+        accessLevel: {
+            type: String,
+            required: false,
+            enum: ['default', 'create', 'manage', 'admin', 'root'],
+            default: 'default',
+            description: 'Minimum access level required to view this link'
+        },
+        description: {
+            type: String,
+            required: false
+        }
     }],
     createdAt: {
         type: Date,

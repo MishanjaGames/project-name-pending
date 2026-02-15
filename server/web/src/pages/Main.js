@@ -14,10 +14,10 @@ function Main({ data, onLogout }) {
   });
 
   const [adminStats, setAdminStats] = useState({
-    totalUsers: '156',
-    activeUsers: '96',
-    totalCourses: '160',
-    enrollments: '48',
+    totalUsers: '???',
+    activeUsers: '???',
+    totalCourses: '???',
+    enrollments: '???',
   });
 
   useEffect(() => {
@@ -27,7 +27,7 @@ function Main({ data, onLogout }) {
   const { reset } = useTimeout(async () => {
     await updateInfo()
     reset()
-  }, 1000)
+  }, 10000)
 
   const updateInfo = async () => {
     try {
@@ -73,18 +73,17 @@ function Main({ data, onLogout }) {
 
   return (
     <>
-      <div className="d-flex flex-column flex-lg-row min-vh-100 bg-light">
-        <Navbar data={data} onLogout={onLogout} />
+      <Navbar data={data} onLogout={onLogout} />
 
-        <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
-          <div className="row mb-4">
-            <div className="col-12">
-              <div className="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-2">
-                <div>
-                  <h1 className="h3 h2-md fw-bold text-dark mb-1">Server Admin Dashboard</h1>
-                  <p className="text-muted mb-0 small">Server status and system information</p>
-                </div>
-                {/*
+      <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+        <div className="row mb-4">
+          <div className="col-12">
+            <div className="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-2">
+              <div>
+                <h1 className="h3 h2-md fw-bold text-dark mb-1">Server Admin Dashboard</h1>
+                <p className="text-muted mb-0 small">Server status and system information</p>
+              </div>
+              {/*
                 <div className="d-none d-lg-block">
                   <div className="badge bg-success p-2 px-3">
                     <svg width="10" height="10" fill="currentColor" viewBox="0 0 16 16" className="me-2" style={{display: 'inline'}}>
@@ -94,37 +93,37 @@ function Main({ data, onLogout }) {
                   </div>
                 </div>
                 */}
+            </div>
+          </div>
+        </div>
+
+        {/* Server Status Cards */}
+        <div className="row g-3 mb-4">
+          <div className="col-6 col-lg-3">
+            <div className="card border-0 shadow-sm h-100">
+              <div className="card-body p-3">
+                <div className="d-flex align-items-center justify-content-between mb-2">
+                  <h6 className="text-muted mb-0 small text-uppercase">Server Uptime</h6>
+                  <svg width="20" height="20" fill="#0d6efd" viewBox="0 0 16 16">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
+                    <path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.854 1.927a.5.5 0 0 1-.408.934L7.5 9.71V3.5a.5.5 0 0 1 .5-.5z" />
+                  </svg>
+                </div>
+                {
+                  serverStatus.status === 'ok' ?
+                    <>
+                      <h3 className="fw-bold mb-1 h4">{formatUptime(serverStatus.uptime)}</h3>
+                      <small className="text-success">✓ Stable</small></> :
+                    <>
+                      <h3 className="fw-bold mb-1 h4">?????????????</h3>
+                      <small className="text-warning">? Reaching...</small></>
+                }
+
               </div>
             </div>
           </div>
 
-          {/* Server Status Cards */}
-          <div className="row g-3 mb-4">
-            <div className="col-6 col-lg-3">
-              <div className="card border-0 shadow-sm h-100">
-                <div className="card-body p-3">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <h6 className="text-muted mb-0 small text-uppercase">Server Uptime</h6>
-                    <svg width="20" height="20" fill="#0d6efd" viewBox="0 0 16 16">
-                      <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
-                      <path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.854 1.927a.5.5 0 0 1-.408.934L7.5 9.71V3.5a.5.5 0 0 1 .5-.5z" />
-                    </svg>
-                  </div>
-                  {
-                    serverStatus.status === 'ok' ?
-                      <>
-                        <h3 className="fw-bold mb-1 h4">{formatUptime(serverStatus.uptime)}</h3>
-                        <small className="text-success">✓ Stable</small></> :
-                      <>
-                        <h3 className="fw-bold mb-1 h4">?????????????</h3>
-                        <small className="text-warning">? Reaching...</small></>
-                  }
-
-                </div>
-              </div>
-            </div>
-
-            {/*
+          {/*
             <div className="col-6 col-lg-3">
               <div className="card border-0 shadow-sm h-100">
                 <div className="card-body p-3">
@@ -143,7 +142,7 @@ function Main({ data, onLogout }) {
             </div>
             */}
 
-            {/*
+          {/*
             <div className="col-6 col-lg-3">
               <div className="card border-0 shadow-sm h-100">
                 <div className="card-body p-3">
@@ -163,7 +162,7 @@ function Main({ data, onLogout }) {
             </div>
             */}
 
-            {/*
+          {/*
             <div className="col-6 col-lg-3">
               <div className="card border-0 shadow-sm h-100">
                 <div className="card-body p-3">
@@ -183,36 +182,36 @@ function Main({ data, onLogout }) {
             </div>
             */}
 
-            {/* Admin Statistics */}
-            <div className="col-6 col-md-4 col-lg-2">
-              <div className="card border-0 shadow-sm h-100">
-                <div className="card-body p-3">
-                  <h6 className="text-muted mb-2 small text-uppercase">Total Users</h6>
-                  {
-                    (adminStats.totalUsers > 0 && serverStatus.status === 'ok') ? <h2 className="fw-bold text-primary mb-1 h3">{adminStats.totalUsers}</h2> : <h2 className="fw-bold text-secondary mb-1 h3">???</h2>
-                  }
-                  {
-                    (adminStats.totalUsers > 0 && serverStatus.status === 'ok') ? <small className="text-muted">{adminStats.activeUsers} in process of learning</small> : <small className="text-warning">??? in process of learning</small>
-                  }
-                </div>
+          {/* Admin Statistics */}
+          <div className="col-6 col-md-4 col-lg-2">
+            <div className="card border-0 shadow-sm h-100">
+              <div className="card-body p-3">
+                <h6 className="text-muted mb-2 small text-uppercase">Total Users</h6>
+                {
+                  (adminStats.totalUsers > 0 && serverStatus.status === 'ok') ? <h2 className="fw-bold text-primary mb-1 h3">{adminStats.totalUsers}</h2> : <h2 className="fw-bold text-secondary mb-1 h3">???</h2>
+                }
+                {
+                  (adminStats.totalUsers > 0 && serverStatus.status === 'ok') ? <small className="text-muted">{adminStats.activeUsers} in process of learning</small> : <small className="text-warning">??? in process of learning</small>
+                }
               </div>
             </div>
+          </div>
 
-            <div className="col-6 col-md-4 col-lg-2">
-              <div className="card border-0 shadow-sm h-100">
-                <div className="card-body p-3">
-                  <h6 className="text-muted mb-2 small text-uppercase">Total Courses</h6>
-                  {
-                    (adminStats.totalCourses > 0 || serverStatus.status === 'ok') ? <h2 className="fw-bold text-primary mb-1 h3">{adminStats.totalCourses}</h2> : <h2 className="fw-bold text-secondary mb-1 h3">???</h2>
-                  }
-                  {
-                    (adminStats.totalCourses > 0 || serverStatus.status === 'ok') ? <small className="text-muted">{adminStats.enrollments} being checked</small> : <small className="text-warning">??? being checked</small>
-                  }
-                </div>
+          <div className="col-6 col-md-4 col-lg-2">
+            <div className="card border-0 shadow-sm h-100">
+              <div className="card-body p-3">
+                <h6 className="text-muted mb-2 small text-uppercase">Total Courses</h6>
+                {
+                  (adminStats.totalCourses > 0 || serverStatus.status === 'ok') ? <h2 className="fw-bold text-primary mb-1 h3">{adminStats.totalCourses}</h2> : <h2 className="fw-bold text-secondary mb-1 h3">???</h2>
+                }
+                {
+                  (adminStats.totalCourses > 0 || serverStatus.status === 'ok') ? <small className="text-muted">{adminStats.enrollments} being checked</small> : <small className="text-warning">??? being checked</small>
+                }
               </div>
             </div>
+          </div>
 
-            {/*
+          {/*
             <div className="col-6 col-md-4 col-lg-2">
               <div className="card border-0 shadow-sm h-100">
                 <div className="card-body p-3">
@@ -224,7 +223,7 @@ function Main({ data, onLogout }) {
             </div>
             */}
 
-            {/*
+          {/*
             <div className="col-6 col-md-6 col-lg-3">
               <div className="card border-0 shadow-sm h-100">
                 <div className="card-body p-3">
@@ -238,95 +237,95 @@ function Main({ data, onLogout }) {
             </div>
             */}
 
-            <div className="col-6 col-md-6 col-lg-3">
-              <div className="card border-0 shadow-sm h-100">
-                <div className="card-body p-3">
-                  <h6 className="text-muted mb-2 small text-uppercase">Database status</h6>
-                  {
-                    serverStatus.db_status === 'connected' && serverStatus.status === 'ok' ?
+          <div className="col-6 col-md-6 col-lg-3">
+            <div className="card border-0 shadow-sm h-100">
+              <div className="card-body p-3">
+                <h6 className="text-muted mb-2 small text-uppercase">Database status</h6>
+                {
+                  serverStatus.db_status === 'connected' && serverStatus.status === 'ok' ?
+                    <>
+                      <div className="d-flex align-items-center gap-2 mb-1">
+                        <span className="badge bg-success">CONNECTED</span>
+                      </div>
+                      <div className="d-flex align-items-center gap-2 mb-1">
+                        <span className="badge bg-success">SYNCED</span>
+                      </div>
+                    </> :
+                    serverStatus.status === 'fixing' || serverStatus.db_status === 'reconnecting' ?
                       <>
                         <div className="d-flex align-items-center gap-2 mb-1">
-                          <span className="badge bg-success">CONNECTED</span>
+                          <span className="badge bg-warning">CONNECTING</span>
                         </div>
                         <div className="d-flex align-items-center gap-2 mb-1">
-                          <span className="badge bg-success">SYNCED</span>
+                          <span className="badge bg-warning">SYNCING</span>
                         </div>
                       </> :
-                      serverStatus.status === 'fixing' || serverStatus.db_status === 'reconnecting' ?
-                        <>
-                          <div className="d-flex align-items-center gap-2 mb-1">
-                            <span className="badge bg-warning">CONNECTING</span>
-                          </div>
-                          <div className="d-flex align-items-center gap-2 mb-1">
-                            <span className="badge bg-warning">SYNCING</span>
-                          </div>
-                        </> :
-                        <>
-                          <div className="d-flex align-items-center gap-2 mb-1">
-                            <span className="badge bg-danger">DISCONNECTED</span>
-                          </div>
-                          <div className="d-flex align-items-center gap-2 mb-1">
-                            <span className="badge bg-danger">NOT SYNCED</span>
-                          </div>
-                        </>
-                  }
-                </div>
+                      <>
+                        <div className="d-flex align-items-center gap-2 mb-1">
+                          <span className="badge bg-danger">DISCONNECTED</span>
+                        </div>
+                        <div className="d-flex align-items-center gap-2 mb-1">
+                          <span className="badge bg-danger">NOT SYNCED</span>
+                        </div>
+                      </>
+                }
               </div>
             </div>
           </div>
+        </div>
 
-          {/* System Info and Server Health */}
-          <div className="row g-1 mb-4">
-            <div className="col-12 col-lg-8">
-              <div className="card border-0 shadow-sm">
-                <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3">
-                  <h5 className="mb-0">System Information</h5>
-                </div>
-                <div className="card-body">
-                  <table className="table table-sm table-borderless mb-0">
-                    <tbody>
-                      <tr>
-                        <td className="text-muted" width="40%"><strong>Server Status:</strong></td>
-                        <td>
-                          {
-                            serverStatus.status === 'ok' ?
-                              <span className="badge bg-success">Connected</span>
-                              :
+        {/* System Info and Server Health */}
+        <div className="row g-1 mb-4">
+          <div className="col-12 col-lg-8">
+            <div className="card border-0 shadow-sm">
+              <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3">
+                <h5 className="mb-0">System Information</h5>
+              </div>
+              <div className="card-body">
+                <table className="table table-sm table-borderless mb-0">
+                  <tbody>
+                    <tr>
+                      <td className="text-muted" width="40%"><strong>Server Status:</strong></td>
+                      <td>
+                        {
+                          serverStatus.status === 'ok' ?
+                            <span className="badge bg-success">Connected</span>
+                            :
+                            <span className="badge bg-warning">Reconnecting</span>
+                        }
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="text-muted"><strong>MongoDB Status:</strong></td>
+                      <td>
+                        {
+                          serverStatus.status === 'ok' && serverStatus.db_status === 'connected' ?
+                            <span className="badge bg-success">Connected</span>
+                            :
+                            serverStatus.status === 'fixing' || serverStatus.db_status === 'reconnecting' ?
                               <span className="badge bg-warning">Reconnecting</span>
-                          }
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="text-muted"><strong>MongoDB Status:</strong></td>
-                        <td>
-                          {
-                            serverStatus.status === 'ok' && serverStatus.db_status === 'connected' ?
-                              <span className="badge bg-success">Connected</span>
                               :
-                               serverStatus.status === 'fixing' || serverStatus.db_status === 'reconnecting' ?
-                                <span className="badge bg-warning">Reconnecting</span>
-                                :
-                                <span className="badge bg-danger">Disconnected</span>
-                          }
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="text-muted"><strong>Last Restart:</strong></td>
-                        <td>
-                          <div>
-                            {formatLaunchTime(serverStatus.launchTime)}
-                            <small className="text-muted"> ({getTimeAgo(serverStatus.launchTime)})</small>
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                              <span className="badge bg-danger">Disconnected</span>
+                        }
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="text-muted"><strong>Last Restart:</strong></td>
+                      <td>
+                        <div>
+                          {formatLaunchTime(serverStatus.launchTime)}
+                          <small className="text-muted"> ({getTimeAgo(serverStatus.launchTime)})</small>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
+        </div>
 
-          {/*
+        {/*
           <div className="row g-3">
             <div className="col-12 col-lg-4">
               <div className="card border-0 shadow-sm">
@@ -366,7 +365,6 @@ function Main({ data, onLogout }) {
             </div>
           </div>
           */}
-        </div>
       </div>
     </>
   )

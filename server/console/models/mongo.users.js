@@ -47,6 +47,34 @@ const userSchema = new Schema({
         type: Schema.Types.ObjectId,
         required: false
     }],
+    links: [{
+        type: {
+            type: String,
+            required: false,
+            enum: ['image', 'video', 'document', 'other']
+        },
+        url: {
+            type: String,
+            required: false,
+            description: 'Full path including filename and extension (e.g., /api/files/users/123/avatar.jpg)'
+        },
+        filename: {
+            type: String,
+            required: false,
+            description: 'Original filename with extension'
+        },
+        accessLevel: {
+            type: String,
+            required: false,
+            enum: ['default', 'create', 'manage', 'admin', 'root'],
+            default: 'default',
+            description: 'Minimum access level required to view this link'
+        },
+        description: {
+            type: String,
+            required: false
+        }
+    }],
     createdAt: {
         type: Date,
         default: Date.now()

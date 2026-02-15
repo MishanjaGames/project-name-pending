@@ -7,6 +7,7 @@ const cors = require('cors')
 const config = require('./config/cfg')
 const restRouter = require('./routes/rest')
 const { loadAPI, useAPI } = require('./utils/connectionHandler')
+const logger = require('./utils/logger')
 
 global = {
     server: {
@@ -34,6 +35,12 @@ app.use(passport.initialize())
 require('./middleware/passport')(passport)
 app.use(morgan('dev'))
 
+// Simple custom logging middleware
+app.use((req, res, next) => {
+    logger.logRequest(req)
+    next()
+})
+
 app.use(bodyParser.urlencoded({ extended: true }))
 app.use(bodyParser.json())
 
@@ -42,15 +49,6 @@ loadAPI()
 useAPI()
 const DB = global.API.module
 DB.use()
-
-// {
-// "email": "root@local.com",
-// "password": "r00t5up3r53cr3tp4ss@cc3s5"
-// }
-// {
-// "email": "user@local.com",
-// "password": "b7g#d&iRyDVIdk!f"
-// }
 
 app.use('/api', restRouter)
 

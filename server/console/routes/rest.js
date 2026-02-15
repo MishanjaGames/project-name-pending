@@ -5,12 +5,14 @@ const authRouter = require('./auth');
 const usersRouter = require('./users');
 const rolesRouter = require('./roles');
 const coursesRouter = require('./courses');
+const filesRouter = require('./files');
 const manageRouter = require('./manage');
 const utilsRouter = require('./utils')
 const utils = require('../utils/utils');
 
 
 router.use('/auth', authRouter)
+router.use('/files', filesRouter)
 router.use('/manage', passport.authenticate('jwt', { session: false }), utils.validate('manage'), manageRouter)
 router.use('/users', passport.authenticate('jwt', { session: false }), usersRouter)
 router.use('/courses', coursesRouter)
