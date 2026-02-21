@@ -152,23 +152,28 @@ function CoursePage() {
 
                 {/* Then render external links */}
                 {course.links && course.links.length > 0 ? (
-                  course.links.map((link, idx) => (
-                    <li className="list-group-item d-flex justify-content-between align-items-center py-3" key={'l-'+idx}>
-                      <div className="d-flex align-items-center gap-3">
-                        <i className="bi bi-link-45deg text-primary fs-4"></i>
-                        <a href={link} target="_blank" rel="noopener noreferrer" className="text-decoration-none text-dark">
-                          Material #{idx + 1}: {link}
-                        </a>
-                      </div>
-                    </li>
-                  ))
+                  course.links.map((link, idx) => {
+                    const url = typeof link === 'object' ? link.url : link;
+                    const displayName = typeof link === 'object' ? (link.filename || link.url) : link;
+                    if (!url) return null;
+                    return (
+                      <li className="list-group-item py-3" key={'l-'+idx}>
+                        <div className="mb-2 fw-bold">
+                          <i className="bi bi-link-45deg me-2"></i>
+                          <a href={url} target="_blank" rel="noopener noreferrer">
+                            Material #{idx + 1} : {displayName}
+                          </a>
+                        </div>
+                      </li>
+                    );
+                  })
                 ) : (!course._tempVideos || course._tempVideos.length === 0) ? (
                   <li className="list-group-item py-3 text-muted">No links or videos provided for this course.</li>
                 ) : null}
               </ul>
             </div>
 
-            {/* Description */}
+            {/* Описание */}
             <h4 className="fw-bold mb-3">Description</h4>
             <div className="card border-0 shadow-sm p-4 text-muted">
               <p>{course.description}</p>

@@ -28,7 +28,7 @@ export default function AddCourseForm() {
 
   useEffect(() => {
     return () => {
-      // revoke object URLs
+      // освобождаем временные objectURL
       if (videoUrlsRef.current.length) {
         videoUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
         videoUrlsRef.current = [];
@@ -70,7 +70,7 @@ export default function AddCourseForm() {
 
     setVideoPreviews(prev => {
       const copy = prev.slice();
-      // revoke old preview if blob
+      // освобождаем старый preview, если это blob
       if (copy[index] && copy[index].startsWith && copy[index].startsWith('blob:')) {
         try { URL.revokeObjectURL(copy[index]); } catch(_) {}
       }
@@ -113,7 +113,7 @@ export default function AddCourseForm() {
     setLoading(true);
     
     try {
-      // Convert files to Data URLs to simulate upload in mock service
+      // Конвертация файлов в data-URL для мок-сервиса и сбор сырых File[] в `_files`
       const fileToDataUrl = (file) => new Promise((resolve, reject) => {
         if (!file) return resolve(null);
         const reader = new FileReader();
@@ -123,25 +123,25 @@ export default function AddCourseForm() {
       });
 
       const dataToSend = { ...formData };
-      // attach learn list
       dataToSend.whatYouWillLearn = learnList.filter(s => s && s.trim());
-
+      const filesToUpload = [];
       if (imgFile) {
         dataToSend._tempImage = await fileToDataUrl(imgFile);
+        filesToUpload.push(imgFile);
       }
 
-      // handle multiple videos: convert selected files to data URLs
       const videosToSave = [];
       for (let i=0;i<videoPreviews.length;i++) {
         const file = videoFiles[i];
         if (file) {
-          const data = await fileToDataUrl(file);
-          videosToSave.push(data);
+          videosToSave.push(await fileToDataUrl(file));
+          filesToUpload.push(file);
         } else if (videoPreviews[i]) {
           videosToSave.push(videoPreviews[i]);
         }
       }
       if (videosToSave.length) dataToSend._tempVideos = videosToSave;
+      if (filesToUpload.length) dataToSend._files = filesToUpload;
 
       await courseService.create(dataToSend, user);
       alert(t('course.success') || 'Course created successfully!');
@@ -155,7 +155,7 @@ export default function AddCourseForm() {
 
   return (
     <form onSubmit={handleSubmit}>
-      {/* Title */}
+      {/* Заголовок */}
       <div className="mb-3">
         <label className="form-label">{t('course.titleLabel')}</label>
         <input 
@@ -167,7 +167,7 @@ export default function AddCourseForm() {
         />
       </div>
 
-      {/* Direction */}
+      {/* Направление */}
       <div className="mb-3">
         <label className="form-label">Direction</label>
         <select 
@@ -183,7 +183,7 @@ export default function AddCourseForm() {
         </select>
       </div>
 
-      {/* Level */}
+      {/* Уровень */}
       <div className="mb-3">
         <label className="form-label">Level</label>
         <select 
@@ -198,7 +198,7 @@ export default function AddCourseForm() {
         </select>
       </div>
 
-      {/* Price */}
+      {/* Цена */}
       <div className="mb-3">
         <label className="form-label">{t('course.priceLabel')}</label>
         <div className="input-group">
@@ -215,7 +215,7 @@ export default function AddCourseForm() {
         </div>
       </div>
 
-      {/* Description */}
+      {/* Описание */}
       <div className="mb-3">
         <label className="form-label">{t('course.descriptionLabel')}</label>
         <textarea 
@@ -227,18 +227,7 @@ export default function AddCourseForm() {
         />
       </div>
 
-      {/* Links */}
-      {/* <div className="mb-4">
-        <label className="form-label">Materials/Links (comma separated)</label>
-        <input 
-          name="links" 
-          className="form-control" 
-          placeholder="https://github.com/repo, https://drive.google.com/..." 
-          value={formData.links} 
-          onChange={handleChange} 
-        />
-        <div className="form-text small text-muted">Paste URLs to videos or repositories.</div>
-      </div> */}
+      {/* Ссылки убраны — используем локальные файлы или backend links */}
       {/* Upload cover image */}
       <div className="mb-3">
         <label className="form-label fw-bold">Upload cover image</label>

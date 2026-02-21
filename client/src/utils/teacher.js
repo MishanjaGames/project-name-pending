@@ -2,30 +2,30 @@ import { getUser } from './auth';
 
 /**
  * submitTeacherApplication
- * Expects a FormData instance with the fields/files described in the form.
+ * Ожидает FormData с полями/файлами формы.
  * POST /api/teacher-applications
- * Returns parsed JSON on success, throws Error on failure.
+ * Возвращает JSON при успехе, выбрасывает Error при ошибке.
  *
- * Backend expectations / notes for integration:
- * - Accept multipart/form-data
- * - Validate required fields server-side (name, email, bio, cert, id)
- * - Save files to secure storage (S3/Cloud storage or server FS) and store references
- * - Set application status: pending -> admin can change to approved/rejected
- * - Return meaningful errors e.g. { message: 'File too large' }
+ * Заметки для интеграции с бэком:
+ * - Принимать multipart/form-data
+ * - Валидировать обязательные поля на сервере (name, email, bio, cert, id)
+ * - Сохранять файлы в безопасное хранилище и хранить ссылки
+ * - Устанавливать статус заявки: pending -> approved/rejected
+ * - Возвращать понятные ошибки, например { message: 'File too large' }
  */
 export async function submitTeacherApplication(formData) {
   const headers = {};
-  // attach authorization if available
+  // добавляем авторизационный заголовок, если есть
   try {
     const user = getUser();
     if (user && user.token) headers['Authorization'] = `Bearer ${user.token}`;
   } catch (e) {
-    // ignore
+    // игнорируем ошибки чтения user
   }
 
   const res = await fetch('/api/teacher-applications', {
     method: 'POST',
-    headers, // Do NOT set Content-Type for FormData
+    headers, // Не устанавливаем Content-Type при отправке FormData
     body: formData,
   });
 

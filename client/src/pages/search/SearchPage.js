@@ -13,7 +13,7 @@ function SearchPage() {
   const { t } = useContext(SettingsContext);
   const { addItem } = useCart();
 
-  // State for view mode: 'grid' or 'list'
+  // Вид отображения: 'grid' или 'list'
   const [viewMode, setViewMode] = useState('grid');
   
   // --- НОВОЕ: Состояние для курсов ---
@@ -70,7 +70,7 @@ function SearchPage() {
     setSearchQuery(q);
   }, [location.search]);
 
-  // Styles
+  // Стили для превью-картинок
   const gridImageStyle = {
     width: '100%',
     height: '160px',
@@ -333,8 +333,8 @@ function SearchPage() {
                 {filtered.map(course => (
                   <div key={course.id} className={viewMode === 'grid' ? "col-12 col-md-6 col-lg-4" : "col-12"}>
                     
-                    {viewMode === 'grid' ? (
-                      // GRID VIEW CARD
+                        {viewMode === 'grid' ? (
+                          // КАРТОЧКА (СЕТКА)
                       <div 
                         className="card h-100 course-card border-0 shadow-sm" 
                         onClick={() => handleCardClick(course.id)} 
@@ -365,7 +365,7 @@ function SearchPage() {
                         </div>
                       </div>
                     ) : (
-                      // LIST VIEW CARD
+                      // КАРТОЧКА (СПИСОК)
                       <div 
                         className="card h-100 course-card border-0 shadow-sm"
                         onClick={() => handleCardClick(course.id)}

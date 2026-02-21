@@ -51,7 +51,7 @@ function LoginPage() {
               type="email"
               className="form-control form-control-lg"
               id="email"
-              // placeholder={t('emailAddress')}
+              // placeholder (убран)
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -64,7 +64,7 @@ function LoginPage() {
               type="password"
               className="form-control form-control-lg"
               id="password"
-              // placeholder={t('enterYourPassword')}
+              // placeholder (убран)
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

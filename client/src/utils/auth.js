@@ -7,7 +7,7 @@ export function getUser() {
 }
 
 export function setUser(user) {
-  // Ensure mock user has an id field used by other parts of the app
+  // Гарантируем наличие поля id/_id (нужно в разных частях приложения)
   const idVal = user._id || user.id || user.email || ('u_' + Date.now());
   const normalized = { ...user, _id: idVal, id: idVal };
   localStorage.setItem('user', JSON.stringify(normalized));
@@ -16,7 +16,7 @@ export function setUser(user) {
 export function promoteToTeacher() {
   const user = getUser();
   if (!user) throw new Error('No authenticated user');
-  // Mark as teacher for client-side testing. Backend must perform real verification.
+  // Отмечаем пользователя как преподавателя для клиентских тестов. Реальная проверка делается на сервере.
   user.role = 'teacher';
   user.isTeacher = true;
   setUser(user);

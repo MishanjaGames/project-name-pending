@@ -1,5 +1,54 @@
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Флаг: включать реальную загрузку на бэкенд позже
+const backendEnabled = false;
+
+// Загрузка файлов. Пока заглушка: возвращаем объекты {type,url,filename}
+// При включении backendEnabled отправляем multipart POST на сервер
+async function uploadFiles(courseId, files) {
+  if (!files || files.length === 0) return [];
+  if (!backendEnabled) {
+    return files.map((f, i) => {
+      if (typeof f === 'string') return { type: 'video', url: f, filename: `uploaded_${i}`, accessLevel: 'public' };
+      return { type: 'video', url: URL.createObjectURL(f), filename: f.name || `file_${i}`, accessLevel: 'public' };
+    });
+  }
+
+  try {
+    const form = new FormData();
+    files.forEach((file, idx) => {
+      if (typeof file === 'string' && file.startsWith('data:')) {
+        const res = fetch(file).then(r => r.blob());
+        form.append('files', res, `upload_${idx}`);
+      } else {
+        form.append('files', file, file.name || `file_${idx}`);
+      }
+    });
+
+    const resp = await fetch(`/api/courses/${courseId}/files`, { method: 'POST', body: form });
+    if (!resp.ok) throw new Error('Upload failed');
+    const body = await resp.json();
+    return body.links || [];
+  } catch (e) {
+    console.warn('uploadFiles failed, fallback to local mapping', e);
+    return files.map((f, i) => ({ type: 'video', url: typeof f === 'string' ? f : URL.createObjectURL(f), filename: f.name || `file_${i}`, accessLevel: 'public' }));
+  }
+}
+
+// Преобразуем курс для UI: если пришёл links-объект — заполняем _tempVideos/_tempImage
+function normalizeCourseForUI(course) {
+  if (!course) return course;
+  const copy = { ...course };
+  if (Array.isArray(copy.links) && copy.links.length > 0 && typeof copy.links[0] === 'object') {
+    copy._tempVideos = copy.links.filter(l => l.type === 'video').map(l => l.url);
+    const img = copy.links.find(l => l.type === 'image');
+    if (img && img.url) copy._tempImage = img.url;
+  }
+  copy._tempVideos = copy._tempVideos || [];
+  copy._tempImage = copy._tempImage || 'https://via.placeholder.com/400x250?text=Course';
+  return copy;
+}
+
 let COURSES = [
   // --- КУРСЫ ---
   { 
@@ -101,19 +150,26 @@ export const courseService = {
   // Получить все курсы
   getAll: async () => {
     await delay(600);
-    return COURSES;
+    return COURSES.map(normalizeCourseForUI);
   },
 
   // Получить один курс по ID
   getById: async (id) => {
     await delay(400);
-    return COURSES.find(c => String(c._id) === String(id));
+    const found = COURSES.find(c => String(c._id) === String(id));
+    return normalizeCourseForUI(found);
   },
 
   // Создать курс
   create: async (courseData, user) => {
     await delay(1000);
     
+    // Если переданы сырые файлы в поле `_files`, попытаемся загрузить их
+    let linksFromUpload = [];
+    if (courseData && courseData._files) {
+      linksFromUpload = await uploadFiles('new_' + Date.now(), courseData._files);
+    }
+
     const newCourse = {
       _id: 'new_' + Date.now(),
       userId: { _id: user.id || 'me', nickname: user.name || user.nickname },
@@ -123,10 +179,12 @@ export const courseService = {
       direction: courseData.direction,
       level: courseData.level,
       price: Number(courseData.price),
-      links: courseData.links ? (Array.isArray(courseData.links) ? courseData.links : courseData.links.split(',').map(s => s.trim())) : [],
-      // teacher-defined learn list
+      // Сохраняем links: если пришли объекты (от бэкенда) — используем их,
+      // иначе поддерживаем старый формат строк.
+      links: (linksFromUpload && linksFromUpload.length > 0) ? linksFromUpload : (courseData.links ? (Array.isArray(courseData.links) ? courseData.links : courseData.links.split(',').map(s => s.trim())) : []),
+      // Список "Что вы узнаете" от преподавателя
       whatYouWillLearn: courseData.whatYouWillLearn || [],
-      // support uploaded image/video data URLs in mock
+      // Поддержка data-URL изображений/видео (мок)
       _tempVideos: courseData._tempVideos || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -134,7 +192,7 @@ export const courseService = {
     };
 
     COURSES.push(newCourse);
-    console.log('Course created in Mock DB:', newCourse);
+    console.log('Course created: ', newCourse);
     return newCourse;
   },
   // Обновить курс
@@ -142,17 +200,24 @@ export const courseService = {
     await delay(800);
     // Находим индекс курса в массиве
     const index = COURSES.findIndex(c => String(c._id) === String(id));
-    
-    if (index !== -1) {
-      // Сохраняем старые данные и накладываем новые
-      COURSES[index] = { 
-        ...COURSES[index], 
-        ...updatedData, 
-        updatedAt: new Date().toISOString() // Обновляем дату изменения
-      };
-      return COURSES[index];
+    if (index === -1) throw new Error('Course not found');
+
+    // Если пришли сырые файлы — попытаться загрузить и получить links
+    if (updatedData && updatedData._files) {
+      const linksFromUpload = await uploadFiles(id, updatedData._files);
+      if (linksFromUpload && linksFromUpload.length > 0) {
+        updatedData.links = linksFromUpload;
+      }
     }
-    throw new Error('Course not found');
+
+    // Сохраняем старые данные и накладываем новые
+    COURSES[index] = {
+      ...COURSES[index],
+      ...updatedData,
+      updatedAt: new Date().toISOString()
+    };
+
+    return normalizeCourseForUI(COURSES[index]);
   },
 
   // Удалить курс

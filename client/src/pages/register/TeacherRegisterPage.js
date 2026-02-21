@@ -3,7 +3,7 @@ import TeacherForm from '../../components/TeacherForm';
 import { getUser } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
 
-// This page shows the teacher application form. It pre-fills the email if user is logged in.
+// Страница заявки преподавателя. Если пользователь залогинен — подставляем email.
 export default function TeacherRegisterPage() {
   const user = getUser();
   const { t } = useContext(SettingsContext);

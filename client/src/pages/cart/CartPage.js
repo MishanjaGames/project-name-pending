@@ -48,7 +48,7 @@ function CartPage() {
   return (
     <div className="container py-5" style={{ maxWidth: '1100px' }}>
       
-      {/* HEADER */}
+      {/* ЗАГОЛОВОК */}
       <div className="d-flex justify-content-between align-items-center mb-5">
         <div>
           <h2 className="fw-bold mb-1">{t('cart') || 'Shopping Cart'}</h2>
@@ -69,7 +69,7 @@ function CartPage() {
       </div>
 
       {items.length === 0 ? (
-        // EMPTY STATE
+      // ПУСТОЙ КОРЗИНА
         <div className="text-center py-5">
           <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '100px', height: '100px' }}>
             <i className="bi bi-cart-x fs-1 text-muted"></i>
@@ -83,10 +83,10 @@ function CartPage() {
           </button>
         </div>
       ) : (
-        // CART CONTENT
+        // СОДЕРЖИМОЕ КОРЗИНЫ
         <div className="row g-4">
           
-          {/* LEFT COLUMN: ITEMS */}
+          {/* ЛЕВЫЙ СТОЛБЕЦ: ТОВАРЫ */}
           <div className="col-12 col-lg-8">
             <div className="d-grid gap-3">
               {items.map((it) => (
@@ -94,7 +94,7 @@ function CartPage() {
                   <div className="card-body p-3">
                     <div className="d-flex flex-column flex-md-row align-items-center gap-4">
                       
-                      {/* Image */}
+                      {/* Изображение */}
                       <img 
                         src={it.img || 'https://via.placeholder.com/150'} 
                         alt={it.title} 
@@ -102,7 +102,7 @@ function CartPage() {
                         style={imgStyle} 
                       />
 
-                      {/* Content */}
+                      {/* Содержимое */}
                       <div className="flex-grow-1 text-center text-md-start">
                         <h5 className="fw-bold mb-1">{it.title}</h5>
                         <p className="text-muted small mb-2">{it.author || 'Unknown Author'}</p>
@@ -111,7 +111,7 @@ function CartPage() {
                         </div>
                       </div>
 
-                      {/* Price & Controls */}
+                      {/* Цена и элементы управления */}
                       <div className="d-flex flex-column align-items-center align-items-md-end gap-2" style={{ minWidth: '140px' }}>
                         <div className="fs-4 fw-bold text-primary">
                           ${(Number(it.price) * (it.qty || 1)).toFixed(2)}

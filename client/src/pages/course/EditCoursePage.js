@@ -26,39 +26,35 @@ export default function EditCoursePage() {
 
   const [loading, setLoading] = useState(true);
 
-  // Получаем данные курса
+  // Загружаем курс и подготавливаем превью/списки для редактирования
   useEffect(() => {
     const fetchCourse = async () => {
       try {
         const course = await courseService.getById(id);
-        if (course) {
-          setFormData({
-            title: course.title,
-            description: course.description,
-            direction: course.direction,
-            level: course.level,
-            price: course.price,
-            links: course.links ? course.links.join(', ') : ''
-          });
+        if (!course) return;
 
-          // set previews from existing course data if present
-          if (course._tempImage || course.img) {
-            setImgPreview(course._tempImage || course.img);
-          }
-          // support existing videos array
-          if (course._tempVideos && course._tempVideos.length > 0) {
-            setVideoPreviews(course._tempVideos.slice());
-            setVideoFiles(new Array(course._tempVideos.length).fill(null));
-          } else if (course._tempVideo) {
-            setVideoPreviews([course._tempVideo]);
-            setVideoFiles([null]);
-          }
-          if (course.whatYouWillLearn && course.whatYouWillLearn.length > 0) {
-            setLearnList(course.whatYouWillLearn.slice());
-          }
+        setFormData({
+          title: course.title,
+          description: course.description,
+          direction: course.direction,
+          level: course.level,
+          price: course.price,
+          links: course.links ? (Array.isArray(course.links) ? course.links.map(l => typeof l === 'object' ? l.url : l).join(', ') : course.links.join(', ')) : ''
+        });
+
+        if (course._tempImage || course.img) setImgPreview(course._tempImage || course.img);
+
+        if (course._tempVideos && course._tempVideos.length > 0) {
+          setVideoPreviews(course._tempVideos.slice());
+          setVideoFiles(new Array(course._tempVideos.length).fill(null));
+        } else if (course._tempVideo) {
+          setVideoPreviews([course._tempVideo]);
+          setVideoFiles([null]);
         }
+
+        if (course.whatYouWillLearn && course.whatYouWillLearn.length > 0) setLearnList(course.whatYouWillLearn.slice());
       } catch (error) {
-        alert('Error loading course');
+        alert('Ошибка загрузки курса');
       } finally {
         setLoading(false);
       }
@@ -167,9 +163,12 @@ export default function EditCoursePage() {
       };
 
       // If user selected files, convert to data URLs (simulate upload)
+      // If user selected files, convert to data URLs (simulate upload)
+      const filesToUpload = [];
       if (imgFile) {
         const dataUrl = await fileToDataUrl(imgFile);
         dataToSend._tempImage = dataUrl;
+        filesToUpload.push(imgFile);
       } else if (imgPreview) {
         // keep existing preview (could be remote url or data url)
         dataToSend._tempImage = imgPreview;
@@ -182,11 +181,14 @@ export default function EditCoursePage() {
         if (file) {
           const data = await fileToDataUrl(file);
           videosToSave.push(data);
+          filesToUpload.push(file);
         } else if (videoPreviews[i]) {
           videosToSave.push(videoPreviews[i]);
         }
       }
       if (videosToSave.length) dataToSend._tempVideos = videosToSave;
+
+      if (filesToUpload.length) dataToSend._files = filesToUpload;
 
       // include teacher-provided learn list
       dataToSend.whatYouWillLearn = learnList.filter(s => s && s.trim());
@@ -211,13 +213,13 @@ export default function EditCoursePage() {
           <h3 className="mb-4 fw-bold">Edit Course</h3>
           
           <form onSubmit={handleSubmit}>
-            {/* Title */}
+            {/* Заголовок */}
             <div className="mb-3">
               <label className="form-label">{t('course.titleLabel')}</label>
               <input name="title" className="form-control" value={formData.title} onChange={handleChange} required />
             </div>
 
-            {/* Direction */}
+            {/* Направление */}
             <div className="mb-3">
               <label className="form-label">Direction</label>
               <select name="direction" className="form-select" value={formData.direction} onChange={handleChange}>
@@ -228,7 +230,7 @@ export default function EditCoursePage() {
               </select>
             </div>
 
-            {/* Level */}
+            {/* Уровень */}
             <div className="mb-3">
               <label className="form-label">Level</label>
               <select name="level" className="form-select" value={formData.level} onChange={handleChange}>
@@ -238,13 +240,13 @@ export default function EditCoursePage() {
               </select>
             </div>
 
-            {/* Price */}
+            {/* Цена */}
             <div className="mb-3">
               <label className="form-label">{t('course.priceLabel')}</label>
               <input type="number" name="price" className="form-control" value={formData.price} onChange={handleChange} required min="0" />
             </div>
 
-            {/* Description */}
+            {/* Описание */}
             <div className="mb-3">
               <label className="form-label">{t('course.descriptionLabel')}</label>
               <textarea name="description" className="form-control" rows="4" value={formData.description} onChange={handleChange} />

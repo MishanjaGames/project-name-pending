@@ -26,7 +26,7 @@ function SignUpPage() {
     const newUser = { name: fullName || email.split('@')[0], email, enrolled: [] };
     setUser(newUser);
     console.log('Sign Up:', newUser);
-    // navigate to search page after register
+    // переходим на страницу поиска после регистрации
     navigate('/search');
   };
 
