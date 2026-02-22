@@ -119,7 +119,7 @@ function AccountPage() {
                   </button>
                 )}
                 
-                {/* Кнопка для разработчика */}
+                {/* Кнопка для разработчика
                 {user.role !== 'teacher' && (
                   <button className="btn btn-light text-start p-3 rounded-3 d-flex align-items-center" onClick={() => {
                       if (!window.confirm(t('teacher.confirmGrant'))) return;
@@ -128,7 +128,7 @@ function AccountPage() {
                     <i className="bi bi-bug me-3 fs-5 text-warning"></i>
                     <div className="small text-muted ms-2">Dev: Give Teacher Role</div>
                   </button>
-                )}
+                )} */}
 
                 <hr className="my-2 opacity-50"/>
                 <button className="btn btn-danger border-0 text-start p-3 rounded-3 d-flex align-items-center shadow-sm" onClick={handleLogout}>

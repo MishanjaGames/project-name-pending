@@ -113,41 +113,48 @@ export default function AddCourseForm() {
     setLoading(true);
     
     try {
-      // Конвертация файлов в data-URL для мок-сервиса и сбор сырых File[] в `_files`
-      const fileToDataUrl = (file) => new Promise((resolve, reject) => {
-        if (!file) return resolve(null);
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      // Step 1: Create course (without files)
+      const courseData = {
+        title: formData.title,
+        description: formData.description,
+        direction: formData.direction,
+        level: formData.level,
+        price: parseFloat(formData.price) || 0,
+        whatYouWillLearn: learnList.filter(s => s && s.trim())
+      };
 
-      const dataToSend = { ...formData };
-      dataToSend.whatYouWillLearn = learnList.filter(s => s && s.trim());
-      const filesToUpload = [];
-      if (imgFile) {
-        dataToSend._tempImage = await fileToDataUrl(imgFile);
-        filesToUpload.push(imgFile);
+      const newCourse = await courseService.create(courseData, user);
+      
+      if (!newCourse || !newCourse._id) {
+        throw new Error('Failed to create course - no ID received');
       }
 
-      const videosToSave = [];
-      for (let i=0;i<videoPreviews.length;i++) {
-        const file = videoFiles[i];
-        if (file) {
-          videosToSave.push(await fileToDataUrl(file));
-          filesToUpload.push(file);
-        } else if (videoPreviews[i]) {
-          videosToSave.push(videoPreviews[i]);
+      const courseId = newCourse._id;
+
+      // Step 2: Upload thumbnail if provided
+      if (imgFile) {
+        try {
+          await courseService.uploadThumbnail(courseId, imgFile);
+        } catch (error) {
+          console.warn('Thumbnail upload failed, continuing...', error);
         }
       }
-      if (videosToSave.length) dataToSend._tempVideos = videosToSave;
-      if (filesToUpload.length) dataToSend._files = filesToUpload;
 
-      await courseService.create(dataToSend, user);
+      // Step 3: Upload content files if provided
+      const contentFiles = videoFiles.filter(f => f !== null && f !== undefined);
+      if (contentFiles.length > 0) {
+        try {
+          await courseService.uploadContentFiles(courseId, contentFiles);
+        } catch (error) {
+          console.warn('Content files upload failed, continuing...', error);
+        }
+      }
+
       alert(t('course.success') || 'Course created successfully!');
       navigate('/account');
     } catch (error) {
-      alert('Error creating course');
+      console.error('Error creating course:', error);
+      alert('Error creating course: ' + (error.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }

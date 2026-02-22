@@ -1,37 +1,68 @@
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4040/api';
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Флаг: включать реальную загрузку на бэкенд позже
-const backendEnabled = false;
-
-// Загрузка файлов. Пока заглушка: возвращаем объекты {type,url,filename}
-// При включении backendEnabled отправляем multipart POST на сервер
-async function uploadFiles(courseId, files) {
-  if (!files || files.length === 0) return [];
-  if (!backendEnabled) {
-    return files.map((f, i) => {
-      if (typeof f === 'string') return { type: 'video', url: f, filename: `uploaded_${i}`, accessLevel: 'public' };
-      return { type: 'video', url: URL.createObjectURL(f), filename: f.name || `file_${i}`, accessLevel: 'public' };
-    });
+// Получить токен из localStorage
+function getAuthHeaders() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('No auth token found');
   }
+  return {
+    'Authorization': token.startsWith('Bearer ') ? token : `Bearer ${token}`,
+  };
+}
 
+// Загрузка thumbnail
+async function uploadThumbnail(courseId, file) {
+  if (!file) return null;
+  
   try {
-    const form = new FormData();
-    files.forEach((file, idx) => {
-      if (typeof file === 'string' && file.startsWith('data:')) {
-        const res = fetch(file).then(r => r.blob());
-        form.append('files', res, `upload_${idx}`);
-      } else {
-        form.append('files', file, file.name || `file_${idx}`);
-      }
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${API_URL}/manage/courses/${courseId}/files`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: formData
     });
 
-    const resp = await fetch(`/api/courses/${courseId}/files`, { method: 'POST', body: form });
-    if (!resp.ok) throw new Error('Upload failed');
-    const body = await resp.json();
-    return body.links || [];
-  } catch (e) {
-    console.warn('uploadFiles failed, fallback to local mapping', e);
-    return files.map((f, i) => ({ type: 'video', url: typeof f === 'string' ? f : URL.createObjectURL(f), filename: f.name || `file_${i}`, accessLevel: 'public' }));
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.data || null;
+  } catch (error) {
+    console.error('uploadThumbnail error:', error);
+    throw error;
+  }
+}
+
+// Загрузка контент файлов (multiple)
+async function uploadContentFiles(courseId, files) {
+  if (!files || files.length === 0) return [];
+  
+  try {
+    const formData = new FormData();
+    files.forEach((file, idx) => {
+      formData.append('files', file, file.name || `file_${idx}`);
+    });
+
+    const response = await fetch(`${API_URL}/manage/courses/${courseId}/files/multiple`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.data || [];
+  } catch (error) {
+    console.error('uploadContentFiles error:', error);
+    throw error;
   }
 }
 
@@ -160,40 +191,57 @@ export const courseService = {
     return normalizeCourseForUI(found);
   },
 
-  // Создать курс
+  // Создать курс (только курс, без файлов)
   create: async (courseData, user) => {
-    await delay(1000);
+    await delay(500);
     
-    // Если переданы сырые файлы в поле `_files`, попытаемся загрузить их
-    let linksFromUpload = [];
-    if (courseData && courseData._files) {
-      linksFromUpload = await uploadFiles('new_' + Date.now(), courseData._files);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Authorization': token.startsWith('Bearer ') ? token : `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      const payload = {
+        userId: user.id || user._id,
+        title: courseData.title,
+        description: courseData.description,
+        direction: courseData.direction,
+        level: courseData.level,
+        price: Number(courseData.price),
+        skills: courseData.whatYouWillLearn || [],
+        status: 'draft'
+      };
+
+      const response = await fetch(`${API_URL}/manage/courses`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create course');
+      }
+
+      const data = await response.json();
+      const newCourse = data.data;
+
+      // Fallback: добавляем в локальный список если нет подключения к реальному бэку
+      if (newCourse && newCourse._id) {
+        COURSES.push({
+          ...newCourse,
+          links: newCourse.links || [],
+          _tempImage: 'https://via.placeholder.com/400x250?text=New+Course',
+          _tempVideos: []
+        });
+      }
+
+      return newCourse;
+    } catch (error) {
+      console.error('create course error:', error);
+      throw error;
     }
-
-    const newCourse = {
-      _id: 'new_' + Date.now(),
-      userId: { _id: user.id || 'me', nickname: user.name || user.nickname },
-      status: 'editing', // По дефолту черновик
-      title: courseData.title,
-      description: courseData.description,
-      direction: courseData.direction,
-      level: courseData.level,
-      price: Number(courseData.price),
-      // Сохраняем links: если пришли объекты (от бэкенда) — используем их,
-      // иначе поддерживаем старый формат строк.
-      links: (linksFromUpload && linksFromUpload.length > 0) ? linksFromUpload : (courseData.links ? (Array.isArray(courseData.links) ? courseData.links : courseData.links.split(',').map(s => s.trim())) : []),
-      // Список "Что вы узнаете" от преподавателя
-      whatYouWillLearn: courseData.whatYouWillLearn || [],
-      // Поддержка data-URL изображений/видео (мок)
-      _tempVideos: courseData._tempVideos || [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      _tempImage: courseData._tempImage || 'https://via.placeholder.com/400x250?text=New+Course' 
-    };
-
-    COURSES.push(newCourse);
-    console.log('Course created: ', newCourse);
-    return newCourse;
   },
   // Обновить курс
   update: async (id, updatedData) => {
@@ -202,13 +250,8 @@ export const courseService = {
     const index = COURSES.findIndex(c => String(c._id) === String(id));
     if (index === -1) throw new Error('Course not found');
 
-    // Если пришли сырые файлы — попытаться загрузить и получить links
-    if (updatedData && updatedData._files) {
-      const linksFromUpload = await uploadFiles(id, updatedData._files);
-      if (linksFromUpload && linksFromUpload.length > 0) {
-        updatedData.links = linksFromUpload;
-      }
-    }
+    // Файлы загружаются отдельно через uploadThumbnail и uploadContentFiles
+    // Здесь только обновляем данные курса
 
     // Сохраняем старые данные и накладываем новые
     COURSES[index] = {
@@ -225,5 +268,15 @@ export const courseService = {
     await delay(600);
     COURSES = COURSES.filter(c => String(c._id) !== String(id));
     return true;
+  },
+
+  // Загрузить thumbnail
+  uploadThumbnail: async (courseId, file) => {
+    return uploadThumbnail(courseId, file);
+  },
+
+  // Загрузить контент файлы
+  uploadContentFiles: async (courseId, files) => {
+    return uploadContentFiles(courseId, files);
   }
 };
