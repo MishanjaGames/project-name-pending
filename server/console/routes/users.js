@@ -10,10 +10,8 @@ router.post('/', passport.authenticate('jwt', {session: false}), validate('admin
 router.delete('/:id', passport.authenticate('jwt', {session: false}), validate('admin'), controller.remove)
 router.patch('/:id', passport.authenticate('jwt', {session: false}), validate('admin'), controller.update)
 
-// Profile picture routes
-// GET routes are public (needed for img tags) - no auth required
+
 router.get('/:id/profile-picture/:filename', controller.getProfilePicture)
-// POST/PUT/DELETE routes require authentication
 router.post('/:id/profile-picture', passport.authenticate('jwt', {session: false}), validate('manage'), controller.uploadProfilePicture)
 router.put('/:id/profile-picture', passport.authenticate('jwt', {session: false}), validate('manage'), controller.updateProfilePicture)
 router.delete('/:id/profile-picture', passport.authenticate('jwt', {session: false}), validate('manage'), controller.deleteProfilePicture)

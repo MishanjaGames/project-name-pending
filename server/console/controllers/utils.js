@@ -20,7 +20,3 @@ module.exports.getStatusInfo = async (req, res) => {
         db_status: global.db.status
     })
 }
-
-module.exports.loadData = async (req,res)=>{
-    res.status(200).json()
-}

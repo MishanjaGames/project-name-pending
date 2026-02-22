@@ -46,12 +46,11 @@ const courseSchema = new Schema({
         url: {
             type: String,
             required: false,
-            description: 'Full path including filename and extension (e.g., /api/manage/courses/456/thumbnail.jpg)'
+            description: 'Full path (e.g., /api/manage/courses/456/thumbnail.jpg)'
         },
         filename: {
             type: String,
             required: false,
-            description: 'Original filename with extension'
         },
         accessLevel: {
             type: String,

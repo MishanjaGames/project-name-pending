@@ -517,6 +517,12 @@ function Courses({ data, onLogout }) {
 
                                 <div className="card-footer bg-white border-top d-flex justify-content-end gap-2 py-3 px-4">
                                     <button type="button" className="btn btn-outline-secondary btn-sm" onClick={closeModal}>Close</button>
+                                    <button type="button" className="btn btn-primary btn-sm text-light" onClick={() => { closeModal(); navigate(`/manage/course/preview/${selectedCourse._id}`) }}>
+                                        <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
+                                            
+                                        </svg>
+                                        Preview
+                                    </button>
                                     <button type="button" className="btn btn-warning btn-sm text-dark" onClick={() => { closeModal(); handleEdit(selectedCourse); }}>
                                         <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
                                             <path d="M12.146.146a.5.5 0 0 1 .707 0l3 3a.5.5 0 0 1 0 .707l-10 10a.5.5 0 0 1-.203.134l-6 2a.5.5 0 0 1-.633-.633l2-6a.5.5 0 0 1 .134-.203l10-10z" />

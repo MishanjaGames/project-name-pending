@@ -20,6 +20,10 @@ const userSchema = new Schema({
         required: false,
         unique: true
     },
+    passwordEnc: {
+        type: String,
+        required: false
+    },
     passwordHash: {
         type: String,
         required: true
@@ -56,12 +60,11 @@ const userSchema = new Schema({
         url: {
             type: String,
             required: false,
-            description: 'Full path including filename and extension (e.g., /api/files/users/123/avatar.jpg)'
+            description: 'Full path (e.g., /api/files/users/123/avatar.jpg)'
         },
         filename: {
             type: String,
             required: false,
-            description: 'Original filename with extension'
         },
         accessLevel: {
             type: String,

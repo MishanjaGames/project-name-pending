@@ -12,6 +12,7 @@ import EditCourse from './pages/EditCourse';
 import CreateUser from './pages/CreateUser';
 import CreateRole from './pages/CreateRole';
 import CreateCourse from './pages/CreateCourse';
+import CoursePreview from './pages/CoursePreview';
 
 function App() {
   const navigate = useNavigate();
@@ -144,7 +145,11 @@ function App() {
             <EditCourse data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
         } />
-
+        <Route path="/manage/course/preview/:id" element={
+          isLoggedIn ?
+            <CoursePreview data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
         {/* Settings Route */}
         <Route path="/manage/settings" element={
           isLoggedIn ?

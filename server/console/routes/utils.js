@@ -4,7 +4,6 @@ const { readLogs, getLogFiles } = require('../utils/logger');
 const passport = require('passport')
 
 router.get('/status', utils.getStatusInfo)
-router.post('/send', utils.loadData)
 
 /**
  * GET /api/utils/logs - Get logs from today or specified date
