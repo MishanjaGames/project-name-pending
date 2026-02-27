@@ -13,7 +13,7 @@ const UPLOAD_PATHS = {
 
 const FILE_LIMITS = {
     profilePicture: 5 * 1024 * 1024,  // 5MB
-    courseFile: 50 * 1024 * 1024       // 50MB
+    courseFile: 512 * 1024 * 1024       // 512MB
 };
 
 const ALLOWED_TYPES = {

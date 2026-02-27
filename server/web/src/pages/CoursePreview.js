@@ -28,6 +28,11 @@ function CoursePreview({ data, onLogout }) {
   const [editingItem, setEditingItem] = useState(null);
   const [textFilesToUpload, setTextFilesToUpload] = useState({});
   const [loadingTextContent, setLoadingTextContent] = useState({});
+  // ① incremented after "Save Changes" — forces TextItemDisplay to re-fetch from server
+  const [textRefreshKey, setTextRefreshKey] = useState(0);
+  // local content cache: { [iid]: string } — holds unsaved edits so the display is instant
+  const [localTextContent, setLocalTextContent] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate()
 
   const token = localStorage.getItem('token');
@@ -288,6 +293,11 @@ function CoursePreview({ data, onLogout }) {
 
     setEditingItem(null);
     setHasChanges(true);
+    // ② cache the new content locally so TextItemDisplay shows it instantly,
+    // without waiting for the file to be uploaded to the server
+    if (itemData.type === 'text' && itemData.content !== undefined) {
+      setLocalTextContent(prev => ({ ...prev, [updatedItem.iid]: itemData.content }));
+    }
   };
 
   const deleteContentItem = (volumeIndex, chapterIndex, itemIndex) => {
@@ -371,106 +381,111 @@ function CoursePreview({ data, onLogout }) {
 
     let html = text;
 
-    // Escape HTML special characters first
     html = html.replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
 
-    // Headers
     html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
     html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
     html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
 
-    // Paragraph
     html = html.replace(/`\{([^}]+)\}`/g, '<p>$1</p>');
 
-    // Video player  ->  {video-url}
     html = html.replace(/\{([^}]+)\}/g, '<video src="$1" class="video-player" controls></video>');
 
-    // YouTube embed  ->  (youtube-url)  — accepts any YouTube URL format
     html = html.replace(/\(([^)]+)\)/g, (_, rawUrl) => {
       const toEmbedUrl = (url) => {
-        // Already an embed URL — pass through
         if (url.includes('youtube.com/embed/')) return url;
-        // youtu.be/ID
         const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
         if (shortMatch) return `https://www.youtube.com/embed/${shortMatch[1]}`;
-        // youtube.com/watch?v=ID
         const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
         if (watchMatch) return `https://www.youtube.com/embed/${watchMatch[1]}`;
-        // youtube.com/shorts/ID
         const shortsMatch = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
         if (shortsMatch) return `https://www.youtube.com/embed/${shortsMatch[1]}`;
-        // Unrecognised — return as-is so it doesn't break
         return url;
       };
       const embedUrl = toEmbedUrl(rawUrl.trim());
       return `<iframe src="${embedUrl}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
     });
 
-    // Download file  ->  ![Label|url]!
     html = html.replace(/!\[([^\|]+)\|([^\]]+)\]!/g, '<a href="$2" download class="text-download-link"><i class="bi bi-download"></i> $1</a>');
-
-    // Link  ->  @url@
     html = html.replace(/@([^@]+)@/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-
-    // Image  ->  #image-url#
     html = html.replace(/#([^#]+)#/g, '<img alt="$1" class="content-image" src="$1">');
 
-    // Numbered lists
     html = html.replace(/^(\d+)\.\s(.+)$/gm, '<li class="numbered-item">$2</li>');
     html = html.replace(/(<li class="numbered-item">.*?<\/li>\n?)+/gs, '<ol>$&</ol>');
-
-    // Bullet lists
     html = html.replace(/^[•\-\*]\s(.+)$/gm, '<li>$1</li>');
     html = html.replace(/(<li>.*?<\/li>\n?)+/gs, '<ul>$&</ul>');
 
-    // Tabs
     html = html.replace(/\\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
-
-    // Line breaks
     html = html.replace(/\\n/g, '<br>');
 
     return html;
   };
 
+  const resetUnsavedState = () => {
+    setTextFilesToUpload({});
+    setLocalTextContent({});
+    setHasChanges(false);
+    setTextRefreshKey(k => k + 1);
+  };
+
   const handleSaveChanges = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+
+    const token = localStorage.getItem('token');
+
     try {
-      const token = localStorage.getItem('token');
+      // ── Step 1: upload all pending text files ──────────────────────────────
       const urlUpdates = {};
-      const uploadPromises = Object.entries(textFilesToUpload).map(([fileKey, fileData]) => {
-        const formData = new FormData();
-        formData.append('file', fileData.file);
-        return fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
-          method: 'POST',
-          headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` },
-          body: formData
-        }).then(async (response) => {
-          if (response.ok) {
-            const result = await response.json();
-            const fileUrl = result.data?.link?.url || result.data?.url || result.url;
-            if (fileUrl) {
-              urlUpdates[fileKey] = { url: fileUrl, volumeIndex: fileData.volumeIndex, chapterIndex: fileData.chapterIndex, itemId: fileData.itemId };
+
+      if (Object.keys(textFilesToUpload).length > 0) {
+        const uploadResults = await Promise.all(
+          Object.entries(textFilesToUpload).map(async ([fileKey, fileData]) => {
+            const formData = new FormData();
+            formData.append('file', fileData.file);
+            try {
+              const res = await fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
+                method: 'POST',
+                headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` },
+                body: formData
+              });
+              if (res.ok) {
+                const result = await res.json();
+                const fileUrl = result.data?.link?.url || result.data?.url || result.url;
+                if (fileUrl) urlUpdates[fileKey] = { url: fileUrl, ...fileData };
+              }
+              return res.ok;
+            } catch {
+              return false;
             }
-          }
-          return response;
-        });
-      });
+          })
+        );
 
-      let newVolumes = [...volumes];
-
-      if (uploadPromises.length > 0) {
-        await Promise.all(uploadPromises);
-        Object.entries(urlUpdates).forEach(([, { url, volumeIndex, chapterIndex, itemId }]) => {
-          if (newVolumes[volumeIndex]?.chapters[chapterIndex]) {
-            const item = newVolumes[volumeIndex].chapters[chapterIndex].items.find(i => i.iid === itemId);
-            if (item) item.url = url;
-          }
-        });
+        if (uploadResults.some(ok => !ok)) {
+          alert('Some files failed to upload. Unsaved changes have been discarded — reloading last saved version.');
+          resetUnsavedState();
+          await fetchData();
+          return;
+        }
       }
 
+      // ── Step 2: patch volumes with the freshly uploaded file URLs ──────────
+      const newVolumes = volumes.map(vol => ({
+        ...vol,
+        chapters: vol.chapters.map(ch => ({
+          ...ch,
+          items: ch.items.map(item => {
+            const matchKey = Object.keys(urlUpdates).find(k => urlUpdates[k].itemId === item.iid);
+            return matchKey ? { ...item, url: urlUpdates[matchKey].url } : item;
+          })
+        }))
+      }));
+
+      // ── Step 3: persist the full course ───────────────────────────────────
       const response = await fetch(`http://localhost:4040/api/manage/courses/${id}`, {
         method: 'PUT',
         headers: {
@@ -481,17 +496,27 @@ function CoursePreview({ data, onLogout }) {
       });
 
       if (response.ok) {
+        // Success — sync state, then re-fetch everything fresh from the server
         setCourse({ ...editableCourse, volumes: newVolumes });
         setEditableCourse({ ...editableCourse, volumes: newVolumes });
         setVolumes(newVolumes);
-        setTextFilesToUpload({});
-        setHasChanges(false);
+        resetUnsavedState();
+        setEditMode(false)
+        await fetchData();
         alert('Changes saved successfully!');
       } else {
-        alert(`Failed to save changes: Server error ${response.status}`);
+        // PUT failed — discard pending local changes and reload server state
+        alert(`Failed to save (server error ${response.status}). Unsaved changes have been discarded — reloading last saved version.`);
+        resetUnsavedState();
+        await fetchData();
       }
     } catch (err) {
-      alert('Failed to save changes: ' + err.message);
+      // Network / unexpected error — same recovery
+      alert(`Failed to save: ${err.message}. Unsaved changes have been discarded — reloading last saved version.`);
+      resetUnsavedState();
+      await fetchData();
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -739,8 +764,11 @@ function CoursePreview({ data, onLogout }) {
                   {editMode ? 'Exit Edit Mode' : 'Edit Course'}
                 </button>
                 {hasChanges && (
-                  <button className="btn btn-success ms-2" onClick={handleSaveChanges}>
-                    <i className="bi bi-save me-1"></i>Save Changes
+                  <button className="btn btn-success ms-2" onClick={handleSaveChanges} disabled={isSaving}>
+                    {isSaving
+                      ? <><span className="spinner-border spinner-border-sm me-1" role="status"></span>Saving…</>
+                      : <><i className="bi bi-save me-1"></i>Save Changes</>
+                    }
                   </button>
                 )}
               </div>
@@ -875,7 +903,14 @@ function CoursePreview({ data, onLogout }) {
                                                 </a>
                                               </div>
                                             ) : item.type === 'text' ? (
-                                              <TextItemDisplay url={item.url} parseTextSyntax={parseTextSyntax} />
+                                              // ④ key includes refreshKey — React unmounts+remounts on change, guaranteeing a fresh fetch
+                                              <TextItemDisplay
+                                                key={`${item.iid}-${textRefreshKey}`}
+                                                url={item.url}
+                                                parseTextSyntax={parseTextSyntax}
+                                                refreshKey={textRefreshKey}
+                                                localContent={localTextContent[item.iid]}
+                                              />
                                             ) : null}
                                           </div>
                                         ))
@@ -940,17 +975,32 @@ function CoursePreview({ data, onLogout }) {
 }
 
 // ─── Text Item Display ────────────────────────────────────────────────────────
-function TextItemDisplay({ url, parseTextSyntax }) {
+// localContent: if set, render it directly without fetching (used for unsaved edits).
+// refreshKey:   when it changes, React remounts this component (via the key prop at
+//               the call site) and adds a cache-buster to the fetch URL, ensuring
+//               stale browser cache doesn't mask the newly uploaded file.
+function TextItemDisplay({ url, parseTextSyntax, refreshKey, localContent }) {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const token = localStorage.getItem('token');
 
   useEffect(() => {
+    // If a local (unsaved) edit exists, show it immediately — no network call needed
+    if (localContent !== undefined) {
+      setContent(localContent);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     if (!url) { setLoading(false); return; }
+    setLoading(true);
+    setError(null);
     const fetchContent = async () => {
       try {
-        const response = await fetch(`http://localhost:4040${url}`, {
+        const cacheBust = `?_=${refreshKey || Date.now()}`;
+        const response = await fetch(`http://localhost:4040${url}${cacheBust}`, {
           headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' }
         });
         if (response.ok) {
@@ -965,7 +1015,7 @@ function TextItemDisplay({ url, parseTextSyntax }) {
       }
     };
     fetchContent();
-  }, [url]);
+  }, [url, refreshKey, localContent]);
 
   if (loading) return <div className="text-item"><p><em>Loading content...</em></p></div>;
   if (error) return <div className="text-item"><p style={{ color: 'red' }}>{error}</p></div>;
@@ -992,8 +1042,8 @@ const SYNTAX_GROUPS = [
     label: 'Media',
     icon: 'bi-play-circle',
     rows: [
-      { format: 'Image',        syntax: '#https://image-url#',                  note: 'Renders inline image' },
-      { format: 'Video (file)', syntax: '{https://video-url.mp4}',              note: 'HTML5 video player' },
+      { format: 'Image',        syntax: '#https://image-url#',                    note: 'Renders inline image' },
+      { format: 'Video (file)', syntax: '{https://video-url.mp4}',                note: 'HTML5 video player' },
       { format: 'YouTube',      syntax: '(https://youtube.com/watch?v=VIDEO_ID)', note: 'Also accepts youtu.be/ and /shorts/ links' },
     ]
   },
@@ -1048,7 +1098,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
       setTextContentError(null);
       const load = async () => {
         try {
-          const res = await fetch(`http://localhost:4040${initialData.url}`, {
+          const res = await fetch(`http://localhost:4040${initialData.url}?_=${Date.now()}`, {
             headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' }
           });
           if (res.ok) { setContent(await res.text()); }
@@ -1142,7 +1192,6 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
               )}
               {textContentError && <div className="alert alert-danger mb-3">{textContentError}</div>}
 
-              {/* ── Syntax Help Toggle ── */}
               <div className="mb-2">
                 <button className="btn btn-sm btn-link px-0" onClick={() => setShowHelp(!showHelp)}>
                   <i className={`bi bi-${showHelp ? 'chevron-up' : 'question-circle'} me-1`}></i>
@@ -1152,28 +1201,17 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
 
               {showHelp && (
                 <div className="syntax-help-panel mb-3">
-                  {/* Group tabs */}
                   <div className="syntax-tabs">
                     {SYNTAX_GROUPS.map((group, gi) => (
-                      <button
-                        key={gi}
-                        className={`syntax-tab${activeHelpGroup === gi ? ' active' : ''}`}
-                        onClick={() => setActiveHelpGroup(gi)}
-                      >
+                      <button key={gi} className={`syntax-tab${activeHelpGroup === gi ? ' active' : ''}`} onClick={() => setActiveHelpGroup(gi)}>
                         <i className={`bi ${group.icon} me-1`}></i>
                         {group.label}
                       </button>
                     ))}
                   </div>
-
-                  {/* Rows for active group */}
                   <table className="syntax-table">
                     <thead>
-                      <tr>
-                        <th>Format</th>
-                        <th>Syntax</th>
-                        <th>Note</th>
-                      </tr>
+                      <tr><th>Format</th><th>Syntax</th><th>Note</th></tr>
                     </thead>
                     <tbody>
                       {SYNTAX_GROUPS[activeHelpGroup].rows.map((row, ri) => (
@@ -1185,8 +1223,6 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
                       ))}
                     </tbody>
                   </table>
-
-                  {/* Quick example for Downloads group */}
                   {activeHelpGroup === 2 && (
                     <div className="syntax-examples">
                       <p className="syntax-examples-title">Result preview</p>
@@ -1197,8 +1233,6 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
                       </div>
                     </div>
                   )}
-
-                  {/* Quick example for Media group */}
                   {activeHelpGroup === 1 && (
                     <div className="syntax-examples">
                       <p className="syntax-examples-title">Result preview</p>
@@ -1214,14 +1248,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
 
               <div className="mb-3">
                 <label className="form-label">Content</label>
-                <textarea
-                  className="form-control"
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  rows="10"
-                  placeholder="Enter your content with syntax..."
-                  disabled={loadingTextContent}
-                />
+                <textarea className="form-control" value={content} onChange={(e) => setContent(e.target.value)} rows="10" placeholder="Enter your content with syntax..." disabled={loadingTextContent} />
               </div>
 
               {content && (
@@ -1234,10 +1261,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
           ) : (
             <>
               <div className="mb-3">
-                <label className="form-label">
-                  <i className={`bi ${typeIcon(type)} me-1`}></i>
-                  Select from uploaded files:
-                </label>
+                <label className="form-label"><i className={`bi ${typeIcon(type)} me-1`}></i>Select from uploaded files:</label>
                 {filteredFiles.length > 0 ? (
                   <>
                     <select className="form-select" value={selectedFileId} onChange={handleExistingFileSelect}>
@@ -1253,10 +1277,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
                 ) : (
                   <div className="alert alert-info mb-0">
                     <i className="bi bi-info-circle me-2"></i>
-                    <small>
-                      No {type === 'document' ? 'PDF/DOCX' : type === 'archive' ? 'ZIP' : type} files found.
-                      {uploadedFiles.length > 0 ? ` You have ${uploadedFiles.length} file(s) uploaded, but none match this type.` : ''} Upload a new one below.
-                    </small>
+                    <small>No {type === 'document' ? 'PDF/DOCX' : type === 'archive' ? 'ZIP' : type} files found.{uploadedFiles.length > 0 ? ` You have ${uploadedFiles.length} file(s) uploaded, but none match this type.` : ''} Upload a new one below.</small>
                   </div>
                 )}
               </div>
@@ -1264,13 +1285,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
               {filteredFiles.length > 0 && <div className="text-center my-2"><small className="text-muted">— OR —</small></div>}
 
               <div className="file-upload-area mb-3" onDragOver={handleDragOver} onDrop={handleDrop}>
-                <input
-                  type="file"
-                  accept={type === 'image' ? 'image/*' : type === 'video' ? 'video/*' : type === 'audio' ? 'audio/*' : type === 'document' ? '.pdf,.doc,.docx' : type === 'archive' ? '.zip' : '*/*'}
-                  onChange={handleFileChange}
-                  id="file-input"
-                  style={{ display: 'none' }}
-                />
+                <input type="file" accept={type === 'image' ? 'image/*' : type === 'video' ? 'video/*' : type === 'audio' ? 'audio/*' : type === 'document' ? '.pdf,.doc,.docx' : type === 'archive' ? '.zip' : '*/*'} onChange={handleFileChange} id="file-input" style={{ display: 'none' }} />
                 <label htmlFor="file-input" className="file-upload-label">
                   <i className={`bi ${typeIcon(type)} upload-icon`}></i>
                   <p>Drag {type} or click to select</p>
@@ -1281,16 +1296,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
 
               <div className="mb-3">
                 <label className="form-label">Enter URL:</label>
-                <input
-                  type="url"
-                  className="form-control"
-                  value={url}
-                  onChange={(e) => {
-                    const newUrl = e.target.value;
-                    setUrl(newUrl); setPreview(newUrl); setUseExistingFile(false); setSelectedFileId(''); setFile(null);
-                  }}
-                  placeholder={`https://example.com/${type}.${type === 'image' ? 'jpg' : type === 'video' ? 'mp4' : 'mp3'}`}
-                />
+                <input type="url" className="form-control" value={url} onChange={(e) => { const v = e.target.value; setUrl(v); setPreview(v); setUseExistingFile(false); setSelectedFileId(''); setFile(null); }} placeholder={`https://example.com/${type}.${type === 'image' ? 'jpg' : type === 'video' ? 'mp4' : 'mp3'}`} />
               </div>
 
               {preview && (
@@ -1299,10 +1305,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
                   {type === 'image' ? <img src={preview} alt="Preview" className="img-preview" /> :
                    type === 'video' ? <video src={preview} controls className="video-preview" /> :
                    type === 'audio' ? <audio src={preview} controls className="audio-preview" /> : (
-                    <div className="alert alert-info">
-                      <i className={`bi ${typeIcon(type)} me-2`}></i>
-                      File selected: {preview.split('/').pop()}
-                    </div>
+                    <div className="alert alert-info"><i className={`bi ${typeIcon(type)} me-2`}></i>File selected: {preview.split('/').pop()}</div>
                   )}
                 </div>
               )}

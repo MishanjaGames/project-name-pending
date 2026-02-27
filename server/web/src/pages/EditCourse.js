@@ -201,9 +201,9 @@ function EditCourse({ data, onLogout }) {
         const newErrors = [];
 
         files.forEach(file => {
-            // Server limit is 50MB per file
-            if (file.size > 50 * 1024 * 1024) {
-                newErrors.push(`${file.name} exceeds 50MB limit (size: ${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
+            // Server limit is 512MB per file
+            if (file.size > 512 * 1024 * 1024) {
+                newErrors.push(`${file.name} exceeds 512MB limit (size: ${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
                 return;
             }
             validFiles.push(file);
@@ -864,7 +864,7 @@ function EditCourse({ data, onLogout }) {
                                                     accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xlsx,.xls"
                                                 />
                                                 <small className="text-muted d-block mt-2">
-                                                    ✓ Max 50MB per file | Select multiple files at once | Supports: Images, Videos, PDFs, Documents
+                                                    ✓ Max 512MB per file | Select multiple files at once | Supports: Images, Videos, PDFs, Documents
                                                 </small>
                                                 {errors.courseFiles && (
                                                     <small className="text-danger d-block mt-1">
