@@ -6,6 +6,8 @@ function CreateCourse({ data, onLogout }) {
     const navigate = useNavigate();
     const [saving, setSaving] = useState(false);
     const [users, setUsers] = useState([]);
+    const [directions, setDirections] = useState([]);
+    const [levels, setLevels] = useState([]);
     const [formData, setFormData] = useState({
         userId: '',
         status: 'editing',
@@ -48,6 +50,45 @@ function CreateCourse({ data, onLogout }) {
 
             fetchUsers();
         }
+
+        // Fetch directions
+        const fetchDirections = async () => {
+            try {
+                const response = await fetch('http://localhost:4040/api/directions', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                if (response.ok) {
+                    const res = await response.json();
+                    setDirections(res.data || []);
+                }
+            } catch (error) {
+                console.error('Error fetching directions:', error);
+            }
+        };
+
+        // Fetch levels
+        const fetchLevels = async () => {
+            try {
+                const response = await fetch('http://localhost:4040/api/levels', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                if (response.ok) {
+                    const res = await response.json();
+                    setLevels(res.data || []);
+                }
+            } catch (error) {
+                console.error('Error fetching levels:', error);
+            }
+        };
+
+        fetchDirections();
+        fetchLevels();
     }, []);
 
     const handleChange = (e) => {
@@ -66,6 +107,7 @@ function CreateCourse({ data, onLogout }) {
 
     const handleThumbnailChange = (e) => {
         const file = e.target.files[0];
+        console.log(file)
         if (file) {
             if (!file.type.startsWith('image/')) {
                 setErrors(prev => ({ ...prev, thumbnail: 'Please select an image file' }));
@@ -98,6 +140,11 @@ function CreateCourse({ data, onLogout }) {
 
     const removeContentFile = (index) => {
         setContentFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const renameFile = (file, newName) => {
+        const blob = file.slice(0, file.size, file.type);
+        return new File([blob], newName, { type: file.type });
     };
 
     const handleAddSkill = () => {
@@ -185,8 +232,11 @@ function CreateCourse({ data, onLogout }) {
 
             // Step 2: Upload thumbnail if provided
             if (thumbnailFile) {
+                const fileExtension = thumbnailFile.name.split('.').pop();
+                const renamedFile = renameFile(thumbnailFile, `thumbnail.${fileExtension}`);
+                console.log(renamedFile)
                 const thumbnailFormData = new FormData();
-                thumbnailFormData.append('file', thumbnailFile);
+                thumbnailFormData.append('file', renamedFile);
 
                 await fetch(`http://localhost:4040/api/manage/courses/${courseId}/files`, {
                     method: 'POST',
@@ -360,7 +410,7 @@ function CreateCourse({ data, onLogout }) {
                                         </div>
 
                                         {/* Status Field */}
-                                        <div className="col-12 col-md-6">
+                                        {/* <div className="col-12 col-md-6">
                                             <label htmlFor="status" className="form-label fw-semibold">
                                                 Status <span className="text-danger">*</span>
                                             </label>
@@ -378,7 +428,7 @@ function CreateCourse({ data, onLogout }) {
                                             {errors.status && (
                                                 <div className="invalid-feedback">{errors.status}</div>
                                             )}
-                                        </div>
+                                        </div> */}
 
                                         {/* Title Field */}
                                         <div className="col-12">
@@ -465,15 +515,20 @@ function CreateCourse({ data, onLogout }) {
                                             <label htmlFor="direction" className="form-label fw-semibold">
                                                 Direction <span className="text-danger">*</span>
                                             </label>
-                                            <input
-                                                type="text"
-                                                className={`form-control ${errors.direction ? 'is-invalid' : ''}`}
+                                            <select
+                                                className={`form-select ${errors.direction ? 'is-invalid' : ''}`}
                                                 id="direction"
                                                 name="direction"
                                                 value={formData.direction}
                                                 onChange={handleChange}
-                                                placeholder="e.g., Programming"
-                                            />
+                                            >
+                                                <option value="">Select direction</option>
+                                                {directions.map((dir) => (
+                                                    <option key={dir._id} value={dir.directionName}>
+                                                        {dir.directionName}
+                                                    </option>
+                                                ))}
+                                            </select>
                                             {errors.direction && (
                                                 <div className="invalid-feedback">{errors.direction}</div>
                                             )}
@@ -492,10 +547,11 @@ function CreateCourse({ data, onLogout }) {
                                                 onChange={handleChange}
                                             >
                                                 <option value="">Select level</option>
-                                                <option value="Junior">Beginner</option>
-                                                <option value="Middle">Intermediate</option>
-                                                <option value="Senior">Advanced</option>
-                                                <option value="Guru">Expert</option>
+                                                {levels.map((lvl) => (
+                                                    <option key={lvl._id} value={lvl.levelName}>
+                                                        {lvl.levelName}
+                                                    </option>
+                                                ))}
                                             </select>
                                             {errors.level && (
                                                 <div className="invalid-feedback">{errors.level}</div>
@@ -523,46 +579,122 @@ function CreateCourse({ data, onLogout }) {
                                             </div>
                                         </div>
 
-                                        {/* Content Files Upload */}
+                                        {/* Course Content Files - IMPROVED VERSION */}
                                         <div className="col-12">
                                             <label className="form-label fw-semibold">
                                                 Course Content Files
+                                                <span className="text-muted ms-2">(Videos, PDFs, Documents, Images)</span>
                                             </label>
                                             <div className="border rounded p-3 bg-light">
-                                                <input
-                                                    type="file"
-                                                    id="contentFiles"
-                                                    className="form-control mb-2"
-                                                    multiple
-                                                    onChange={handleContentFilesChange}
-                                                    accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx"
-                                                />
-                                                <small className="text-muted">
-                                                    Upload course materials (videos, PDFs, documents). Max 50MB per file.
+                                                {/* Upload Button */}
+                                                <div className="mb-3">
+                                                    <input
+                                                        type="file"
+                                                        id="contentFiles"
+                                                        className="d-none"
+                                                        multiple
+                                                        onChange={handleContentFilesChange}
+                                                        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip"
+                                                    />
+                                                    <label htmlFor="contentFiles" className="btn btn-outline-primary">
+                                                        <svg width="16" height="16" fill="currentColor" className="me-2" viewBox="0 0 16 16">
+                                                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+                                                            <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" />
+                                                        </svg>
+                                                        <i className="bi bi-upload me-1"></i>
+                                                        Choose Files to Upload
+                                                    </label>
+                                                </div>
+
+                                                <small className="text-muted d-block mb-3">
+                                                    <i className="bi bi-info-circle me-1"></i>
+                                                    These files will be available to use in your course content (volumes/chapters).
+                                                    Max 50MB per file. Supported: Videos, Audio, Images, PDFs, Documents.
                                                 </small>
 
+                                                {/* Selected Files Display */}
                                                 {contentFiles.length > 0 && (
                                                     <div className="mt-3">
-                                                        <strong className="small">Selected files ({contentFiles.length}):</strong>
-                                                        <ul className="list-group list-group-flush mt-2">
-                                                            {contentFiles.map((file, idx) => (
-                                                                <li key={idx} className="list-group-item d-flex justify-content-between align-items-center px-0">
-                                                                    <span className="small">
-                                                                        {file.name}
-                                                                        <span className="text-muted ms-2">
-                                                                            ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                                                                        </span>
-                                                                    </span>
-                                                                    <button
-                                                                        type="button"
-                                                                        className="btn btn-sm btn-outline-danger"
-                                                                        onClick={() => removeContentFile(idx)}
+                                                        <div className="d-flex justify-content-between align-items-center mb-2">
+                                                            <strong className="small">
+                                                                <i className="bi bi-files me-1"></i>
+                                                                Files to Upload ({contentFiles.length})
+                                                            </strong>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-sm btn-outline-danger"
+                                                                onClick={() => setContentFiles([])}
+                                                            >
+                                                                <i className="bi bi-trash me-1"></i>
+                                                                Clear All
+                                                            </button>
+                                                        </div>
+
+                                                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                                            {contentFiles.map((file, idx) => {
+                                                                const isImage = file.type.startsWith('image/');
+                                                                const isVideo = file.type.startsWith('video/');
+                                                                const isAudio = file.type.startsWith('audio/');
+                                                                const isPDF = file.type === 'application/pdf';
+
+                                                                let icon = 'file-earmark';
+                                                                let iconColor = 'text-secondary';
+
+                                                                if (isImage) {
+                                                                    icon = 'image';
+                                                                    iconColor = 'text-primary';
+                                                                } else if (isVideo) {
+                                                                    icon = 'camera-video';
+                                                                    iconColor = 'text-danger';
+                                                                } else if (isAudio) {
+                                                                    icon = 'music-note';
+                                                                    iconColor = 'text-success';
+                                                                } else if (isPDF) {
+                                                                    icon = 'file-pdf';
+                                                                    iconColor = 'text-danger';
+                                                                }
+
+                                                                return (
+                                                                    <div
+                                                                        key={idx}
+                                                                        className="d-flex justify-content-between align-items-center bg-white p-2 rounded mb-2 border"
                                                                     >
-                                                                        Remove
-                                                                    </button>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
+                                                                        <div className="d-flex align-items-center flex-grow-1">
+                                                                            <i className={`bi bi-${icon} ${iconColor} me-2`} style={{ fontSize: '1.25rem' }}></i>
+                                                                            <div className="flex-grow-1">
+                                                                                <div className="small fw-semibold text-truncate" style={{ maxWidth: '400px' }}>
+                                                                                    {file.name}
+                                                                                </div>
+                                                                                <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                                                                                    {(file.size / 1024 / 1024).toFixed(2)} MB
+                                                                                    <span className="ms-2">•</span>
+                                                                                    <span className="ms-2">
+                                                                                        {isImage ? 'Image' : isVideo ? 'Video' : isAudio ? 'Audio' : isPDF ? 'PDF' : 'Document'}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="btn btn-sm btn-outline-danger"
+                                                                            onClick={() => removeContentFile(idx)}
+                                                                            title="Remove file"
+                                                                        >
+                                                                            <i className="bi bi-x-lg"></i>
+                                                                        </button>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Empty State */}
+                                                {contentFiles.length === 0 && (
+                                                    <div className="text-center py-4 text-muted">
+                                                        <i className="bi bi-cloud-upload" style={{ fontSize: '3rem', opacity: 0.3 }}></i>
+                                                        <p className="mb-0 mt-2 small">No files selected yet</p>
+                                                        <p className="mb-0 small">Upload course materials that you'll use in your lessons</p>
                                                     </div>
                                                 )}
                                             </div>

@@ -21,10 +21,6 @@ const courseSchema = new Schema({
         required: false,
         default: ''
     },
-    skills: [{
-        type: String,
-        required: false
-    }],
     direction: {
         type: String,
         required: true
@@ -33,15 +29,63 @@ const courseSchema = new Schema({
         type: String,
         required: true
     },
+    skills: [{
+        type: String,
+        required: false
+    }],
+    ratings:{
+        type: Number,
+        required: false
+    },
     price: {
         type: Number,
         required: true
     },
+    volumes: [{
+        vid: {
+            type: String,
+            required: true,
+        },
+        title: {
+            type: String,
+            required: true,
+        },
+        chapters: [{
+            cid: {
+                type: String,
+                required: true,
+            },
+            title: {
+                type: String,
+                required: true,
+            },
+            items: [{
+                iid: {
+                    type: String,
+                    required: true,
+                },
+                title: {
+                    type: String,
+                    required: true,
+                },
+                type: {
+                    type: String,
+                    required: false,
+                    enum: ['image', 'video', 'audio', 'document', 'archive', 'other']
+                },
+                url: {
+                    type: String,
+                    required: false,
+                    description: 'Full path (e.g., /api/manage/courses/456/thumbnail.jpg)'
+                },
+            }]
+        }]
+    }],
     links: [{
         type: {
             type: String,
             required: false,
-            enum: ['image', 'video', 'document', 'other']
+            enum: ['image', 'video', 'audio', 'document', 'archive', 'other']
         },
         url: {
             type: String,

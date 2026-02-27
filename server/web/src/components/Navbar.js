@@ -82,6 +82,24 @@ export const Navbar = ({ data, onLogout }) => {
                         </li>
                         <li className="nav-item">
                             <Link 
+                                to='/manage/directions' 
+                                className="nav-link text-white d-flex align-items-center"
+                                onClick={closeSidebar}
+                            >
+                                <span>Directions</span>
+                            </Link>
+                        </li>
+                        <li className="nav-item">
+                            <Link 
+                                to='/manage/levels' 
+                                className="nav-link text-white d-flex align-items-center"
+                                onClick={closeSidebar}
+                            >
+                                <span>Levels</span>
+                            </Link>
+                        </li>
+                        <li className="nav-item">
+                            <Link 
                                 to='/manage/roles' 
                                 className="nav-link text-white d-flex align-items-center"
                                 onClick={closeSidebar}

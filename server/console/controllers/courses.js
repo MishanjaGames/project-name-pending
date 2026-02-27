@@ -69,7 +69,7 @@ module.exports.getById = async (req, res) => {
 
 module.exports.create = async (req, res) => {
     try {
-        const skils = [`Master the core concepts of ${req.body.title}`, 'Learn and build real-world projects']
+        const skils = [`Master the core concepts of ${req.body.title.toLowerCase()}`, 'Learn and build real-world projects']
         
         const course = await new Courses({
             userId: req.body.userId,
@@ -77,8 +77,10 @@ module.exports.create = async (req, res) => {
             description: req.body.description,
             skills: [...skils, ...req.body.skills],
             price: req.body.price,
+            ratings: req.body.ratings || 0,
             level: req.body.level,
             direction: req.body.direction,
+            volumes: [],
             links: [], // Initialize as empty array - thumbnail and files will be added when uploaded
             createdAt: Date.now(),
             updatedAt: Date.now()
@@ -121,10 +123,12 @@ module.exports.update = async (req, res) => {
             status: req.body.status,
             title: req.body.title,
             description: req.body.description,
-            skills: req.body.skills,
-            price: req.body.price,
-            level: req.body.level,
             direction: req.body.direction,
+            level: req.body.level,
+            skills: req.body.skills,
+            ratings: req.body.ratings,
+            price: req.body.price,
+            volumes: req.body.volumes,
             links: req.body.links,
             updatedAt: Date.now()
         }

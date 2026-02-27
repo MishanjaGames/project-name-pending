@@ -1,16 +1,20 @@
 const mongoose = require('mongoose')
 const Schema = mongoose.Schema
  
-const roleSchema = new Schema({
+const directionSchema = new Schema({
     directionName: {
         type: String,
-        default: 'user',
+        default: 'default',
         required: true,
     },
     createdAt: {
         type: Date,
         default: Date.now()
+    },
+    updatedAt: {
+        type: Date,
+        default: Date.now()
     }
 })
 
-module.exports = mongoose.model('directions', roleSchema)
+module.exports = mongoose.model('directions', directionSchema)

@@ -9,6 +9,8 @@ function EditCourse({ data, onLogout }) {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [users, setUsers] = useState([]);
+    const [directions, setDirections] = useState([]);
+    const [levels, setLevels] = useState([]);
     const [formData, setFormData] = useState({
         userId: '',
         status: '',
@@ -28,26 +30,38 @@ function EditCourse({ data, onLogout }) {
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
     const [courseFiles, setCourseFiles] = useState([]);
     const [courseFilesPreview, setCourseFilesPreview] = useState([]);
-    const [existingFiles, setExistingFiles] = useState([]); // Existing uploaded files from server
+    const [existingFiles, setExistingFiles] = useState([]); // Existing uploaded files from server (EXCLUDING thumbnail and system text files)
     const [loadingFiles, setLoadingFiles] = useState(false);
 
-    useEffect(() => {
-        const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token');
 
+    // Helper function to check if file is a system-generated text file
+    const isSystemTextFile = (filename) => {
+        // Pattern: vol-{timestamp}-ch-{timestamp}-item-{timestamp}-{timestamp}.txt
+        return /^vol-\d+-ch-\d+-item-\d+-\d+\.txt$/i.test(filename);
+    };
+
+    useEffect(() => {
         if (token) {
             const headers = {
                 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
                 'Content-Type': 'application/json'
             };
 
-            const fetchCourse = async () => {
+            const fetchData = async () => {
                 try {
-                    const response = await fetch(`http://localhost:4040/api/manage/courses/${id}`, {
-                        method: 'GET',
-                        headers
-                    });
-                    if (response.ok) {
-                        const res = await response.json();
+                    // Fetch course, users, directions, levels, and files in parallel
+                    const [courseRes, usersRes, directionsRes, levelsRes, filesRes] = await Promise.all([
+                        fetch(`http://localhost:4040/api/manage/courses/${id}`, { method: 'GET', headers }),
+                        fetch('http://localhost:4040/api/manage/users', { method: 'GET', headers }),
+                        fetch('http://localhost:4040/api/directions', { method: 'GET', headers }),
+                        fetch('http://localhost:4040/api/levels', { method: 'GET', headers }),
+                        fetch(`http://localhost:4040/api/manage/courses/${id}/files`, { method: 'GET', headers })
+                    ]);
+
+                    // Handle course data
+                    if (courseRes.ok) {
+                        const res = await courseRes.json();
                         const course = res.data || res;
                         setFormData({
                             userId: course.userId || '',
@@ -64,55 +78,66 @@ function EditCourse({ data, onLogout }) {
                         alert('Failed to fetch course details');
                         navigate('/manage/courses');
                     }
+
+                    // Handle users data
+                    if (usersRes.ok) {
+                        const res = await usersRes.json();
+                        setUsers(res.data || res);
+                    }
+
+                    // Handle directions data
+                    if (directionsRes.ok) {
+                        const directionsData = await directionsRes.json();
+                        if (Array.isArray(directionsData.data)) {
+                            setDirections(directionsData.data);
+                        }
+                    }
+
+                    // Handle levels data
+                    if (levelsRes.ok) {
+                        const levelsData = await levelsRes.json();
+                        if (Array.isArray(levelsData.data)) {
+                            setLevels(levelsData.data);
+                        }
+                    }
+
+                    // Handle files data - EXCLUDE THUMBNAIL AND SYSTEM TEXT FILES
+                    if (filesRes.ok) {
+                        const res = await filesRes.json();
+                        const allFiles = res.data || res.files || [];
+                        
+                        // Filter out:
+                        // 1. Thumbnail files (contains 'thumbnail' in name or first image file)
+                        // 2. System-generated text files (pattern: vol-*-ch-*-item-*-*.txt)
+                        const files = allFiles.filter((file) => {
+                            const fileName = (file.originalName || file.filename || '').toLowerCase();
+                            
+                            // Exclude thumbnails
+                            const isThumbnail = fileName.includes('thumbnail') || 
+                                              (fileName.endsWith('.png') && allFiles.indexOf(file) === 0 && file.mimetype?.startsWith('image/'));
+                            
+                            // Exclude system text files
+                            const isSystemText = isSystemTextFile(file.originalName || file.filename || '');
+                            
+                            return !isThumbnail && !isSystemText;
+                        });
+                        
+                        setExistingFiles(files);
+                    }
+
                 } catch (error) {
-                    console.error('Error fetching course:', error);
+                    console.error('Error fetching data:', error);
                     alert('Error loading course details');
                     navigate('/manage/courses');
                 } finally {
                     setLoading(false);
-                }
-            };
-
-            const fetchUsers = async () => {
-                try {
-                    const response = await fetch('http://localhost:4040/api/manage/users', {
-                        method: 'GET',
-                        headers
-                    });
-                    if (response.ok) {
-                        const res = await response.json();
-                        setUsers(res.data || res);
-                    }
-                } catch (error) {
-                    console.error('Error fetching users:', error);
-                }
-            };
-
-            const fetchFiles = async () => {
-                setLoadingFiles(true);
-                try {
-                    const response = await fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
-                        method: 'GET',
-                        headers
-                    });
-                    if (response.ok) {
-                        const res = await response.json();
-                        // Filter out thumbnail (index 0) to show only course files
-                        const files = (res.data || res.files || []).filter((file, idx) => idx !== 0);
-                        setExistingFiles(files);
-                    }
-                } catch (error) {
-                    console.error('Error fetching files:', error);
-                } finally {
                     setLoadingFiles(false);
                 }
             };
 
-            fetchCourse();
-            fetchUsers();
-            fetchFiles();
+            fetchData();
         }
-    }, [id, navigate]);
+    }, [id, navigate, token]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -120,7 +145,6 @@ function EditCourse({ data, onLogout }) {
             ...prev,
             [name]: value
         }));
-        // Clear error for this field
         if (errors[name]) {
             setErrors(prev => ({
                 ...prev,
@@ -177,21 +201,23 @@ function EditCourse({ data, onLogout }) {
         const newErrors = [];
 
         files.forEach(file => {
+            // Server limit is 50MB per file
             if (file.size > 50 * 1024 * 1024) {
-                newErrors.push(`${file.name} exceeds 50MB limit`);
+                newErrors.push(`${file.name} exceeds 50MB limit (size: ${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
                 return;
             }
             validFiles.push(file);
         });
 
         if (newErrors.length > 0) {
-            setErrors(prev => ({ ...prev, courseFiles: newErrors.join(', ') }));
+            setErrors(prev => ({ ...prev, courseFiles: newErrors.join('; ') }));
         } else {
             setErrors(prev => ({ ...prev, courseFiles: '' }));
         }
 
-        setCourseFiles(validFiles);
-        setCourseFilesPreview(validFiles.map(f => ({ name: f.name, size: (f.size / (1024 * 1024)).toFixed(2) })));
+        // Add to existing files instead of replacing
+        setCourseFiles(prev => [...prev, ...validFiles]);
+        setCourseFilesPreview(prev => [...prev, ...validFiles.map(f => ({ name: f.name, size: (f.size / (1024 * 1024)).toFixed(2) }))]);
     };
 
     const removeCourseFile = (index) => {
@@ -200,27 +226,26 @@ function EditCourse({ data, onLogout }) {
     };
 
     const deleteExistingFile = async (fileIndex) => {
-        if (!window.confirm('Are you sure you want to delete this file?')) {
+        const file = existingFiles[fileIndex];
+        if (!window.confirm(`Are you sure you want to delete "${file.originalName || file.filename}"?`)) {
             return;
         }
 
         try {
-            const token = localStorage.getItem('token');
             const headers = {
                 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
                 'Content-Type': 'application/json'
             };
 
-            // Add 1 to fileIndex because thumbnail is at index 0
-            const actualIndex = fileIndex + 1;
+            // Use the actual filename to identify which file to delete
+            const fileIdentifier = file.filename || file.originalName;
 
-            const response = await fetch(`http://localhost:4040/api/manage/courses/${id}/files/${actualIndex}`, {
+            const response = await fetch(`http://localhost:4040/api/manage/courses/${id}/files/${fileIdentifier}`, {
                 method: 'DELETE',
                 headers
             });
 
             if (response.ok) {
-                // Remove from local state
                 setExistingFiles(prev => prev.filter((_, i) => i !== fileIndex));
                 alert('File deleted successfully');
             } else {
@@ -273,8 +298,12 @@ function EditCourse({ data, onLogout }) {
         setSaving(true);
 
         try {
-            const token = localStorage.getItem('token');
-            const headers = {
+            const jsonHeaders = {
+                'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
+                'Content-Type': 'application/json'
+            };
+
+            const multipartHeaders = {
                 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`
             };
 
@@ -292,10 +321,7 @@ function EditCourse({ data, onLogout }) {
 
             const response = await fetch(`http://localhost:4040/api/manage/courses/${id}`, {
                 method: 'PATCH',
-                headers: {
-                    ...headers,
-                    'Content-Type': 'application/json'
-                },
+                headers: jsonHeaders,
                 body: JSON.stringify(updatePayload)
             });
 
@@ -310,11 +336,10 @@ function EditCourse({ data, onLogout }) {
             if (thumbnail) {
                 const thumbnailFormData = new FormData();
                 thumbnailFormData.append('file', thumbnail);
-                thumbnailFormData.append('isThumbnail', 'true');
 
                 const thumbnailResponse = await fetch(`http://localhost:4040/api/manage/courses/${id}/files?thumbnail=true`, {
                     method: 'POST',
-                    headers,
+                    headers: multipartHeaders,
                     body: thumbnailFormData
                 });
 
@@ -333,13 +358,39 @@ function EditCourse({ data, onLogout }) {
 
                 const filesResponse = await fetch(`http://localhost:4040/api/manage/courses/${id}/files/multiple`, {
                     method: 'POST',
-                    headers,
+                    headers: multipartHeaders,
                     body: filesFormData
                 });
 
                 if (!filesResponse.ok) {
                     const errorData = await filesResponse.json();
                     console.error('Course files upload failed:', errorData);
+                    alert(`Failed to upload some files: ${errorData.message || 'Unknown error'}`);
+                } else {
+                    // Refresh the files list after successful upload
+                    try {
+                        const filesRes = await fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
+                            method: 'GET',
+                            headers: jsonHeaders
+                        });
+                        if (filesRes.ok) {
+                            const res = await filesRes.json();
+                            const allFiles = res.data || res.files || [];
+                            
+                            // Apply same filtering as initial load
+                            const files = allFiles.filter((file) => {
+                                const fileName = (file.originalName || file.filename || '').toLowerCase();
+                                const isThumbnail = fileName.includes('thumbnail') || 
+                                                  (fileName.endsWith('.png') && allFiles.indexOf(file) === 0 && file.mimetype?.startsWith('image/'));
+                                const isSystemText = isSystemTextFile(file.originalName || file.filename || '');
+                                return !isThumbnail && !isSystemText;
+                            });
+                            
+                            setExistingFiles(files);
+                        }
+                    } catch (err) {
+                        console.error('Error refreshing files list:', err);
+                    }
                 }
             }
 
@@ -385,7 +436,6 @@ function EditCourse({ data, onLogout }) {
         return (
             <>
                 <Navbar data={data} onLogout={onLogout} />
-
                 <div className="flex-grow-1 d-flex align-items-center justify-content-center">
                     <div className="text-center">
                         <div className="spinner-border text-primary mb-3" role="status">
@@ -428,8 +478,13 @@ function EditCourse({ data, onLogout }) {
                         <div className="card border-0 shadow-sm">
                             <div className="card-body p-4">
                                 <form onSubmit={handleSubmit}>
-                                    {/* Course Icon Preview and Thumbnail Upload */}
+                                    {/* Course Thumbnail */}
                                     <div className="text-center mb-4">
+                                        <label className="form-label fw-semibold d-block mb-3">
+                                            Course Thumbnail
+                                            <span className="text-muted ms-2">(Main course image)</span>
+                                        </label>
+
                                         {thumbnailPreview ? (
                                             <img
                                                 src={thumbnailPreview}
@@ -463,7 +518,6 @@ function EditCourse({ data, onLogout }) {
                                             </div>
                                         )}
 
-                                        {/* Button Logic: Show Upload button when no thumbnail, Show Change/Delete when thumbnail exists */}
                                         <div className="mb-2 d-flex justify-content-center gap-2">
                                             <input
                                                 type="file"
@@ -474,7 +528,6 @@ function EditCourse({ data, onLogout }) {
                                             />
 
                                             {!thumbnailPreview && !(formData.links && formData.links.length > 0 && formData.links[0] && formData.links[0].url) ? (
-                                                // No thumbnail - show only Upload button
                                                 <label htmlFor="thumbnail" className="btn btn-sm btn-primary">
                                                     <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
                                                         <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
@@ -483,7 +536,6 @@ function EditCourse({ data, onLogout }) {
                                                     Upload Thumbnail
                                                 </label>
                                             ) : (
-                                                // Thumbnail exists - show Change and Delete buttons
                                                 <>
                                                     <label htmlFor="thumbnail" className="btn btn-sm btn-warning">
                                                         <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
@@ -548,11 +600,6 @@ function EditCourse({ data, onLogout }) {
                                             {errors.userId && (
                                                 <div className="invalid-feedback">{errors.userId}</div>
                                             )}
-                                            {formData.userId && (
-                                                <small className="text-muted">
-                                                    Selected: <span className="fw-semibold">{getUserInfo(formData.userId).nickname}</span>
-                                                </small>
-                                            )}
                                         </div>
 
                                         {/* Status Field */}
@@ -610,9 +657,6 @@ function EditCourse({ data, onLogout }) {
                                                 placeholder="Enter course description"
                                                 rows="4"
                                             />
-                                            <small className="text-muted">
-                                                Provide a detailed description of what students will learn
-                                            </small>
                                         </div>
 
                                         {/* Skills Field */}
@@ -627,16 +671,13 @@ function EditCourse({ data, onLogout }) {
                                                     value={skillInput}
                                                     onChange={(e) => setSkillInput(e.target.value)}
                                                     onKeyPress={handleSkillInputKeyPress}
-                                                    placeholder="Type a skill and press Enter or click Add"
+                                                    placeholder="Type a skill and press Enter"
                                                 />
                                                 <button
                                                     className="btn btn-outline-primary"
                                                     type="button"
                                                     onClick={handleAddSkill}
                                                 >
-                                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" className="me-1">
-                                                        <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
-                                                    </svg>
                                                     Add
                                                 </button>
                                             </div>
@@ -663,27 +704,257 @@ function EditCourse({ data, onLogout }) {
                                                     ))}
                                                 </div>
                                             )}
-                                            <small className="text-muted">
-                                                Add skills that students will learn in this course
-                                            </small>
                                         </div>
 
-                                        
+                                        {/* Course Files Section */}
+                                        <div className="col-12">
+                                            <label className="form-label fw-semibold">
+                                                Course Files
+                                                <span className="text-muted ms-2">(Content files for volumes/chapters)</span>
+                                            </label>
+
+                                            {/* Display Existing Course Files (EXCLUDING thumbnail and system text files) */}
+                                            {existingFiles && existingFiles.length > 0 && (
+                                                <div className="mb-3">
+                                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                                        <div className="small fw-semibold">
+                                                            <svg width="14" height="14" fill="currentColor" className="me-1 text-success" viewBox="0 0 16 16">
+                                                                <path d="M10.854 5.146a.5.5 0 0 1 0 .708l-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7.5 7.793l2.646-2.647a.5.5 0 0 1 .708 0z" />
+                                                                <path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1zm3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4h-3.5z" />
+                                                            </svg>
+                                                            Uploaded Course Files ({existingFiles.length})
+                                                        </div>
+                                                        <small className="text-muted">
+                                                            <svg width="12" height="12" fill="currentColor" className="me-1" viewBox="0 0 16 16">
+                                                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
+                                                                <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" />
+                                                            </svg>
+                                                            Available in course content
+                                                        </small>
+                                                    </div>
+
+                                                    {loadingFiles ? (
+                                                        <div className="text-center py-3">
+                                                            <div className="spinner-border spinner-border-sm text-primary" role="status">
+                                                                <span className="visually-hidden">Loading files...</span>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div
+                                                            className="border rounded p-2 bg-light"
+                                                            style={{ maxHeight: '400px', overflowY: 'auto' }}
+                                                        >
+                                                            {existingFiles.map((file, idx) => {
+                                                                const fileName = file.originalName || file.filename || `File ${idx + 1}`;
+                                                                const fileSize = file.size ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : 'Unknown size';
+                                                                const mimeType = file.mimetype || file.mimeType || '';
+
+                                                                // Determine file type and icon
+                                                                let icon = 'file-earmark';
+                                                                let iconColor = 'text-secondary';
+                                                                let fileType = 'File';
+
+                                                                if (mimeType.startsWith('image/')) {
+                                                                    icon = 'image';
+                                                                    iconColor = 'text-primary';
+                                                                    fileType = 'Image';
+                                                                } else if (mimeType.startsWith('video/')) {
+                                                                    icon = 'camera-video';
+                                                                    iconColor = 'text-danger';
+                                                                    fileType = 'Video';
+                                                                } else if (mimeType.startsWith('audio/')) {
+                                                                    icon = 'music-note';
+                                                                    iconColor = 'text-success';
+                                                                    fileType = 'Audio';
+                                                                } else if (mimeType === 'application/pdf') {
+                                                                    icon = 'file-pdf';
+                                                                    iconColor = 'text-danger';
+                                                                    fileType = 'PDF';
+                                                                } else if (mimeType.includes('document') || mimeType.includes('word')) {
+                                                                    icon = 'file-word';
+                                                                    iconColor = 'text-primary';
+                                                                    fileType = 'Document';
+                                                                }
+
+                                                                return (
+                                                                    <div
+                                                                        key={idx}
+                                                                        className="d-flex justify-content-between align-items-center bg-white p-3 rounded mb-2 shadow-sm border"
+                                                                    >
+                                                                        <div className="d-flex align-items-center flex-grow-1">
+                                                                            <i
+                                                                                className={`bi bi-${icon} ${iconColor} me-3`}
+                                                                                style={{ fontSize: '1.5rem' }}
+                                                                            ></i>
+                                                                            <div className="flex-grow-1">
+                                                                                <div className="fw-semibold small text-truncate" style={{ maxWidth: '500px' }}>
+                                                                                    {fileName}
+                                                                                </div>
+                                                                                <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                                                                                    <span className="badge bg-light text-dark me-2">
+                                                                                        {fileType}
+                                                                                    </span>
+                                                                                    <svg width="12" height="12" fill="currentColor" className="me-1" viewBox="0 0 16 16">
+                                                                                        <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2zm13 2.383-4.758 2.855L15 11.114v-5.73zm-.034 6.878L9.271 8.82 8 9.583 6.728 8.82l-5.694 3.44A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.739zM1 11.114l4.758-2.876L1 5.383v5.73z" />
+                                                                                    </svg>
+                                                                                    {fileSize}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="d-flex gap-2">
+                                                                            <a
+                                                                                href={`http://localhost:4040${file.url || file.path}`}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="btn btn-sm btn-outline-info"
+                                                                                title="Download file"
+                                                                            >
+                                                                                <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                                                                                    <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+                                                                                    <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z" />
+                                                                                </svg>
+                                                                            </a>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-sm btn-outline-danger"
+                                                                                onClick={() => deleteExistingFile(idx)}
+                                                                                title="Delete file"
+                                                                            >
+                                                                                <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                                                                                    <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                                                                                    <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                                                                                </svg>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                    <small className="text-muted d-block mt-2">
+                                                        <svg width="12" height="12" fill="currentColor" className="me-1" viewBox="0 0 16 16">
+                                                            <path d="M9.5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-1 2.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z" />
+                                                            <path d="M7 2a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1V2zM6 8.5v2A1.5 1.5 0 0 0 7.5 12h2a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.5.5z" />
+                                                        </svg>
+                                                        Tip: These files can be used in volumes/chapters/items
+                                                    </small>
+                                                </div>
+                                            )}
+
+                                            {/* Separator */}
+                                            <div className="text-center my-3">
+                                                <span className="badge bg-light text-secondary">OR</span>
+                                            </div>
+
+                                            {/* Upload New Files */}
+                                            <div className="mb-3">
+                                                <label htmlFor="courseFiles" className="btn btn-success btn-lg w-100 d-flex align-items-center justify-content-center gap-2" style={{ cursor: 'pointer' }}>
+                                                    <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                                                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+                                                        <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" />
+                                                    </svg>
+                                                    <span>Upload Course Files (Images, Videos, PDFs, Docs)</span>
+                                                </label>
+                                                <input
+                                                    type="file"
+                                                    id="courseFiles"
+                                                    className="d-none"
+                                                    multiple
+                                                    onChange={handleCourseFilesChange}
+                                                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xlsx,.xls"
+                                                />
+                                                <small className="text-muted d-block mt-2">
+                                                    ✓ Max 50MB per file | Select multiple files at once | Supports: Images, Videos, PDFs, Documents
+                                                </small>
+                                                {errors.courseFiles && (
+                                                    <small className="text-danger d-block mt-1">
+                                                        <strong>⚠ Error:</strong> {errors.courseFiles}
+                                                    </small>
+                                                )}
+                                            </div>
+
+                                            {/* New Files Preview */}
+                                            {courseFilesPreview.length > 0 && (
+                                                <div className="mb-3">
+                                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                                        <strong className="small text-success">
+                                                            <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
+                                                                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+                                                                <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" />
+                                                            </svg>
+                                                            New Files to Upload ({courseFilesPreview.length})
+                                                        </strong>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-sm btn-outline-danger"
+                                                            onClick={() => {
+                                                                setCourseFiles([]);
+                                                                setCourseFilesPreview([]);
+                                                            }}
+                                                        >
+                                                            <svg width="12" height="12" fill="currentColor" className="me-1" viewBox="0 0 16 16">
+                                                                <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854z" />
+                                                            </svg>
+                                                            Clear All
+                                                        </button>
+                                                    </div>
+                                                    <div className="border rounded p-2 bg-success bg-opacity-10">
+                                                        {courseFilesPreview.map((fileInfo, idx) => (
+                                                            <div
+                                                                key={idx}
+                                                                className="d-flex justify-content-between align-items-center bg-white p-2 rounded mb-2 border border-success"
+                                                            >
+                                                                <span className="small">
+                                                                    <svg width="14" height="14" fill="currentColor" className="me-2 text-success" viewBox="0 0 16 16">
+                                                                        <path d="M4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H4zm0 1h8a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z" />
+                                                                    </svg>
+                                                                    <strong>{fileInfo.name}</strong>
+                                                                    <span className="text-muted ms-2">({fileInfo.size} MB)</span>
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-sm btn-outline-danger"
+                                                                    onClick={() => removeCourseFile(idx)}
+                                                                >
+                                                                    <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                                                                        <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854z" />
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <small className="text-success d-block mt-1">
+                                                        <svg width="12" height="12" fill="currentColor" className="me-1" viewBox="0 0 16 16">
+                                                            <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z" />
+                                                        </svg>
+                                                        Will be uploaded on save
+                                                    </small>
+                                                </div>
+                                            )}
+                                        </div>
 
                                         {/* Direction Field */}
                                         <div className="col-12 col-md-4">
                                             <label htmlFor="direction" className="form-label fw-semibold">
                                                 Direction <span className="text-danger">*</span>
                                             </label>
-                                            <input
-                                                type="text"
-                                                className={`form-control ${errors.direction ? 'is-invalid' : ''}`}
+                                            <select
+                                                className={`form-select ${errors.direction ? 'is-invalid' : ''}`}
                                                 id="direction"
                                                 name="direction"
                                                 value={formData.direction}
-                                                onChange={handleChange}
-                                                placeholder="e.g., Programming, Design"
-                                            />
+                                                onChange={(e) => {
+                                                    handleChange(e);
+                                                    setFormData(prev => ({ ...prev, level: '' }));
+                                                }}
+                                            >
+                                                <option value="">Select direction</option>
+                                                {directions.map(dir => (
+                                                    <option key={dir._id} value={dir.directionName}>
+                                                        {dir.directionName}
+                                                    </option>
+                                                ))}
+                                            </select>
                                             {errors.direction && (
                                                 <div className="invalid-feedback">{errors.direction}</div>
                                             )}
@@ -700,15 +971,22 @@ function EditCourse({ data, onLogout }) {
                                                 name="level"
                                                 value={formData.level}
                                                 onChange={handleChange}
+                                                disabled={!formData.direction}
                                             >
                                                 <option value="">Select level</option>
-                                                <option value="Junior">Beginner</option>
-                                                <option value="Middle">Intermediate</option>
-                                                <option value="Senior">Advanced</option>
-                                                <option value="Guru">Expert</option>
+                                                {levels
+                                                    .filter(level => level.directionName === formData.direction)
+                                                    .map(level => (
+                                                        <option key={level._id} value={level.levelName}>
+                                                            {level.levelName}
+                                                        </option>
+                                                    ))}
                                             </select>
                                             {errors.level && (
                                                 <div className="invalid-feedback">{errors.level}</div>
+                                            )}
+                                            {!formData.direction && (
+                                                <small className="text-muted">Select direction first</small>
                                             )}
                                         </div>
 
@@ -734,9 +1012,6 @@ function EditCourse({ data, onLogout }) {
                                                     <div className="invalid-feedback">{errors.price}</div>
                                                 )}
                                             </div>
-                                            <small className="text-muted">
-                                                Leave empty or 0 for free courses
-                                            </small>
                                         </div>
                                     </div>
 
@@ -771,24 +1046,6 @@ function EditCourse({ data, onLogout }) {
                                         </button>
                                     </div>
                                 </form>
-                            </div>
-                        </div>
-
-                        {/* Help Card */}
-                        <div className="card border-0 bg-light mt-3">
-                            <div className="card-body p-3">
-                                <h6 className="fw-semibold mb-2 small">
-                                    <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
-                                        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" />
-                                    </svg>
-                                    Course Status Guide
-                                </h6>
-                                <ul className="small text-muted mb-0 ps-3">
-                                    <li><strong>Editing:</strong> Course is being created or modified</li>
-                                    <li><strong>On Check:</strong> Course is under review for approval</li>
-                                    <li><strong>Deployed:</strong> Course is published and available to students</li>
-                                </ul>
                             </div>
                         </div>
                     </div>

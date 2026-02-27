@@ -64,13 +64,33 @@ function Roles({ data, onLogout }) {
         navigate(`/manage/role/${role._id}`);
     };
 
-    const handleDelete = (role) => {
+    const handleDelete = async (role) => {
         const confirmed = window.confirm(
             `Are you sure you want to delete role "${role.roleName}"?\n\nThis action cannot be undone.`
         );
 
         if (confirmed) {
-            alert(`[PLACEHOLDER] Role "${role.roleName}" would be deleted here.\n\nTo implement: add DELETE request to the handleDelete function.`);
+            let i = prompt(`You confirmed to proceed deleting role "${role.roleName}" (${role.accessLevel}) \n\n This action cannot be undone.
+                \n Please enter role's name to continue.`)
+            if (i === role.roleName) {
+                alert(`Role "${role.roleName}" (${role.accessLevel}) is DELETING. \n This action cannot be undone.`)
+
+                try {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`http://localhost:4040/api/manage/roles/${role._id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (response.ok) {
+                        alert(`Role "${role.roleName}" (${role.accessLevel}) is DELETED.`)
+                    }
+                } catch (error) {
+                    console.error('Error deleting role:', error);
+                }
+            }
         }
     };
 

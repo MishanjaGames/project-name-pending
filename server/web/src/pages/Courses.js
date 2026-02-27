@@ -13,51 +13,52 @@ function Courses({ data, onLogout }) {
     const [selectedDirection, setSelectedDirection] = useState(''); // filter by direction
     const navigate = useNavigate();
 
+    const token = localStorage.getItem('token');
+
     useEffect(() => {
-        const token = localStorage.getItem('token');
+
 
         if (token) {
-
-            const fetchCourses = async () => {
-                try {
-                    const response = await fetch('http://localhost:4040/api/manage/courses', {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    if (response.ok) {
-                        const res = await response.json();
-                        setCourses(res.data || res);
-                    }
-                } catch (error) {
-                    console.error('Error fetching courses:', error);
-                }
-            };
-
-            const fetchUsers = async () => {
-                try {
-                    const response = await fetch('http://localhost:4040/api/manage/users', {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    if (response.ok) {
-                        const res = await response.json();
-                        setUsers(res.data || res);
-                    }
-                } catch (error) {
-                    console.error('Error fetching users:', error);
-                }
-            };
-
             fetchCourses();
             fetchUsers();
         }
     }, []);
+
+    const fetchCourses = async () => {
+        try {
+            const response = await fetch('http://localhost:4040/api/manage/courses', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.ok) {
+                const res = await response.json();
+                setCourses(res.data || res);
+            }
+        } catch (error) {
+            console.error('Error fetching courses:', error);
+        }
+    };
+
+    const fetchUsers = async () => {
+        try {
+            const response = await fetch('http://localhost:4040/api/manage/users', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.ok) {
+                const res = await response.json();
+                setUsers(res.data || res);
+            }
+        } catch (error) {
+            console.error('Error fetching users:', error);
+        }
+    };
 
     // Helper: find user by userId from the users array
     const getUserInfo = (userId) => {
@@ -115,15 +116,35 @@ function Courses({ data, onLogout }) {
         navigate(`/manage/course/${course._id}`);
     };
 
-    const handleDelete = (course) => {
-        // TODO: Replace with actual delete API call
-
+    const handleDelete = async (course) => {
         const confirmed = window.confirm(
-            `Are you sure you want to delete course "${course.title}"?\n\nThis action cannot be undone.`
+            `Are you sure you want to delete course "${course.title}" (${getUserInfo(course.userId).email})?\n\nThis action cannot be undone.`
         );
 
         if (confirmed) {
-            alert(`[PLACEHOLDER] Course "${course.title}" would be deleted here.\n\nTo implement: add DELETE request to the handleDelete function.`);
+            let i = prompt(`You confirmed to proceed deleting course "${course.title}" (${getUserInfo(course.userId).email}) \n\n This action cannot be undone.
+                \n Please enter course's author's email name to continue.`)
+            if (i === getUserInfo(course.userId).email) {
+                alert(`Course "${course.title}" (${getUserInfo(course.userId).email}) is DELETING. \n This action cannot be undone.`)
+
+                try {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`http://localhost:4040/api/manage/courses/${course._id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (response.ok) {
+                        alert(`Course "${course.title}" (${getUserInfo(course.userId).email}) is DELETED.`)
+                        fetchCourses()
+                        fetchUsers()
+                    }
+                } catch (error) {
+                    console.error('Error deleting course:', error);
+                }
+            }
         }
     };
 
@@ -416,13 +437,34 @@ function Courses({ data, onLogout }) {
 
                                 <div className="card-body p-4">
                                     <div className="text-center mb-4">
-                                        <div className="rounded bg-primary bg-opacity-10 d-flex align-items-center justify-content-center text-primary mx-auto mb-3"
-                                            style={{ width: '72px', height: '72px', fontSize: '1.5rem' }}>
-                                            <svg width="32" height="32" fill="currentColor" viewBox="0 0 16 16">
-                                                <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 6.464V13.5a.5.5 0 0 0 1 0V6.236a.5.5 0 0 0-.053-.224l-7.5-3.5z" />
-                                                <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032z" />
-                                            </svg>
-                                        </div>
+                                        {(() => {
+                                            const thumbnailUrl = getCourseThumbnailUrl(selectedCourse);
+                                            return thumbnailUrl ? (
+                                                <AuthImage
+                                                    src={thumbnailUrl}
+                                                    alt={selectedCourse.title}
+                                                    className="rounded flex-shrink-0"
+                                                    style={{ width: '96px', height: '96px', objectFit: 'cover' }}
+                                                    fallback={
+                                                        <div className="rounded bg-primary bg-opacity-10 d-flex align-items-center justify-content-center text-primary flex-shrink-0"
+                                                            style={{ width: '96px', height: '96px', fontSize: '0.9rem' }}>
+                                                            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                                                                <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 6.464V13.5a.5.5 0 0 0 1 0V6.236a.5.5 0 0 0-.053-.224l-7.5-3.5z" />
+                                                                <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032z" />
+                                                            </svg>
+                                                        </div>
+                                                    }
+                                                />
+                                            ) : (
+                                                <div className="rounded bg-primary bg-opacity-10 d-flex align-items-center justify-content-center text-primary flex-shrink-0"
+                                                    style={{ width: '96px', height: '96px', fontSize: '0.9rem' }}>
+                                                    <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                                                        <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 6.464V13.5a.5.5 0 0 0 1 0V6.236a.5.5 0 0 0-.053-.224l-7.5-3.5z" />
+                                                        <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032z" />
+                                                    </svg>
+                                                </div>
+                                            );
+                                        })()}
                                         <h5 className="fw-bold mb-2">{selectedCourse.title || 'Untitled'}</h5>
                                         <span className={`badge rounded-pill ${getStatusBadgeColor(selectedCourse.status)}`}>
                                             {selectedCourse.status || '—'}
@@ -519,7 +561,7 @@ function Courses({ data, onLogout }) {
                                     <button type="button" className="btn btn-outline-secondary btn-sm" onClick={closeModal}>Close</button>
                                     <button type="button" className="btn btn-primary btn-sm text-light" onClick={() => { closeModal(); navigate(`/manage/course/preview/${selectedCourse._id}`) }}>
                                         <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                            
+
                                         </svg>
                                         Preview
                                     </button>

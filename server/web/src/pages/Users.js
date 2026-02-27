@@ -399,10 +399,28 @@ function Users({ data, onLogout }) {
 
                                 <div className="card-body p-4">
                                     <div className="text-center mb-4">
-                                        <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white mx-auto mb-3"
-                                            style={{ width: '72px', height: '72px', fontSize: '1.8rem' }}>
-                                            {selectedUser.nickname ? selectedUser.nickname.charAt(0).toUpperCase() : '?'}
-                                        </div>
+                                        {(() => {
+                                                const avatarUrl = getProfilePictureUrl(selectedUser);
+                                                return avatarUrl ? (
+                                                    <AuthImage
+                                                        src={avatarUrl}
+                                                        alt={selectedUser.nickname}
+                                                        className="rounded-circle flex-shrink-0"
+                                                        style={{ width: '96px', height: '96px', objectFit: 'cover' }}
+                                                        fallback={
+                                                            <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white flex-shrink-0"
+                                                                style={{ width: '96px', height: '96px', fontSize: '0.8rem' }}>
+                                                                {selectedUser.nickname ? selectedUser.nickname.charAt(0).toUpperCase() : '?'}
+                                                            </div>
+                                                        }
+                                                    />
+                                                ) : (
+                                                    <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white flex-shrink-0"
+                                                        style={{ width: '34px', height: '34px', fontSize: '0.8rem' }}>
+                                                        {selectedUser.nickname ? selectedUser.nickname.charAt(0).toUpperCase() : '?'}
+                                                    </div>
+                                                );
+                                            })()}
                                         <h5 className="fw-bold mb-1">{selectedUser.nickname || 'Unknown'}</h5>
                                     </div>
 

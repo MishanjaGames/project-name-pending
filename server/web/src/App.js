@@ -3,15 +3,21 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Main from './pages/Main';
 import Courses from './pages/Courses';
+import Directions from './pages/Directions';
+import Levels from './pages/Levels';
 import Roles from './pages/Roles';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
-import EditUser from './pages/EditUser';
-import EditRole from './pages/EditRole';
-import EditCourse from './pages/EditCourse';
+import CreateDirection from './pages/CreateDirection';
+import CreateLevel from './pages/CreateLevel';
 import CreateUser from './pages/CreateUser';
 import CreateRole from './pages/CreateRole';
 import CreateCourse from './pages/CreateCourse';
+import EditDirection from './pages/EditDirection';
+import EditLevel from './pages/EditLevel';
+import EditUser from './pages/EditUser';
+import EditRole from './pages/EditRole';
+import EditCourse from './pages/EditCourse';
 import CoursePreview from './pages/CoursePreview';
 
 function App() {
@@ -95,6 +101,69 @@ function App() {
             <Navigate to="/login" />
         } />
 
+        
+        {/* Courses Routes */}
+        <Route path="/manage/courses" element={
+          isLoggedIn ?
+            <Courses data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/manage/courses/create" element={
+          isLoggedIn ?
+            <CreateCourse data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/manage/course/:id" element={
+          isLoggedIn ?
+            <EditCourse data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/manage/course/preview/:id" element={
+          isLoggedIn ?
+            <CoursePreview data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        {/* Settings Route */}
+        <Route path="/manage/settings" element={
+          isLoggedIn ?
+            <Settings data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+
+        {/* Directions Routes */}
+        <Route path="/manage/directions" element={
+          isLoggedIn ?
+            <Directions data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/manage/directions/create" element={
+          isLoggedIn ?
+            <CreateDirection data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/manage/direction/:id" element={
+          isLoggedIn ?
+            <EditDirection data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+
+        {/* Levels Routes */}
+        <Route path="/manage/levels" element={
+          isLoggedIn ?
+            <Levels data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/manage/levels/create" element={
+          isLoggedIn ?
+            <CreateLevel data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/manage/level/:id" element={
+          isLoggedIn ?
+            <EditLevel data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+
         {/* Users Routes */}
         <Route path="/manage/users" element={
           isLoggedIn ?
@@ -126,34 +195,6 @@ function App() {
         <Route path="/manage/role/:id" element={
           isLoggedIn ?
             <EditRole data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-
-        {/* Courses Routes */}
-        <Route path="/manage/courses" element={
-          isLoggedIn ?
-            <Courses data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/courses/create" element={
-          isLoggedIn ?
-            <CreateCourse data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/course/:id" element={
-          isLoggedIn ?
-            <EditCourse data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/course/preview/:id" element={
-          isLoggedIn ?
-            <CoursePreview data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        {/* Settings Route */}
-        <Route path="/manage/settings" element={
-          isLoggedIn ?
-            <Settings data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
         } />
 

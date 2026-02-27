@@ -1,149 +1,173 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import './CoursePreview.css';
 
-// Mock user data - replace with your actual auth
-const MOCK_USER = {
-  nickname: 'Admin User',
-  email: 'admin@example.com',
-  role: 'admin'
-};
-
-function CoursePreview() {
+function CoursePreview({ data, onLogout }) {
   const { id } = useParams();
   const [course, setCourse] = useState(null);
+  const [author, setAuthor] = useState({});
+  const [role, setRole] = useState({})
   const [loading, setLoading] = useState(true);
+  const [expandedVolumes, setExpandedVolumes] = useState({});
   const [expandedChapters, setExpandedChapters] = useState({});
   const [editMode, setEditMode] = useState(false);
-  const [chapters, setChapters] = useState([]);
+  const [volumes, setVolumes] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
+  const [directions, setDirections] = useState([]);
+  const [levels, setLevels] = useState([]);
+
+  const [draggedVolume, setDraggedVolume] = useState(null);
   const [draggedChapter, setDraggedChapter] = useState(null);
   const [draggedItem, setDraggedItem] = useState(null);
-  
-  // Editable course fields
+
   const [editableCourse, setEditableCourse] = useState(null);
-  const [showAddItemModal, setShowAddItemModal] = useState(null); // {chapterIndex, type}
-  const [showTextEditor, setShowTextEditor] = useState(null);
-  const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
+  const [showAddItemModal, setShowAddItemModal] = useState(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [editingTitle, setEditingTitle] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
+  const [textFilesToUpload, setTextFilesToUpload] = useState({});
+  const [loadingTextContent, setLoadingTextContent] = useState({});
+  const navigate = useNavigate()
+
+  const token = localStorage.getItem('token');
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      const mockCourse = {
-        _id: id || '1',
-        title: 'Unity 2D Platformer',
-        description: 'Create your first 2D platformer game with Unity. Learn game development fundamentals and build a complete game from scratch.',
-        direction: 'GAME DEVELOPMENT',
-        level: 'JUNIOR',
-        price: 9.99,
-        rating: 4.8,
-        ratingCount: 91,
-        thumbnail: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=400&h=250&fit=crop',
-        author: {
-          nickname: 'Amar Abdurazakov'
-        },
-        updatedAt: '2026-02-18T14:30:00Z',
-        whatYouWillLearn: [
-          'Master the core concepts of Unity 2D Platformer',
-          'Build real-world projects',
-          'Understand game physics and mechanics',
-          'Create engaging player controls'
-        ],
-        chapters: [
-          {
-            id: 'chapter-1',
-            title: 'Chapter 1: Introduction',
-            items: [
-              {
-                id: 'video-1',
-                type: 'video',
-                title: 'Welcome to the Course',
-                url: 'https://www.w3schools.com/html/mov_bbb.mp4'
-              },
-              {
-                id: 'link-1',
-                type: 'link',
-                title: 'Course Setup Guide',
-                url: 'https://unity.com/learn'
-              }
-            ]
-          },
-          {
-            id: 'chapter-2',
-            title: 'Chapter 2: Getting Started with Unity',
-            items: [
-              {
-                id: 'video-2',
-                type: 'video',
-                title: 'Installing Unity',
-                url: 'https://www.w3schools.com/html/movie.mp4'
-              }
-            ]
-          }
-        ]
-      };
-      
-      setCourse(mockCourse);
-      setEditableCourse({...mockCourse});
-      setChapters(mockCourse.chapters);
-      setLoading(false);
-    }, 500);
+    fetchData();
+    setRole(data.role)
   }, [id]);
 
-  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    if (course) {
+      fetchUserData();
+    }
+  }, [course?.userId]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [courseRes, directionsRes, levelsRes, filesRes] = await Promise.all([
+        fetch(`http://localhost:4040/api/courses/${id}`).catch(() => null),
+        fetch('http://localhost:4040/api/directions').catch(() => null),
+        fetch('http://localhost:4040/api/levels').catch(() => null),
+        fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
+          headers: {
+            'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '',
+            'Content-Type': 'application/json'
+          }
+        }).catch(() => null),
+      ]);
+
+      if (courseRes && courseRes.ok) {
+        const courseData = await courseRes.json();
+        if (courseData.data) {
+          setCourse(courseData.data);
+          setEditableCourse({ ...courseData.data });
+          setVolumes(courseData.data.volumes || []);
+        }
+      }
+
+      if (directionsRes && directionsRes.ok) {
+        const directionsData = await directionsRes.json();
+        if (Array.isArray(directionsData.data)) {
+          setDirections(directionsData.data);
+        }
+      }
+
+      if (levelsRes && levelsRes.ok) {
+        const levelsData = await levelsRes.json();
+        if (Array.isArray(levelsData.data)) {
+          setLevels(levelsData.data);
+        }
+      }
+
+      if (filesRes && filesRes.ok) {
+        const filesData = await filesRes.json();
+        const allFiles = filesData.data || filesData.files || [];
+        const contentFiles = allFiles.filter((file) => {
+          const fileName = (file.originalName || file.filename || '').toLowerCase();
+          const isThumbnail = fileName.includes('thumbnail') ||
+            (fileName.endsWith('.png') && allFiles.indexOf(file) === 0 && file.mimetype?.startsWith('image/'));
+          const isSystemText = isSystemTextFile(file.originalName || file.filename || '');
+          return !isThumbnail && !isSystemText;
+        });
+        setUploadedFiles(contentFiles);
+      }
+
+      setLoading(false);
+    } catch (err) {
+      console.error(`${err}`)
+    }
+  };
+
+  const fetchUserData = async () => {
+    try {
+      if (!course?.userId) return;
+      const response = await fetch(`http://localhost:4040/api/manage/users/${course.userId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
+          'Content-Type': 'application/json'
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAuthor({
+          nickname: data.data.nickname,
+          email: data.data.email,
+          firstName: data.data.firstName,
+          lastName: data.data.lastName
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (hasChanges) {
         e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        e.returnValue = 'You have unsaved changes!';
         return e.returnValue;
       }
     };
-
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasChanges]);
 
+  const isSystemTextFile = (filename) => {
+    return /^vol-\d+-ch-\d+-item-\d+-\d+\.txt$/i.test(filename);
+  };
+
+  const toggleVolume = (volumeId) => {
+    setExpandedVolumes(prev => ({ ...prev, [volumeId]: !prev[volumeId] }));
+  };
+
   const toggleChapter = (chapterId) => {
-    setExpandedChapters(prev => ({
-      ...prev,
-      [chapterId]: !prev[chapterId]
-    }));
+    setExpandedChapters(prev => ({ ...prev, [chapterId]: !prev[chapterId] }));
   };
 
   const handleCourseFieldChange = (field, value) => {
-    setEditableCourse(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setEditableCourse(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
   };
 
   const handleSkillChange = (index, value) => {
-    const newSkills = [...editableCourse.whatYouWillLearn];
+    const newSkills = [...editableCourse.skills];
     newSkills[index] = value;
-    setEditableCourse(prev => ({
-      ...prev,
-      whatYouWillLearn: newSkills
-    }));
+    setEditableCourse(prev => ({ ...prev, skills: newSkills }));
     setHasChanges(true);
   };
 
   const addSkill = () => {
-    setEditableCourse(prev => ({
-      ...prev,
-      whatYouWillLearn: [...prev.whatYouWillLearn, '']
-    }));
+    setEditableCourse(prev => ({ ...prev, skills: [...prev.skills, ''] }));
     setHasChanges(true);
   };
 
   const removeSkill = (index) => {
-    const newSkills = editableCourse.whatYouWillLearn.filter((_, i) => i !== index);
-    setEditableCourse(prev => ({
-      ...prev,
-      whatYouWillLearn: newSkills
-    }));
+    const newSkills = editableCourse.skills.filter((_, i) => i !== index);
+    setEditableCourse(prev => ({ ...prev, skills: newSkills }));
     setHasChanges(true);
   };
 
@@ -152,167 +176,350 @@ function CoursePreview() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setEditableCourse(prev => ({
-          ...prev,
-          thumbnail: reader.result
-        }));
+        setEditableCourse(prev => ({ ...prev, thumbnail: reader.result }));
         setHasChanges(true);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Chapter drag & drop
-  const handleChapterDragStart = (e, index) => {
+  const addVolume = () => {
+    const newVolume = { vid: `vol-${Date.now()}`, title: 'New Volume', chapters: [] };
+    setVolumes([...volumes, newVolume]);
+    setHasChanges(true);
+  };
+
+  const deleteVolume = (volumeIndex) => {
+    const volume = volumes[volumeIndex];
+    const userInput = prompt(`To delete this volume, please type its title:\n"${volume.title}"`);
+    if (userInput === volume.title) {
+      setVolumes(volumes.filter((_, i) => i !== volumeIndex));
+      setHasChanges(true);
+      alert('Volume deleted successfully');
+    } else if (userInput !== null) {
+      alert('Title does not match. Deletion cancelled.');
+    }
+  };
+
+  const updateVolumeTitle = (volumeIndex, newTitle) => {
+    const newVolumes = [...volumes];
+    newVolumes[volumeIndex].title = newTitle;
+    setVolumes(newVolumes);
+    setHasChanges(true);
+  };
+
+  const addChapter = (volumeIndex) => {
+    const newChapter = { cid: `ch-${Date.now()}`, title: 'New Chapter', items: [] };
+    const newVolumes = [...volumes];
+    newVolumes[volumeIndex].chapters.push(newChapter);
+    setVolumes(newVolumes);
+    setHasChanges(true);
+  };
+
+  const deleteChapter = (volumeIndex, chapterIndex) => {
+    const chapter = volumes[volumeIndex].chapters[chapterIndex];
+    const userInput = prompt(`To delete this chapter, please type its title:\n"${chapter.title}"`);
+    if (userInput === chapter.title) {
+      const newVolumes = [...volumes];
+      newVolumes[volumeIndex].chapters = newVolumes[volumeIndex].chapters.filter((_, i) => i !== chapterIndex);
+      setVolumes(newVolumes);
+      setHasChanges(true);
+      alert('Chapter deleted successfully');
+    } else if (userInput !== null) {
+      alert('Title does not match. Deletion cancelled.');
+    }
+  };
+
+  const updateChapterTitle = (volumeIndex, chapterIndex, newTitle) => {
+    const newVolumes = [...volumes];
+    newVolumes[volumeIndex].chapters[chapterIndex].title = newTitle;
+    setVolumes(newVolumes);
+    setHasChanges(true);
+  };
+
+  const addContentItem = (volumeIndex, chapterIndex, type) => {
+    setShowAddItemModal({ volumeIndex, chapterIndex, type });
+  };
+
+  const saveContentItem = (volumeIndex, chapterIndex, itemData) => {
+    const newVolumes = [...volumes];
+    const newItem = {
+      iid: `item-${Date.now()}`,
+      type: itemData.type,
+      title: itemData.title,
+      url: itemData.url || ''
+    };
+    newVolumes[volumeIndex].chapters[chapterIndex].items.push(newItem);
+    setVolumes(newVolumes);
+
+    if (itemData.type === 'text' && itemData.content) {
+      const fileKey = `${newVolumes[volumeIndex].vid}-${newVolumes[volumeIndex].chapters[chapterIndex].cid}-${newItem.iid}`;
+      const textBlob = new Blob([itemData.content], { type: 'text/plain' });
+      const textFile = new File([textBlob], `${fileKey}.txt`, { type: 'text/plain' });
+      setTextFilesToUpload(prev => ({ ...prev, [fileKey]: { file: textFile, itemId: newItem.iid, volumeIndex, chapterIndex } }));
+    }
+
+    setShowAddItemModal(null);
+    setHasChanges(true);
+  };
+
+  const editContentItem = (volumeIndex, chapterIndex, itemIndex) => {
+    const item = volumes[volumeIndex].chapters[chapterIndex].items[itemIndex];
+    setEditingItem({ volumeIndex, chapterIndex, itemIndex, item });
+  };
+
+  const updateContentItem = (volumeIndex, chapterIndex, itemIndex, itemData) => {
+    const newVolumes = [...volumes];
+    const updatedItem = {
+      ...newVolumes[volumeIndex].chapters[chapterIndex].items[itemIndex],
+      type: itemData.type,
+      title: itemData.title,
+      url: itemData.url || newVolumes[volumeIndex].chapters[chapterIndex].items[itemIndex].url || ''
+    };
+    newVolumes[volumeIndex].chapters[chapterIndex].items[itemIndex] = updatedItem;
+    setVolumes(newVolumes);
+
+    if (itemData.type === 'text' && itemData.content) {
+      const fileKey = `${newVolumes[volumeIndex].vid}-${newVolumes[volumeIndex].chapters[chapterIndex].cid}-${updatedItem.iid}`;
+      const textBlob = new Blob([itemData.content], { type: 'text/plain' });
+      const textFile = new File([textBlob], `${fileKey}.txt`, { type: 'text/plain' });
+      setTextFilesToUpload(prev => ({ ...prev, [fileKey]: { file: textFile, itemId: updatedItem.iid, volumeIndex, chapterIndex } }));
+    }
+
+    setEditingItem(null);
+    setHasChanges(true);
+  };
+
+  const deleteContentItem = (volumeIndex, chapterIndex, itemIndex) => {
+    if (!window.confirm('Delete this item?')) return;
+    const newVolumes = [...volumes];
+    newVolumes[volumeIndex].chapters[chapterIndex].items.splice(itemIndex, 1);
+    setVolumes(newVolumes);
+    setHasChanges(true);
+  };
+
+  const updateItemTitle = (volumeIndex, chapterIndex, itemIndex, newTitle) => {
+    const newVolumes = [...volumes];
+    newVolumes[volumeIndex].chapters[chapterIndex].items[itemIndex].title = newTitle;
+    setVolumes(newVolumes);
+    setHasChanges(true);
+  };
+
+  const handleVolumeDragStart = (e, index) => {
     if (!editMode) return;
-    setDraggedChapter(index);
+    setDraggedVolume(index);
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleChapterDragOver = (e) => {
+  const handleVolumeDrop = (e, targetIndex) => {
+    if (!editMode || draggedVolume === null) return;
+    e.preventDefault();
+    const newVolumes = [...volumes];
+    const [moved] = newVolumes.splice(draggedVolume, 1);
+    newVolumes.splice(targetIndex, 0, moved);
+    setVolumes(newVolumes);
+    setDraggedVolume(null);
+    setHasChanges(true);
+  };
+
+  const handleChapterDragStart = (e, volumeIndex, chapterIndex) => {
+    if (!editMode) return;
+    setDraggedChapter({ volumeIndex, chapterIndex });
+    e.dataTransfer.effectAllowed = 'move';
+    e.stopPropagation();
+  };
+
+  const handleChapterDrop = (e, targetVolumeIndex, targetChapterIndex) => {
+    if (!editMode || !draggedChapter) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const newVolumes = [...volumes];
+    const [moved] = newVolumes[draggedChapter.volumeIndex].chapters.splice(draggedChapter.chapterIndex, 1);
+    newVolumes[targetVolumeIndex].chapters.splice(targetChapterIndex, 0, moved);
+    setVolumes(newVolumes);
+    setDraggedChapter(null);
+    setHasChanges(true);
+  };
+
+  const handleItemDragStart = (e, volumeIndex, chapterIndex, itemIndex) => {
+    if (!editMode) return;
+    setDraggedItem({ volumeIndex, chapterIndex, itemIndex });
+    e.dataTransfer.effectAllowed = 'move';
+    e.stopPropagation();
+  };
+
+  const handleItemDrop = (e, targetVolumeIndex, targetChapterIndex, targetItemIndex) => {
+    if (!editMode || !draggedItem) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const newVolumes = [...volumes];
+    const [moved] = newVolumes[draggedItem.volumeIndex].chapters[draggedItem.chapterIndex].items.splice(draggedItem.itemIndex, 1);
+    newVolumes[targetVolumeIndex].chapters[targetChapterIndex].items.splice(targetItemIndex, 0, moved);
+    setVolumes(newVolumes);
+    setDraggedItem(null);
+    setHasChanges(true);
+  };
+
+  const handleDragOver = (e) => {
     if (!editMode) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleChapterDrop = (e, targetIndex) => {
-    if (!editMode || draggedChapter === null) return;
-    e.preventDefault();
-
-    const newChapters = [...chapters];
-    const [movedChapter] = newChapters.splice(draggedChapter, 1);
-    newChapters.splice(targetIndex, 0, movedChapter);
-    
-    setChapters(newChapters);
-    setDraggedChapter(null);
-    setHasChanges(true);
-  };
-
-  // Item drag & drop
-  const handleItemDragStart = (e, chapterIndex, itemIndex) => {
-    if (!editMode) return;
-    setDraggedItem({ chapterIndex, itemIndex });
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleItemDrop = (e, targetChapterIndex, targetItemIndex) => {
-    if (!editMode || !draggedItem) return;
-    e.preventDefault();
-
-    const newChapters = [...chapters];
-    const sourceChapter = newChapters[draggedItem.chapterIndex];
-    const targetChapter = newChapters[targetChapterIndex];
-    
-    const [movedItem] = sourceChapter.items.splice(draggedItem.itemIndex, 1);
-    targetChapter.items.splice(targetItemIndex, 0, movedItem);
-    
-    setChapters(newChapters);
-    setDraggedItem(null);
-    setHasChanges(true);
-  };
-
-  const addContentItem = (chapterIndex, type) => {
-    setShowAddItemModal({ chapterIndex, type });
-  };
-
-  const saveContentItem = (chapterIndex, itemData) => {
-    const newChapters = [...chapters];
-    const newItem = {
-      id: `item-${Date.now()}`,
-      ...itemData
-    };
-    newChapters[chapterIndex].items.push(newItem);
-    setChapters(newChapters);
-    setShowAddItemModal(null);
-    setHasChanges(true);
-  };
-
-  const deleteContentItem = (chapterIndex, itemIndex) => {
-    if (!window.confirm('Delete this item?')) return;
-    const newChapters = [...chapters];
-    newChapters[chapterIndex].items.splice(itemIndex, 1);
-    setChapters(newChapters);
-    setHasChanges(true);
-  };
-
   const parseTextSyntax = (text) => {
+    if (!text) return '';
+
     let html = text;
-    
+
+    // Escape HTML special characters first
+    html = html.replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
     // Headers
     html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
     html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
     html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-    
-    // Paragraphs
-    html = html.replace(/`([^}]+)`/g, '<p>$1</p>');
-    
-    // Links
+
+    // Paragraph
+    html = html.replace(/`\{([^}]+)\}`/g, '<p>$1</p>');
+
+    // Video player  ->  {video-url}
+    html = html.replace(/\{([^}]+)\}/g, '<video src="$1" class="video-player" controls></video>');
+
+    // YouTube embed  ->  (youtube-url)  — accepts any YouTube URL format
+    html = html.replace(/\(([^)]+)\)/g, (_, rawUrl) => {
+      const toEmbedUrl = (url) => {
+        // Already an embed URL — pass through
+        if (url.includes('youtube.com/embed/')) return url;
+        // youtu.be/ID
+        const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+        if (shortMatch) return `https://www.youtube.com/embed/${shortMatch[1]}`;
+        // youtube.com/watch?v=ID
+        const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+        if (watchMatch) return `https://www.youtube.com/embed/${watchMatch[1]}`;
+        // youtube.com/shorts/ID
+        const shortsMatch = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+        if (shortsMatch) return `https://www.youtube.com/embed/${shortsMatch[1]}`;
+        // Unrecognised — return as-is so it doesn't break
+        return url;
+      };
+      const embedUrl = toEmbedUrl(rawUrl.trim());
+      return `<iframe src="${embedUrl}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
+    });
+
+    // Download file  ->  ![Label|url]!
+    html = html.replace(/!\[([^\|]+)\|([^\]]+)\]!/g, '<a href="$2" download class="text-download-link"><i class="bi bi-download"></i> $1</a>');
+
+    // Link  ->  @url@
     html = html.replace(/@([^@]+)@/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-    
+
+    // Image  ->  #image-url#
+    html = html.replace(/#([^#]+)#/g, '<img alt="$1" class="content-image" src="$1">');
+
+    // Numbered lists
+    html = html.replace(/^(\d+)\.\s(.+)$/gm, '<li class="numbered-item">$2</li>');
+    html = html.replace(/(<li class="numbered-item">.*?<\/li>\n?)+/gs, '<ol>$&</ol>');
+
+    // Bullet lists
+    html = html.replace(/^[•\-\*]\s(.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*?<\/li>\n?)+/gs, '<ul>$&</ul>');
+
+    // Tabs
+    html = html.replace(/\\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
+
+    // Line breaks
+    html = html.replace(/\\n/g, '<br>');
+
     return html;
   };
 
   const handleSaveChanges = async () => {
     try {
-      // TODO: Implement actual API call
-      // await fetch(`/api/courses/${id}`, {
-      //   method: 'PUT',
-      //   body: JSON.stringify({ ...editableCourse, chapters })
-      // });
-      
-      setCourse({...editableCourse});
-      setHasChanges(false);
-      alert('Changes saved successfully!');
+      const token = localStorage.getItem('token');
+      const urlUpdates = {};
+      const uploadPromises = Object.entries(textFilesToUpload).map(([fileKey, fileData]) => {
+        const formData = new FormData();
+        formData.append('file', fileData.file);
+        return fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
+          method: 'POST',
+          headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` },
+          body: formData
+        }).then(async (response) => {
+          if (response.ok) {
+            const result = await response.json();
+            const fileUrl = result.data?.link?.url || result.data?.url || result.url;
+            if (fileUrl) {
+              urlUpdates[fileKey] = { url: fileUrl, volumeIndex: fileData.volumeIndex, chapterIndex: fileData.chapterIndex, itemId: fileData.itemId };
+            }
+          }
+          return response;
+        });
+      });
+
+      let newVolumes = [...volumes];
+
+      if (uploadPromises.length > 0) {
+        await Promise.all(uploadPromises);
+        Object.entries(urlUpdates).forEach(([, { url, volumeIndex, chapterIndex, itemId }]) => {
+          if (newVolumes[volumeIndex]?.chapters[chapterIndex]) {
+            const item = newVolumes[volumeIndex].chapters[chapterIndex].items.find(i => i.iid === itemId);
+            if (item) item.url = url;
+          }
+        });
+      }
+
+      const response = await fetch(`http://localhost:4040/api/manage/courses/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ...editableCourse, volumes: newVolumes })
+      });
+
+      if (response.ok) {
+        setCourse({ ...editableCourse, volumes: newVolumes });
+        setEditableCourse({ ...editableCourse, volumes: newVolumes });
+        setVolumes(newVolumes);
+        setTextFilesToUpload({});
+        setHasChanges(false);
+        alert('Changes saved successfully!');
+      } else {
+        alert(`Failed to save changes: Server error ${response.status}`);
+      }
     } catch (err) {
-      console.error('Error saving:', err);
-      alert('Failed to save changes');
+      alert('Failed to save changes: ' + err.message);
     }
   };
 
-  const handleAddToCart = () => {
-    alert(`Added "${course.title}" to cart!`);
-  };
-
-  const handleEnroll = () => {
-    alert(`Enrolled in "${course.title}"!`);
-  };
-
-  const handleLogout = () => {
-    alert('Logout clicked');
-  };
+  const handleAddToCart = () => alert(`Added "${course.title}" to cart!`);
+  const handleEnroll = () => alert(`Enrolled in "${course.title}"!`);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    const options = { year: 'numeric', month: 'long', day: 'numeric' };
-    return date.toLocaleDateString('en-US', options);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
-  const renderStars = (rating) => {
+  const renderStars = (ratings) => {
     const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(<i key={i} className="bi bi-star-fill text-warning"></i>);
-    }
-    if (hasHalfStar) {
-      stars.push(<i key="half" className="bi bi-star-half text-warning"></i>);
-    }
+    const fullStars = Math.floor(ratings);
+    const hasHalfStar = ratings % 1 !== 0;
+    for (let i = 0; i < fullStars; i++) stars.push(<i key={i} className="bi bi-star-fill text-warning"></i>);
+    if (hasHalfStar) stars.push(<i key="half" className="bi bi-star-half text-warning"></i>);
     const emptyStars = 5 - stars.length;
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(<i key={`empty-${i}`} className="bi bi-star text-warning"></i>);
-    }
+    for (let i = 0; i < emptyStars; i++) stars.push(<i key={`empty-${i}`} className="bi bi-star text-warning"></i>);
     return stars;
   };
 
   if (loading) {
     return (
       <>
-        <Navbar data={MOCK_USER} onLogout={handleLogout} />
+        <Navbar data={data} onLogout={onLogout} />
         <div className="course-preview-loading">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
+          <div className="spinner-border text-primary"></div>
         </div>
       </>
     );
@@ -321,97 +528,90 @@ function CoursePreview() {
   if (!course) {
     return (
       <>
-        <Navbar data={MOCK_USER} onLogout={handleLogout} />
-        <div className="course-preview-error">
-          <h3>Course not found</h3>
+        <Navbar data={data} onLogout={onLogout} />
+        <div className="course-preview-page">
+          <div className="row mb-1">
+            <div className="col-12">
+              <div className="d-flex align-items-center gap-3 mb-2">
+                <button className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" onClick={() => navigate('/manage/courses')}>
+                  <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path fillRule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" />
+                  </svg>
+                  Back to Courses
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="course-preview-error"><h3>Course not found</h3></div>
         </div>
       </>
     );
   }
 
-  const isAdmin = MOCK_USER && ['admin', 'root', 'manager'].includes(MOCK_USER.role);
+  const isAdmin = data.role && ['admin', 'root', 'manager', 'create'].includes(role.roleName);
+  const hasContent = volumes.length > 0;
 
   return (
     <>
-      <Navbar data={MOCK_USER} onLogout={handleLogout} />
-      
+      <Navbar data={data} onLogout={onLogout} />
+
       <div className="course-preview-page">
+        <div className="row mb-1">
+          <div className="col-12">
+            <div className="d-flex align-items-center gap-3 mb-2">
+              <button className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" onClick={() => navigate('/manage/courses')}>
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                  <path fillRule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" />
+                </svg>
+                Back to Courses
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="course-preview-container">
-          
-          {/* Top Section: Course Info + Purchase Card */}
           <div className="content-wrapper">
-            
-            {/* Left Column - Course Info Only */}
             <div className="course-info-section">
-              
-              {/* Mobile Thumbnail */}
               <div className="mobile-thumbnail">
                 {editMode ? (
                   <div className="thumbnail-upload">
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleThumbnailChange}
-                      id="mobile-thumbnail-upload"
-                      style={{display: 'none'}}
-                    />
+                    <input type="file" accept="image/*" onChange={handleThumbnailChange} id="mobile-thumbnail-upload" style={{ display: 'none' }} />
                     <label htmlFor="mobile-thumbnail-upload" className="thumbnail-upload-label">
-                      <img src={editableCourse.thumbnail} alt={editableCourse.title} />
-                      <div className="thumbnail-overlay">
-                        <i className="bi bi-camera"></i>
-                        <span>Change Photo</span>
-                      </div>
+                      <img src={'http://localhost:4040' + editableCourse.links[0].url} alt={editableCourse.links[0].description} />
+                      <div className="thumbnail-overlay"><i className="bi bi-camera"></i><span>Change Photo</span></div>
                     </label>
                   </div>
                 ) : (
-                  <img src={course.thumbnail} alt={course.title} />
+                  <img src={'http://localhost:4040' + editableCourse.links[0].url} alt={editableCourse.links[0].description} />
                 )}
               </div>
 
-              {/* Title and Price Row */}
               <div className="title-price-row">
                 {editMode ? (
-                  <input 
-                    type="text"
-                    className="form-control course-title-input"
-                    value={editableCourse.title}
-                    onChange={(e) => handleCourseFieldChange('title', e.target.value)}
-                  />
+                  <input type="text" className="form-control course-title-input" value={editableCourse.title} onChange={(e) => handleCourseFieldChange('title', e.target.value)} />
                 ) : (
                   <h1 className="course-title">{course.title}</h1>
                 )}
                 <div className="mobile-price">
-                  ${editMode ? (
-                    <input 
-                      type="number"
-                      className="form-control price-input"
-                      value={editableCourse.price}
-                      onChange={(e) => handleCourseFieldChange('price', parseFloat(e.target.value))}
-                      step="0.01"
-                      min="0"
-                    />
-                  ) : course.price}
+                  {editMode ? (
+                    <input type="number" className="form-control price-input" value={editableCourse.price} onChange={(e) => handleCourseFieldChange('price', parseFloat(e.target.value))} step="0.01" min="0" />
+                  ) : (course.price > 0) ? '$' + course.price : 'Free'}
                 </div>
               </div>
-              
-              {/* Direction and Level Badges */}
+
               <div className="badges-row">
                 {editMode ? (
                   <>
-                    <input 
-                      type="text"
-                      className="form-control badge-input"
-                      value={editableCourse.direction}
-                      onChange={(e) => handleCourseFieldChange('direction', e.target.value)}
-                      placeholder="Direction"
-                    />
-                    <input 
-                      type="text"
-                      className="form-control badge-input"
-                      value={editableCourse.level}
-                      onChange={(e) => handleCourseFieldChange('level', e.target.value)}
-                      placeholder="Level"
-                    />
+                    <select className="form-select badge-input" value={editableCourse.direction} onChange={(e) => handleCourseFieldChange('direction', e.target.value)}>
+                      <option value="">Select Direction</option>
+                      {directions.map((dir) => <option key={dir._id} value={dir.directionName}>{dir.directionName}</option>)}
+                    </select>
+                    <select className="form-select badge-input" value={editableCourse.level} onChange={(e) => handleCourseFieldChange('level', e.target.value)}>
+                      <option value="">Select Level</option>
+                      {levels.filter(level => level.directionName === editableCourse.direction).map((level) => (
+                        <option key={level._id} value={level.levelName}>{level.levelName}</option>
+                      ))}
+                    </select>
                   </>
                 ) : (
                   <>
@@ -420,49 +620,30 @@ function CoursePreview() {
                   </>
                 )}
               </div>
-              
-              {/* Description Box */}
+
               <div className="description-box">
                 {editMode ? (
-                  <textarea 
-                    className="form-control"
-                    value={editableCourse.description}
-                    onChange={(e) => handleCourseFieldChange('description', e.target.value)}
-                    rows="3"
-                  />
+                  <textarea className="form-control" value={editableCourse.description} onChange={(e) => handleCourseFieldChange('description', e.target.value)} rows="3" />
                 ) : (
                   <p>{course.description}</p>
                 )}
               </div>
 
-              {/* Mobile Skills */}
               <div className="mobile-skills">
                 <h4 className="section-title">What you'll learn</h4>
                 <div className="skills-grid">
                   {editMode ? (
                     <>
-                      {editableCourse.whatYouWillLearn.map((skill, idx) => (
+                      {editableCourse.skills.map((skill, idx) => (
                         <div className="skill-item-edit" key={idx}>
-                          <input 
-                            type="text"
-                            className="form-control skill-input"
-                            value={skill}
-                            onChange={(e) => handleSkillChange(idx, e.target.value)}
-                          />
-                          <button 
-                            className="btn btn-sm btn-danger"
-                            onClick={() => removeSkill(idx)}
-                          >
-                            <i className="bi bi-x"></i>
-                          </button>
+                          <input type="text" className="form-control skill-input" value={skill} onChange={(e) => handleSkillChange(idx, e.target.value)} />
+                          <button className="btn btn-sm btn-danger" onClick={() => removeSkill(idx)}><i className="bi bi-x"></i></button>
                         </div>
                       ))}
-                      <button className="btn btn-sm btn-primary" onClick={addSkill}>
-                        <i className="bi bi-plus"></i> Add Skill
-                      </button>
+                      <button className="btn btn-sm btn-primary" onClick={addSkill}><i className="bi bi-plus"></i> Add Skill</button>
                     </>
                   ) : (
-                    course.whatYouWillLearn.map((item, idx) => (
+                    course.skills.map((item, idx) => (
                       <div className="skill-item" key={idx}>
                         <i className="bi bi-check-circle-fill text-success"></i>
                         <span>{item}</span>
@@ -471,64 +652,42 @@ function CoursePreview() {
                   )}
                 </div>
               </div>
-              
-              {/* Ratings */}
+
               <div className="ratings-section">
-                <span className="rating-number">{course.rating}</span>
-                <div className="stars">{renderStars(course.rating)}</div>
-                <span className="students-count">({course.ratingCount} students)</span>
-              </div>
-              
-              {/* Meta Info */}
-              <div className="course-meta">
-                <span className="meta-item">
-                  Created by <strong>{course.author.nickname}</strong>
-                </span>
-                <span className="meta-divider">•</span>
-                <span className="meta-item">
-                  Last updated {formatDate(course.updatedAt)}
-                </span>
+                <span className="rating-number">{course.ratings}</span>
+                <div className="stars">{renderStars(course.ratings)}</div>
+                <span className="students-count">({course.ratingsCount} students)</span>
               </div>
 
-              {/* Mobile Buttons */}
+              <div className="course-meta">
+                <span className="meta-item">
+                  Created by <strong>{(author.firstName !== 'undefined' || author.lastName !== 'undefined') ? author.nickname : author.firstName + ' ' + author.lastName}</strong>
+                </span>
+                <span className="meta-divider">•</span>
+                <span className="meta-item">Last updated {formatDate(course.updatedAt)}</span>
+              </div>
+
               <div className="mobile-buttons">
-                <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>
-                  Add to Cart
-                </button>
-                <button className="btn btn-outline-secondary btn-lg w-100" onClick={handleEnroll}>
-                  Enroll Now
-                </button>
+                <button className="btn btn-primary btn-lg w-100 mb-2 disabled" onClick={handleAddToCart}>Add to Cart</button>
+                <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>Enroll Now</button>
                 <p className="guarantee-text">30-Day Money-Back Guarantee</p>
               </div>
 
-              {/* Desktop Skills */}
               <div className="desktop-skills section-card">
                 <h4 className="section-title">What you'll learn</h4>
                 <div className="skills-grid">
                   {editMode ? (
                     <>
-                      {editableCourse.whatYouWillLearn.map((skill, idx) => (
+                      {editableCourse.skills.map((skill, idx) => (
                         <div className="skill-item-edit" key={idx}>
-                          <input 
-                            type="text"
-                            className="form-control skill-input"
-                            value={skill}
-                            onChange={(e) => handleSkillChange(idx, e.target.value)}
-                          />
-                          <button 
-                            className="btn btn-sm btn-danger"
-                            onClick={() => removeSkill(idx)}
-                          >
-                            <i className="bi bi-x"></i>
-                          </button>
+                          <input type="text" className="form-control skill-input" value={skill} onChange={(e) => handleSkillChange(idx, e.target.value)} />
+                          <button className="btn btn-sm btn-danger" onClick={() => removeSkill(idx)}><i className="bi bi-x"></i></button>
                         </div>
                       ))}
-                      <button className="btn btn-sm btn-primary mt-2" onClick={addSkill}>
-                        <i className="bi bi-plus"></i> Add Skill
-                      </button>
+                      <button className="btn btn-sm btn-primary mt-2" onClick={addSkill}><i className="bi bi-plus"></i> Add Skill</button>
                     </>
                   ) : (
-                    course.whatYouWillLearn.map((item, idx) => (
+                    course.skills.map((item, idx) => (
                       <div className="skill-item" key={idx}>
                         <i className="bi bi-check-circle-fill text-success"></i>
                         <span>{item}</span>
@@ -537,379 +696,623 @@ function CoursePreview() {
                   )}
                 </div>
               </div>
-
             </div>
 
-            {/* Right Column - Purchase Card */}
             <div className="purchase-card-column">
               <div className="purchase-card">
                 <div className="course-thumbnail">
                   {editMode ? (
                     <div className="thumbnail-upload">
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handleThumbnailChange}
-                        id="desktop-thumbnail-upload"
-                        style={{display: 'none'}}
-                      />
+                      <input type="file" accept="image/*" onChange={handleThumbnailChange} id="desktop-thumbnail-upload" style={{ display: 'none' }} />
                       <label htmlFor="desktop-thumbnail-upload" className="thumbnail-upload-label">
-                        <img src={editableCourse.thumbnail} alt={editableCourse.title} />
-                        <div className="thumbnail-overlay">
-                          <i className="bi bi-camera"></i>
-                          <span>Change Photo</span>
-                        </div>
+                        <img src={'http://localhost:4040' + editableCourse.links[0].url} alt={editableCourse.links[0].description} />
+                        <div className="thumbnail-overlay"><i className="bi bi-camera"></i><span>Change Photo</span></div>
                       </label>
                     </div>
                   ) : (
-                    <img src={course.thumbnail} alt={course.title} />
+                    <img src={'http://localhost:4040' + editableCourse.links[0].url} alt={editableCourse.links[0].description} />
                   )}
                 </div>
-
                 <div className="purchase-card-body">
                   <div className="price-section">
                     <h2 className="price">
-                      ${editMode ? (
-                        <input 
-                          type="number"
-                          className="form-control price-input-desktop"
-                          value={editableCourse.price}
-                          onChange={(e) => handleCourseFieldChange('price', parseFloat(e.target.value))}
-                          step="0.01"
-                          min="0"
-                        />
-                      ) : course.price}
+                      {editMode ? (
+                        <input type="number" className="form-control price-input-desktop" value={editableCourse.price} onChange={(e) => handleCourseFieldChange('price', parseFloat(e.target.value))} step="0.01" min="0" />
+                      ) : (course.price > 0) ? '$' + course.price : 'Free'}
                     </h2>
                   </div>
-
                   <div className="purchase-buttons">
-                    <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>
-                      Add to Cart
-                    </button>
-                    <button className="btn btn-outline-secondary btn-lg w-100" onClick={handleEnroll}>
-                      Enroll Now
-                    </button>
+                    <button className="btn btn-primary btn-lg w-100 mb-2 disabled" onClick={handleAddToCart}>Add to Cart</button>
+                    <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>Enroll Now</button>
                   </div>
-
                   <p className="guarantee-text">30-Day Money-Back Guarantee</p>
                 </div>
               </div>
             </div>
-
           </div>
 
-          {/* Bottom Section: Course Content */}
           <div className="course-content-section">
-            
-            {/* Admin Controls */}
             {isAdmin && (
               <div className="admin-controls">
-                <button 
-                  className={`btn ${editMode ? 'btn-warning' : 'btn-outline-primary'}`}
-                  onClick={() => setEditMode(!editMode)}
-                >
+                <button className={`btn ${editMode ? 'btn-warning' : 'btn-outline-primary'}`} onClick={() => setEditMode(!editMode)}>
                   <i className="bi bi-pencil-square me-1"></i>
                   {editMode ? 'Exit Edit Mode' : 'Edit Course'}
                 </button>
                 {hasChanges && (
                   <button className="btn btn-success ms-2" onClick={handleSaveChanges}>
-                    <i className="bi bi-save me-1"></i>
-                    Save Changes
+                    <i className="bi bi-save me-1"></i>Save Changes
                   </button>
                 )}
               </div>
             )}
 
-            {/* Course Content */}
             <div className="section-card">
-              <h4 className="section-title">Course Content</h4>
-              
-              <div className="chapters-list">
-                {chapters.map((chapter, chapterIndex) => (
-                  <div 
-                    key={chapter.id}
-                    className={`chapter-item ${editMode ? 'draggable' : ''}`}
-                    draggable={editMode}
-                    onDragStart={(e) => handleChapterDragStart(e, chapterIndex)}
-                    onDragOver={handleChapterDragOver}
-                    onDrop={(e) => handleChapterDrop(e, chapterIndex)}
-                  >
-                    <div 
-                      className="chapter-header"
-                      onClick={() => !editMode && toggleChapter(chapter.id)}
+              <div className="section-header">
+                <h4 className="section-title">Course Content</h4>
+                {editMode && hasContent && (
+                  <button className="btn btn-sm btn-primary" onClick={addVolume}>
+                    <i className="bi bi-folder-plus me-1"></i>Add Volume
+                  </button>
+                )}
+              </div>
+
+              {!hasContent ? (
+                <div className="no-content">
+                  <i className="bi bi-inbox"></i>
+                  <p>No content found/loaded</p>
+                  {editMode && (
+                    <button className="btn btn-primary" onClick={addVolume}>
+                      <i className="bi bi-folder-plus me-1"></i>Add First Volume
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="volumes-list">
+                  {volumes.map((volume, volumeIndex) => (
+                    <div
+                      key={volume.vid}
+                      className={`volume-item ${editMode ? 'draggable' : ''}`}
+                      draggable={editMode}
+                      onDragStart={(e) => handleVolumeDragStart(e, volumeIndex)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleVolumeDrop(e, volumeIndex)}
                     >
-                      {editMode ? (
-                        <i className="bi bi-grip-vertical drag-handle me-2"></i>
-                      ) : (
-                        <i className={`bi bi-chevron-${expandedChapters[chapter.id] ? 'down' : 'right'} me-2`}></i>
-                      )}
-                      <span className="chapter-title-text">{chapter.title}</span>
-                      <span className="chapter-count">{chapter.items.length} items</span>
-                    </div>
-                    
-                    {(expandedChapters[chapter.id] || editMode) && (
-                      <div className="chapter-content">
-                        {chapter.items.map((item, itemIndex) => (
-                          <div
-                            key={item.id}
-                            className={`content-item ${editMode ? 'draggable' : ''}`}
-                            draggable={editMode}
-                            onDragStart={(e) => handleItemDragStart(e, chapterIndex, itemIndex)}
-                            onDragOver={handleChapterDragOver}
-                            onDrop={(e) => handleItemDrop(e, chapterIndex, itemIndex)}
-                          >
-                            {editMode && (
-                              <div className="item-controls">
-                                <i className="bi bi-grip-vertical drag-handle"></i>
-                                <button 
-                                  className="btn btn-sm btn-danger ms-auto"
-                                  onClick={() => deleteContentItem(chapterIndex, itemIndex)}
-                                >
-                                  <i className="bi bi-trash"></i>
-                                </button>
-                              </div>
-                            )}
-                            
-                            {item.type === 'video' ? (
-                              <div className="video-item">
-                                <div className="video-header">
-                                  <i className="bi bi-play-circle me-2"></i>
-                                  <span>{item.title}</span>
-                                </div>
-                                <video src={item.url} controls className="video-player" />
-                              </div>
-                            ) : item.type === 'link' ? (
-                              <div className="link-item">
-                                <i className="bi bi-link-45deg me-2"></i>
-                                <a href={item.url} target="_blank" rel="noopener noreferrer">
-                                  {item.title}
-                                </a>
-                              </div>
-                            ) : item.type === 'text' ? (
-                              <div className="text-item">
-                                <h5>{item.title}</h5>
-                                <div dangerouslySetInnerHTML={{ __html: parseTextSyntax(item.content) }} />
-                              </div>
-                            ) : null}
-                          </div>
-                        ))}
-                        
+                      <div className="volume-header" onClick={() => !editMode && toggleVolume(volume.vid)}>
+                        {editMode ? <i className="bi bi-grip-vertical drag-handle me-2"></i> : <i className={`bi bi-chevron-${expandedVolumes[volume.vid] ? 'down' : 'right'} me-2`}></i>}
+                        {editMode && editingTitle?.type === 'volume' && editingTitle?.volumeIndex === volumeIndex ? (
+                          <input type="text" className="form-control title-edit-input" value={volume.title} onChange={(e) => updateVolumeTitle(volumeIndex, e.target.value)} onBlur={() => setEditingTitle(null)} onKeyDown={(e) => { if (e.key === 'Enter') setEditingTitle(null); }} autoFocus onClick={(e) => e.stopPropagation()} />
+                        ) : (
+                          <span className="volume-title-text">{volume.title}</span>
+                        )}
+                        <span className="volume-count">{volume.chapters.length} {volume.chapters.length === 1 ? 'chapter' : 'chapters'}</span>
                         {editMode && (
-                          <div className="add-item-buttons">
-                            <button 
-                              className="btn btn-sm btn-outline-primary"
-                              onClick={() => addContentItem(chapterIndex, 'text')}
-                            >
-                              <i className="bi bi-file-text me-1"></i> Add Text
-                            </button>
-                            <button 
-                              className="btn btn-sm btn-outline-primary"
-                              onClick={() => addContentItem(chapterIndex, 'image')}
-                            >
-                              <i className="bi bi-image me-1"></i> Add Image
-                            </button>
-                            <button 
-                              className="btn btn-sm btn-outline-primary"
-                              onClick={() => addContentItem(chapterIndex, 'video')}
-                            >
-                              <i className="bi bi-camera-video me-1"></i> Add Video
-                            </button>
+                          <div className="header-actions" onClick={(e) => e.stopPropagation()}>
+                            <button className="btn btn-sm btn-outline-primary" onClick={() => setEditingTitle({ type: 'volume', volumeIndex })} title="Edit title"><i className="bi bi-pencil"></i></button>
+                            <button className="btn btn-sm btn-outline-danger" onClick={() => deleteVolume(volumeIndex)} title="Delete volume"><i className="bi bi-trash"></i></button>
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+
+                      {(expandedVolumes[volume.vid] || editMode) && (
+                        <div className="volume-content">
+                          {volume.chapters.length === 0 ? (
+                            <div className="no-content-small">
+                              <p>No chapters in this volume</p>
+                              {editMode && <button className="btn btn-sm btn-primary" onClick={() => addChapter(volumeIndex)}><i className="bi bi-plus"></i> Add Chapter</button>}
+                            </div>
+                          ) : (
+                            <div className="chapters-list">
+                              {volume.chapters.map((chapter, chapterIndex) => (
+                                <div
+                                  key={chapter.cid}
+                                  className={`chapter-item ${editMode ? 'draggable' : ''}`}
+                                  draggable={editMode}
+                                  onDragStart={(e) => handleChapterDragStart(e, volumeIndex, chapterIndex)}
+                                  onDragOver={handleDragOver}
+                                  onDrop={(e) => handleChapterDrop(e, volumeIndex, chapterIndex)}
+                                >
+                                  <div className="chapter-header" onClick={() => !editMode && toggleChapter(chapter.cid)}>
+                                    {editMode ? <i className="bi bi-grip-vertical drag-handle me-2"></i> : <i className={`bi bi-chevron-${expandedChapters[chapter.cid] ? 'down' : 'right'} me-2`}></i>}
+                                    {editMode && editingTitle?.type === 'chapter' && editingTitle?.volumeIndex === volumeIndex && editingTitle?.chapterIndex === chapterIndex ? (
+                                      <input type="text" className="form-control title-edit-input" value={chapter.title} onChange={(e) => updateChapterTitle(volumeIndex, chapterIndex, e.target.value)} onBlur={() => setEditingTitle(null)} onKeyDown={(e) => { if (e.key === 'Enter') setEditingTitle(null); }} autoFocus onClick={(e) => e.stopPropagation()} />
+                                    ) : (
+                                      <span className="chapter-title-text">{chapter.title}</span>
+                                    )}
+                                    <span className="chapter-count">{chapter.items.length} {chapter.items.length === 1 ? 'item' : 'items'}</span>
+                                    {editMode && (
+                                      <div className="header-actions" onClick={(e) => e.stopPropagation()}>
+                                        <button className="btn btn-sm btn-outline-primary" onClick={() => setEditingTitle({ type: 'chapter', volumeIndex, chapterIndex })} title="Edit title"><i className="bi bi-pencil"></i></button>
+                                        <button className="btn btn-sm btn-outline-danger" onClick={() => deleteChapter(volumeIndex, chapterIndex)} title="Delete chapter"><i className="bi bi-trash"></i></button>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {(expandedChapters[chapter.cid] || editMode) && (
+                                    <div className="chapter-content">
+                                      {chapter.items.length === 0 ? (
+                                        <div className="no-content-small"><p>No content in this chapter</p></div>
+                                      ) : (
+                                        chapter.items.map((item, itemIndex) => (
+                                          <div
+                                            key={item.iid}
+                                            className={`content-item ${editMode ? 'draggable' : ''}`}
+                                            draggable={editMode}
+                                            onDragStart={(e) => handleItemDragStart(e, volumeIndex, chapterIndex, itemIndex)}
+                                            onDragOver={handleDragOver}
+                                            onDrop={(e) => handleItemDrop(e, volumeIndex, chapterIndex, itemIndex)}
+                                          >
+                                            {editMode && (
+                                              <div className="item-controls">
+                                                <i className="bi bi-grip-vertical drag-handle"></i>
+                                                {editingTitle?.type === 'item' && editingTitle?.volumeIndex === volumeIndex && editingTitle?.chapterIndex === chapterIndex && editingTitle?.itemIndex === itemIndex ? (
+                                                  <input type="text" className="form-control title-edit-input flex-1" value={item.title} onChange={(e) => updateItemTitle(volumeIndex, chapterIndex, itemIndex, e.target.value)} onBlur={() => setEditingTitle(null)} onKeyDown={(e) => { if (e.key === 'Enter') setEditingTitle(null); }} autoFocus />
+                                                ) : (
+                                                  <span className="item-title flex-1">{item.title}</span>
+                                                )}
+                                                <button className="btn btn-sm btn-outline-info" onClick={() => editContentItem(volumeIndex, chapterIndex, itemIndex)} title="Edit content"><i className="bi bi-pencil-fill"></i></button>
+                                                <button className="btn btn-sm btn-danger" onClick={() => deleteContentItem(volumeIndex, chapterIndex, itemIndex)}><i className="bi bi-trash"></i></button>
+                                              </div>
+                                            )}
+
+                                            {!editMode && item.title && <h5 className="content-item-title">{item.title}</h5>}
+
+                                            {item.type === 'video' ? (
+                                              <div className="video-item"><video src={item.url} controls className="video-player" /></div>
+                                            ) : item.type === 'image' ? (
+                                              <div className="image-item"><img src={item.url} alt={item.title} className="content-image" /></div>
+                                            ) : item.type === 'audio' ? (
+                                              <div className="audio-item"><audio src={item.url} controls className="audio-player" /></div>
+                                            ) : item.type === 'document' ? (
+                                              <div className="document-item">
+                                                <a href={item.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-info">
+                                                  <i className="bi bi-file-pdf me-1"></i> Open Document
+                                                </a>
+                                              </div>
+                                            ) : item.type === 'archive' ? (
+                                              <div className="archive-item">
+                                                <a href={item.url} download className="btn btn-sm btn-outline-info">
+                                                  <i className="bi bi-file-zip me-1"></i> Download Archive
+                                                </a>
+                                              </div>
+                                            ) : item.type === 'text' ? (
+                                              <TextItemDisplay url={item.url} parseTextSyntax={parseTextSyntax} />
+                                            ) : null}
+                                          </div>
+                                        ))
+                                      )}
+
+                                      {editMode && (
+                                        <div className="add-item-buttons">
+                                          <button className="btn btn-sm btn-outline-primary" onClick={() => addContentItem(volumeIndex, chapterIndex, 'text')}><i className="bi bi-file-text me-1"></i> Text</button>
+                                          <button className="btn btn-sm btn-outline-primary" onClick={() => addContentItem(volumeIndex, chapterIndex, 'image')}><i className="bi bi-image me-1"></i> Image</button>
+                                          <button className="btn btn-sm btn-outline-primary" onClick={() => addContentItem(volumeIndex, chapterIndex, 'audio')}><i className="bi bi-music-note me-1"></i> Audio</button>
+                                          <button className="btn btn-sm btn-outline-primary" onClick={() => addContentItem(volumeIndex, chapterIndex, 'video')}><i className="bi bi-camera-video me-1"></i> Video</button>
+                                          <button className="btn btn-sm btn-outline-primary" onClick={() => addContentItem(volumeIndex, chapterIndex, 'document')}><i className="bi bi-file-pdf me-1"></i> Document</button>
+                                          <button className="btn btn-sm btn-outline-primary" onClick={() => addContentItem(volumeIndex, chapterIndex, 'archive')}><i className="bi bi-file-zip me-1"></i> Archive</button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {editMode && (
+                            <button className="btn btn-sm btn-outline-primary mt-2" onClick={() => addChapter(volumeIndex)}>
+                              <i className="bi bi-plus"></i> Add Chapter
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-
           </div>
-
         </div>
       </div>
 
-      {/* Add Item Modal */}
       {showAddItemModal && (
-        <AddItemModal 
+        <AddItemModal
           type={showAddItemModal.type}
-          onSave={(itemData) => saveContentItem(showAddItemModal.chapterIndex, itemData)}
+          onSave={(itemData) => saveContentItem(showAddItemModal.volumeIndex, showAddItemModal.chapterIndex, itemData)}
           onClose={() => setShowAddItemModal(null)}
           parseTextSyntax={parseTextSyntax}
+          uploadedFiles={uploadedFiles}
+        />
+      )}
+
+      {editingItem && (
+        <AddItemModal
+          type={editingItem.item.type}
+          isEditing={true}
+          initialData={editingItem.item}
+          onSave={(itemData) => updateContentItem(editingItem.volumeIndex, editingItem.chapterIndex, editingItem.itemIndex, itemData)}
+          onClose={() => setEditingItem(null)}
+          parseTextSyntax={parseTextSyntax}
+          uploadedFiles={uploadedFiles}
         />
       )}
     </>
   );
 }
 
-// Add Item Modal Component
-function AddItemModal({ type, onSave, onClose, parseTextSyntax }) {
-  const [title, setTitle] = useState('');
+// ─── Text Item Display ────────────────────────────────────────────────────────
+function TextItemDisplay({ url, parseTextSyntax }) {
   const [content, setContent] = useState('');
-  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const token = localStorage.getItem('token');
+
+  useEffect(() => {
+    if (!url) { setLoading(false); return; }
+    const fetchContent = async () => {
+      try {
+        const response = await fetch(`http://localhost:4040${url}`, {
+          headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' }
+        });
+        if (response.ok) {
+          setContent(await response.text());
+        } else {
+          setError('Could not load content');
+        }
+      } catch (err) {
+        setError('Error loading content: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchContent();
+  }, [url]);
+
+  if (loading) return <div className="text-item"><p><em>Loading content...</em></p></div>;
+  if (error) return <div className="text-item"><p style={{ color: 'red' }}>{error}</p></div>;
+  return <div className="text-item"><div dangerouslySetInnerHTML={{ __html: parseTextSyntax(content) }} /></div>;
+}
+
+// ─── Syntax Help Data ─────────────────────────────────────────────────────────
+const SYNTAX_GROUPS = [
+  {
+    label: 'Text & Structure',
+    icon: 'bi-text-left',
+    rows: [
+      { format: 'Heading 1',     syntax: '# Text' },
+      { format: 'Heading 2',     syntax: '## Text' },
+      { format: 'Heading 3',     syntax: '### Text' },
+      { format: 'Paragraph',     syntax: '`{text}`' },
+      { format: 'Numbered list', syntax: '1. Item' },
+      { format: 'Bullet list',   syntax: '- Item  or  • Item' },
+      { format: 'Line break',    syntax: '\\n' },
+      { format: 'Indentation',   syntax: '\\t' },
+    ]
+  },
+  {
+    label: 'Media',
+    icon: 'bi-play-circle',
+    rows: [
+      { format: 'Image',        syntax: '#https://image-url#',                  note: 'Renders inline image' },
+      { format: 'Video (file)', syntax: '{https://video-url.mp4}',              note: 'HTML5 video player' },
+      { format: 'YouTube',      syntax: '(https://youtube.com/watch?v=VIDEO_ID)', note: 'Also accepts youtu.be/ and /shorts/ links' },
+    ]
+  },
+  {
+    label: 'Links & Downloads',
+    icon: 'bi-link-45deg',
+    rows: [
+      { format: 'Link',          syntax: '@https://url@',              note: 'Opens in new tab' },
+      { format: 'Download file', syntax: '![Label|https://file-url]!', note: 'Renders a download button' },
+    ]
+  },
+];
+
+// ─── Add / Edit Item Modal ────────────────────────────────────────────────────
+function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseTextSyntax, uploadedFiles = [] }) {
+  const [title, setTitle] = useState(initialData?.title || '');
+  const [content, setContent] = useState(initialData?.content || '');
+  const [url, setUrl] = useState(initialData?.url || '');
   const [file, setFile] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
-  const [preview, setPreview] = useState('');
+  const [activeHelpGroup, setActiveHelpGroup] = useState(0);
+  const [preview, setPreview] = useState(initialData?.url || initialData?.content || '');
+  const [useExistingFile, setUseExistingFile] = useState(false);
+  const [selectedFileId, setSelectedFileId] = useState('');
+  const [loadingTextContent, setLoadingTextContent] = useState(false);
+  const [textContentError, setTextContentError] = useState(null);
+
+  const token = localStorage.getItem('token');
+
+  const getFilteredFiles = () => {
+    if (type === 'text') return [];
+    const fileTypeMapping = { image: ['image'], video: ['video'], audio: ['audio'], document: ['document'], archive: ['archive'] };
+    const acceptedFileTypes = fileTypeMapping[type] || [];
+    if (!uploadedFiles || uploadedFiles.length === 0) return [];
+    return uploadedFiles.filter(file => {
+      if (acceptedFileTypes.includes(file.type || '')) return true;
+      const filename = (file.originalName || file.filename || '').toLowerCase();
+      if (type === 'image'    && /\.(jpg|jpeg|png|gif|webp)$/i.test(filename)) return true;
+      if (type === 'video'    && /\.(mp4|webm|ogg|mov|avi)$/i.test(filename))  return true;
+      if (type === 'audio'    && /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(filename)) return true;
+      if (type === 'document' && /\.(pdf|doc|docx)$/i.test(filename))           return true;
+      if (type === 'archive'  && /\.(zip|rar|7z)$/i.test(filename))             return true;
+      return false;
+    });
+  };
+
+  const filteredFiles = getFilteredFiles();
+
+  useEffect(() => {
+    if (isEditing && type === 'text' && initialData?.url && !content) {
+      setLoadingTextContent(true);
+      setTextContentError(null);
+      const load = async () => {
+        try {
+          const res = await fetch(`http://localhost:4040${initialData.url}`, {
+            headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' }
+          });
+          if (res.ok) { setContent(await res.text()); }
+          else { setTextContentError('Could not load text content'); }
+        } catch (err) {
+          setTextContentError('Error loading content: ' + err.message);
+        } finally {
+          setLoadingTextContent(false);
+        }
+      };
+      load();
+    }
+  }, [isEditing, type, initialData?.url, content, token]);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (!selectedFile) return;
-
-    // Validate file type
-    const validTypes = type === 'image' ? ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] : 
-                       type === 'video' ? ['video/mp4', 'video/webm', 'video/ogg'] : [];
-    
-    if (!validTypes.includes(selectedFile.type)) {
+    const validTypes = {
+      image:    ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+      video:    ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-mpeg'],
+      audio:    ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/aac', 'audio/flac', 'audio/x-m4a', 'audio/webm'],
+      document: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+      archive:  ['application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed']
+    };
+    if (type !== 'text' && validTypes[type] && !validTypes[type].includes(selectedFile.type)) {
       alert(`Invalid file type. Please select a ${type} file.`);
       return;
     }
-
     setFile(selectedFile);
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result);
-    };
+    reader.onloadend = () => { setPreview(reader.result); setUrl(''); };
     reader.readAsDataURL(selectedFile);
+    setUseExistingFile(false);
+    setSelectedFileId('');
   };
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) {
-      const fakeEvent = { target: { files: [droppedFile] } };
-      handleFileChange(fakeEvent);
+  const handleExistingFileSelect = (e) => {
+    const fileId = e.target.value;
+    setSelectedFileId(fileId);
+    if (fileId) {
+      const selectedFile = uploadedFiles.find(f => f.path === fileId || f.url === fileId);
+      if (selectedFile) {
+        const filePath = selectedFile.url || selectedFile.path || '';
+        const fileUrl = filePath.startsWith('http') ? filePath : `http://localhost:4040${filePath}`;
+        setUrl(fileUrl); setPreview(fileUrl); setUseExistingFile(true); setFile(null);
+      } else {
+        alert('Could not find selected file. Please try again or upload a new file.');
+      }
+    } else {
+      setUrl(''); setPreview(''); setUseExistingFile(false);
     }
+  };
+
+  const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
+  const handleDrop = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile) handleFileChange({ target: { files: [droppedFile] } });
   };
 
   const handleSave = () => {
-    if (!title) {
-      alert('Please enter a title');
-      return;
-    }
-
-    const itemData = {
-      type,
-      title,
-      url: preview || url,
-      content: type === 'text' ? content : undefined
-    };
-
-    onSave(itemData);
+    if (!title.trim()) { alert('Please enter a title'); return; }
+    if (type === 'text') { onSave({ type, title, content }); return; }
+    if (!file && !url && !preview) { alert('Please upload a file, select from existing files, or enter a URL'); return; }
+    onSave({ type, title, url: url || preview || '', content: undefined });
   };
+
+  const typeIcon = (t) => ({ image: 'bi-image', video: 'bi-camera-video', audio: 'bi-music-note', document: 'bi-file-pdf', archive: 'bi-file-zip' }[t] || 'bi-file-earmark');
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h5>Add {type.charAt(0).toUpperCase() + type.slice(1)}</h5>
+          <h5>{isEditing ? 'Edit' : 'Add'} {type === 'file' ? 'File' : type.charAt(0).toUpperCase() + type.slice(1)}</h5>
           <button className="btn-close" onClick={onClose}></button>
         </div>
+
         <div className="modal-body">
           <div className="mb-3">
             <label className="form-label">Title</label>
-            <input 
-              type="text"
-              className="form-control"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter title"
-            />
+            <input type="text" className="form-control" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter title" />
           </div>
 
           {type === 'text' ? (
             <>
-              <div className="mb-2">
-                <button 
-                  className="btn btn-sm btn-link"
-                  onClick={() => setShowHelp(!showHelp)}
-                >
-                  <i className="bi bi-question-circle me-1"></i>
-                  Syntax Help
-                </button>
-              </div>
-              {showHelp && (
-                <div className="alert alert-info">
-                  <strong>Text Formatting:</strong><br/>
-                  <code># Heading 1</code><br/>
-                  <code>## Heading 2</code><br/>
-                  <code>### Heading 3</code><br/>
-                  <code>`text`</code> for paragraphs<br/>
-                  <code>@url@</code> for links
+              {loadingTextContent && (
+                <div className="alert alert-info mb-3">
+                  <div className="spinner-border spinner-border-sm me-2" role="status" style={{ display: 'inline-block' }}><span className="visually-hidden">Loading...</span></div>
+                  Loading text content...
                 </div>
               )}
+              {textContentError && <div className="alert alert-danger mb-3">{textContentError}</div>}
+
+              {/* ── Syntax Help Toggle ── */}
+              <div className="mb-2">
+                <button className="btn btn-sm btn-link px-0" onClick={() => setShowHelp(!showHelp)}>
+                  <i className={`bi bi-${showHelp ? 'chevron-up' : 'question-circle'} me-1`}></i>
+                  {showHelp ? 'Hide syntax help' : 'Syntax help'}
+                </button>
+              </div>
+
+              {showHelp && (
+                <div className="syntax-help-panel mb-3">
+                  {/* Group tabs */}
+                  <div className="syntax-tabs">
+                    {SYNTAX_GROUPS.map((group, gi) => (
+                      <button
+                        key={gi}
+                        className={`syntax-tab${activeHelpGroup === gi ? ' active' : ''}`}
+                        onClick={() => setActiveHelpGroup(gi)}
+                      >
+                        <i className={`bi ${group.icon} me-1`}></i>
+                        {group.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Rows for active group */}
+                  <table className="syntax-table">
+                    <thead>
+                      <tr>
+                        <th>Format</th>
+                        <th>Syntax</th>
+                        <th>Note</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {SYNTAX_GROUPS[activeHelpGroup].rows.map((row, ri) => (
+                        <tr key={ri}>
+                          <td>{row.format}</td>
+                          <td><code>{row.syntax}</code></td>
+                          <td className="syntax-note">{row.note || ''}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Quick example for Downloads group */}
+                  {activeHelpGroup === 2 && (
+                    <div className="syntax-examples">
+                      <p className="syntax-examples-title">Result preview</p>
+                      <div className="syntax-example-row">
+                        <code>![Course PDF|https://example.com/course.pdf]!</code>
+                        <span>→</span>
+                        <span className="text-download-link-demo"><i className="bi bi-download"></i> Course PDF</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Quick example for Media group */}
+                  {activeHelpGroup === 1 && (
+                    <div className="syntax-examples">
+                      <p className="syntax-examples-title">Result preview</p>
+                      <div className="syntax-example-row">
+                        <code>#https://picsum.photos/300/80#</code>
+                        <span>→</span>
+                        <img src="https://picsum.photos/300/80" alt="example" style={{ height: 36, borderRadius: 4, border: '1px solid #dee2e6' }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="mb-3">
                 <label className="form-label">Content</label>
-                <textarea 
+                <textarea
                   className="form-control"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows="10"
                   placeholder="Enter your content with syntax..."
+                  disabled={loadingTextContent}
                 />
               </div>
+
               {content && (
                 <div className="mb-3">
-                  <label className="form-label">Preview:</label>
-                  <div 
-                    className="content-preview"
-                    dangerouslySetInnerHTML={{ __html: parseTextSyntax(content) }}
-                  />
+                  <label className="form-label">Preview</label>
+                  <div className="content-preview" dangerouslySetInnerHTML={{ __html: parseTextSyntax(content) }} />
                 </div>
               )}
             </>
           ) : (
             <>
-              <div 
-                className="file-upload-area mb-3"
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-              >
-                <input 
+              <div className="mb-3">
+                <label className="form-label">
+                  <i className={`bi ${typeIcon(type)} me-1`}></i>
+                  Select from uploaded files:
+                </label>
+                {filteredFiles.length > 0 ? (
+                  <>
+                    <select className="form-select" value={selectedFileId} onChange={handleExistingFileSelect}>
+                      <option value="">-- Choose a file --</option>
+                      {filteredFiles.map((file) => {
+                        const filename = file.originalName || file.filename || 'Unnamed file';
+                        const sizeStr = file.size ? ` (${(file.size / (1024 * 1024)).toFixed(2)} MB)` : '';
+                        return <option key={filteredFiles.indexOf(file)} value={file.url}>{filename}{sizeStr}</option>;
+                      })}
+                    </select>
+                    <small className="text-muted d-block mt-1">{filteredFiles.length} {filteredFiles.length === 1 ? 'file' : 'files'} available</small>
+                  </>
+                ) : (
+                  <div className="alert alert-info mb-0">
+                    <i className="bi bi-info-circle me-2"></i>
+                    <small>
+                      No {type === 'document' ? 'PDF/DOCX' : type === 'archive' ? 'ZIP' : type} files found.
+                      {uploadedFiles.length > 0 ? ` You have ${uploadedFiles.length} file(s) uploaded, but none match this type.` : ''} Upload a new one below.
+                    </small>
+                  </div>
+                )}
+              </div>
+
+              {filteredFiles.length > 0 && <div className="text-center my-2"><small className="text-muted">— OR —</small></div>}
+
+              <div className="file-upload-area mb-3" onDragOver={handleDragOver} onDrop={handleDrop}>
+                <input
                   type="file"
-                  accept={type === 'image' ? 'image/*' : 'video/*'}
+                  accept={type === 'image' ? 'image/*' : type === 'video' ? 'video/*' : type === 'audio' ? 'audio/*' : type === 'document' ? '.pdf,.doc,.docx' : type === 'archive' ? '.zip' : '*/*'}
                   onChange={handleFileChange}
                   id="file-input"
-                  style={{display: 'none'}}
+                  style={{ display: 'none' }}
                 />
                 <label htmlFor="file-input" className="file-upload-label">
-                  <i className={`bi bi-${type === 'image' ? 'image' : 'camera-video'} upload-icon`}></i>
-                  <p>Drag content or click to select</p>
+                  <i className={`bi ${typeIcon(type)} upload-icon`}></i>
+                  <p>Drag {type} or click to select</p>
                 </label>
               </div>
 
+              <div className="text-center my-2"><small className="text-muted">— OR —</small></div>
+
               <div className="mb-3">
-                <label className="form-label">Or enter URL:</label>
-                <input 
+                <label className="form-label">Enter URL:</label>
+                <input
                   type="url"
                   className="form-control"
                   value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com/media.jpg"
+                  onChange={(e) => {
+                    const newUrl = e.target.value;
+                    setUrl(newUrl); setPreview(newUrl); setUseExistingFile(false); setSelectedFileId(''); setFile(null);
+                  }}
+                  placeholder={`https://example.com/${type}.${type === 'image' ? 'jpg' : type === 'video' ? 'mp4' : 'mp3'}`}
                 />
               </div>
 
               {preview && (
                 <div className="mb-3">
                   <label className="form-label">Preview:</label>
-                  {type === 'image' ? (
-                    <img src={preview} alt="Preview" className="img-preview" />
-                  ) : (
-                    <video src={preview} controls className="video-preview" />
+                  {type === 'image' ? <img src={preview} alt="Preview" className="img-preview" /> :
+                   type === 'video' ? <video src={preview} controls className="video-preview" /> :
+                   type === 'audio' ? <audio src={preview} controls className="audio-preview" /> : (
+                    <div className="alert alert-info">
+                      <i className={`bi ${typeIcon(type)} me-2`}></i>
+                      File selected: {preview.split('/').pop()}
+                    </div>
                   )}
                 </div>
               )}
             </>
           )}
         </div>
+
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave}>Save</button>
+          <button className="btn btn-primary" onClick={handleSave}>{isEditing ? 'Update' : 'Save'}</button>
         </div>
       </div>
     </div>

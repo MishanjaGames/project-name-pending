@@ -28,7 +28,9 @@ const ALLOWED_TYPES = {
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'text/plain'
     ],
-    videos: ['video/mp4', 'video/webm', 'video/ogg']
+    videos: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-mpeg'],
+    audio: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/aac', 'audio/flac', 'audio/x-m4a', 'audio/webm'],
+    archives: ['application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed']
 };
 
 // ============================================================================
@@ -91,10 +93,15 @@ const dynamicStorage = (fileType) => multer.diskStorage({
         cb(null, dirPath);
     },
     filename: (req, file, cb) => {
-        const timestamp = Date.now();
         const ext = path.extname(file.originalname);
         const nameWithoutExt = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
-        cb(null, `${nameWithoutExt}-${timestamp}${ext}`);
+        
+        // Don't add timestamp for thumbnail files
+        if (nameWithoutExt === 'thumbnail') {
+            cb(null, `thumbnail${ext}`);
+        } else {
+            cb(null, `${nameWithoutExt}${ext}`);
+        }
     }
 });
 
@@ -114,13 +121,15 @@ const courseFileFilter = (req, file, cb) => {
     const allAllowed = [
         ...ALLOWED_TYPES.images,
         ...ALLOWED_TYPES.documents,
-        ...ALLOWED_TYPES.videos
+        ...ALLOWED_TYPES.videos,
+        ...ALLOWED_TYPES.audio,
+        ...ALLOWED_TYPES.archives
     ];
     
     if (allAllowed.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('File type not allowed'), false);
+        cb(new Error('File type not allowed. Supported: Images, Videos, Audio, Documents (PDF/DOCX), Archives (ZIP)'), false);
     }
 };
 
@@ -285,6 +294,7 @@ module.exports.getCourseFiles = (courseId) => {
         const filePath = path.join(courseDir, filename);
         const stats = fs.statSync(filePath);
         return {
+            url: `/api/files/courses/${courseId}/${filename}`,
             filename: filename,
             size: stats.size,
             created: stats.birthtime,
@@ -673,12 +683,14 @@ module.exports.buildCourseFileLinks = (courseId, accessLevel = 'default') => {
 /**
  * Determine file type based on MIME type
  * @param {string} mimetype - MIME type from uploaded file
- * @returns {string} File type (image, video, document, other)
+ * @returns {string} File type (image, video, audio, document, archive, other)
  */
 module.exports.getFileType = (mimetype) => {
     if (ALLOWED_TYPES.images.includes(mimetype)) return 'image';
     if (ALLOWED_TYPES.videos.includes(mimetype)) return 'video';
+    if (ALLOWED_TYPES.audio.includes(mimetype)) return 'audio';
     if (ALLOWED_TYPES.documents.includes(mimetype)) return 'document';
+    if (ALLOWED_TYPES.archives.includes(mimetype)) return 'archive';
     return 'other';
 };
 

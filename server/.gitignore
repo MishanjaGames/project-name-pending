@@ -1,8 +1,10 @@
 console/node_modules
 web-t/node_modules
 web/node_modules
+../client
 
 web-panel01
+web-t
 storage
 *.zip
 *.rar

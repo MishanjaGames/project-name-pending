@@ -55,7 +55,7 @@ const userSchema = new Schema({
         type: {
             type: String,
             required: false,
-            enum: ['image', 'video', 'document', 'other']
+            enum: ['image', 'video', 'audio', 'document', 'archive', 'other']
         },
         url: {
             type: String,
