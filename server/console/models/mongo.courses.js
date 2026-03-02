@@ -50,6 +50,16 @@ const courseSchema = new Schema({
             type: String,
             required: true,
         },
+        type: {
+            type: String,
+            required: false,
+            enum: ['container', 'image', 'video', 'audio', 'document', 'archive', 'other']
+        },
+        url: {
+            type: String,
+            required: false,
+            description: 'Full path (e.g., /api/manage/courses/456/thumbnail.jpg)'
+        },
         chapters: [{
             cid: {
                 type: String,
@@ -58,6 +68,16 @@ const courseSchema = new Schema({
             title: {
                 type: String,
                 required: true,
+            },
+            type: {
+                type: String,
+                required: false,
+                enum: ['container', 'image', 'video', 'audio', 'document', 'archive', 'other']
+            },
+            url: {
+                type: String,
+                required: false,
+                description: 'Full path (e.g., /api/manage/courses/456/thumbnail.jpg)'
             },
             items: [{
                 iid: {
@@ -77,7 +97,7 @@ const courseSchema = new Schema({
                     type: String,
                     required: false,
                     description: 'Full path (e.g., /api/manage/courses/456/thumbnail.jpg)'
-                },
+                }
             }]
         }]
     }],

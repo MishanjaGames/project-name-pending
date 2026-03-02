@@ -13,7 +13,7 @@ module.exports.login = async (req, res) => {
 
         if (isRulePassw) {
 
-            const token = utils.createToken(userDb, config.JWT_SECRET, {expiresIn: 60*60*2})
+            const token = utils.createToken(userDb, config.JWT_SECRET)
 
             // const token = jwt.sign({
             //     userId: userDb._id,
@@ -32,6 +32,16 @@ module.exports.login = async (req, res) => {
     } else {
         errorHandler(res, 404, 'User not found')
     }
+}
+
+module.exports.extendToken = async (req, res) => {
+
+    const token = await utils.extendToken(req)
+
+    res.status(200).json({
+        token: `${token}`,
+        tokenType: 'Bearer'
+    })
 }
 
 module.exports.register = async (req, res) => {

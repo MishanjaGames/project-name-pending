@@ -52,7 +52,7 @@ function CreateDirection({ data, onLogout }) {
       <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="mb-0">Create Direction</h2>
-          <button 
+          <button
             className="btn btn-outline-secondary"
             onClick={() => navigate('/manage/directions')}
           >
@@ -84,8 +84,8 @@ function CreateDirection({ data, onLogout }) {
                   </div>
 
                   <div className="d-flex gap-2">
-                    <button 
-                      type="submit" 
+                    <button
+                      type="submit"
                       className="btn btn-primary"
                       disabled={loading}
                     >
@@ -116,7 +116,7 @@ function CreateDirection({ data, onLogout }) {
 
             <div className="alert alert-info mt-3">
               <i className="bi bi-info-circle me-2"></i>
-              <strong>Note:</strong> Directions are used to categorize courses. 
+              <strong>Note:</strong> Directions are used to categorize courses.
               You can create levels for each direction to further organize courses.
             </div>
           </div>

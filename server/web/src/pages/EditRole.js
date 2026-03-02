@@ -94,7 +94,7 @@ function EditRole({ data, onLogout }) {
 
         if (!formData.accessLevel) {
             newErrors.accessLevel = 'Access level is required';
-        } else if (!['user', 'create', 'manage', 'admin'].includes(formData.accessLevel)) {
+        } else if (!['user', 'create', 'quality', 'manage', 'admin'].includes(formData.accessLevel)) {
             newErrors.accessLevel = 'Please select a valid access level';
         }
 
@@ -150,10 +150,12 @@ function EditRole({ data, onLogout }) {
 
     const getAccessLevelBadgeColor = (level) => {
         switch (level) {
+            case 'root': return 'bg-dark';
             case 'admin': return 'bg-danger';
-            case 'manage': return 'bg-warning text-dark';
-            case 'create': return 'bg-info text-dark';
-            case 'user': return 'bg-secondary';
+            case 'manage': case 'manager': return 'bg-warning text-dark';
+            case 'quality': return 'bg-success';
+            case 'create': return 'bg-info text-light';
+            case 'user': return 'bg-primary';
             default: return 'bg-secondary';
         }
     };
@@ -162,6 +164,7 @@ function EditRole({ data, onLogout }) {
         switch (level) {
             case 'admin': return 'Administrator - Full system access';
             case 'manage': return 'Manager - High-level permissions';
+            case 'quality': return 'Quality Control - Content creation and control access'
             case 'create': return 'Create - Content creation access';
             case 'user': return 'User - Standard user permissions';
             default: return 'Not set';
@@ -265,6 +268,7 @@ function EditRole({ data, onLogout }) {
                                             <option value="">Select an access level</option>
                                             <option value="user">User - Standard user permissions</option>
                                             <option value="create">Create - Content creation access</option>
+                                            <option value="quality">Quality Control - Content creation and control access</option>
                                             <option value="manage">Manage - High-level permissions</option>
                                             <option value="admin">Admin - Full system access</option>
                                             {
@@ -333,6 +337,7 @@ function EditRole({ data, onLogout }) {
                                 <ul className="small text-muted mb-0 ps-3">
                                     <li><strong>User:</strong> Standard user permissions</li>
                                     <li><strong>Create:</strong> Content creation access</li>
+                                    <li><strong>Quality(Quality Control):</strong> Content creation and control access</li>
                                     <li><strong>Manage:</strong> High-level permissions (manager)</li>
                                     <li><strong>Admin:</strong> Full system access (administrator)</li>
                                 </ul>

@@ -12,7 +12,7 @@ module.exports.createToken = (payload, secret, expiresIn) => {
         userId: payload._id,
         email: payload.email,
         role: payload.role
-    }, secret, expiresIn || { expiresIn: 60 * 60 * 2 })
+    }, secret, expiresIn || { expiresIn: 60 * 60 * 4 }) // 60 * 60 * 4
 }
 
 module.exports.parseToken = async (token) => {
@@ -29,6 +29,46 @@ module.exports.parseToken = async (token) => {
         console.log(e.message);
     }
 }
+
+module.exports.extendToken = async (req) => {
+    try {
+        const token = req.headers.authorization ? req.headers.authorization.split(' ')[1] : null;
+
+        let userId;
+        if (token && token !== 'undefined') {
+            const decoded = jwt.verify(token, config.JWT_SECRET,
+                { ignoreExpiration: true });
+            userId = decoded.userId;
+        } 
+        else if (req.body?.data?._id) {
+            userId = req.body.data._id;
+        } 
+        else {
+            return 'No token or userId provided';
+        }
+
+        const userDb = await User.findById(userId);
+        if (!userDb) {
+            return 'User not found';
+        }
+
+        const newToken = jwt.sign(
+            {
+                userId: userDb._id,
+                email: userDb.email,
+                role: userDb.role
+            },
+            config.JWT_SECRET,
+            { expiresIn: 60 * 60 * 4 } //60 * 60 * 4
+        );
+
+        return newToken;
+
+    } catch (e) {
+        console.error('Token extension error:', e.message);
+        return undefined;
+    }
+};
 
 module.exports.generatePasswordHash = async (password) => {
     if (!password) {

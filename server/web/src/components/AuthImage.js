@@ -39,7 +39,7 @@ function AuthImage({ src, alt, className, style, fallback }) {
                 }
 
                 const response = await fetch(imageUrl, { headers });
-                
+
                 if (response.ok) {
                     const blob = await response.blob();
                     if (isMounted) {

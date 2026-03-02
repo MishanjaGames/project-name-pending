@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
+import { extendSession } from "../utils/utils";
 import AuthImage from "../components/AuthImage";
 
 function Courses({ data, onLogout }) {
     const [courses, setCourses] = useState([]);
+    const [loading, setLoading] = useState(false);
     const [users, setUsers] = useState([]);
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [showModal, setShowModal] = useState(false);
@@ -16,13 +18,18 @@ function Courses({ data, onLogout }) {
     const token = localStorage.getItem('token');
 
     useEffect(() => {
-
-
         if (token) {
             fetchCourses();
             fetchUsers();
         }
     }, []);
+
+    const fetchData = async () => {
+        setLoading(true);
+        await fetchCourses();
+        await fetchUsers();
+        setLoading(false);
+    }
 
     const fetchCourses = async () => {
         try {
@@ -33,6 +40,9 @@ function Courses({ data, onLogout }) {
                     'Content-Type': 'application/json'
                 }
             });
+            if (response.status === 401) {
+                await extendSession(data)
+            }
             if (response.ok) {
                 const res = await response.json();
                 setCourses(res.data || res);
@@ -51,6 +61,9 @@ function Courses({ data, onLogout }) {
                     'Content-Type': 'application/json'
                 }
             });
+            if (response.status === 401) {
+                extendSession(data)
+            }
             if (response.ok) {
                 const res = await response.json();
                 setUsers(res.data || res);
@@ -190,12 +203,39 @@ function Courses({ data, onLogout }) {
                                     <p className="text-muted mb-0 small">Manage all courses and content</p>
                                 </div>
                                 <div className="d-flex align-items-center gap-2">
+                                    <button className="btn btn-primary btn-sm" onClick={() => navigate('/creator/apply')}>
+                                        <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
+                                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
+                                            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
+                                        </svg>
+                                        Apply Form
+                                    </button>
                                     <button className="btn btn-success btn-sm" onClick={() => navigate('/manage/courses/create')}>
                                         <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
                                             <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
                                             <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
                                         </svg>
                                         Add Course
+                                    </button>
+                                    <button
+                                        className="btn btn-sm btn-outline-primary"
+                                        onClick={() => fetchData()}
+                                        disabled={loading}
+                                    >
+                                        {loading ? (
+                                            <>
+                                                <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                                Loading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16" style={{ verticalAlign: 'middle' }}>
+                                                    <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14zm6-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0z" />
+                                                    <path d="M8 4a.5.5 0 0 1 .5.5v3.362l2.236-1.618a.5.5 0 0 1 .894.447l-4 2.9a.5.5 0 0 1-.06.03.5.5 0 0 1-.894-.447l4-2.9a.5.5 0 0 1 .06-.03V4.5A.5.5 0 0 1 8 4z" />
+                                                </svg>
+                                                Refresh
+                                            </>
+                                        )}
                                     </button>
                                     <span className="badge bg-primary rounded-pill p-2 px-3">
                                         {filteredCourses.length}{filteredCourses.length !== courses.length ? ` / ${courses.length}` : ''} {courses.length === 1 ? 'course' : 'courses'}

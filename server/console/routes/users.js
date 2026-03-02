@@ -10,10 +10,11 @@ router.post('/', passport.authenticate('jwt', {session: false}), validate('admin
 router.delete('/:id', passport.authenticate('jwt', {session: false}), validate('admin'), controller.remove)
 router.patch('/:id', passport.authenticate('jwt', {session: false}), validate('admin'), controller.update)
 
-
 router.get('/:id/profile-picture/:filename', controller.getProfilePicture)
 router.post('/:id/profile-picture', passport.authenticate('jwt', {session: false}), validate('manage'), controller.uploadProfilePicture)
 router.put('/:id/profile-picture', passport.authenticate('jwt', {session: false}), validate('manage'), controller.updateProfilePicture)
 router.delete('/:id/profile-picture', passport.authenticate('jwt', {session: false}), validate('manage'), controller.deleteProfilePicture)
+
+router.post('',()=>{})
 
 module.exports = router

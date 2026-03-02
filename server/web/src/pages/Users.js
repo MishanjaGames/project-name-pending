@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import AuthImage from "../components/AuthImage";
+import { extendSession } from "../utils/utils";
 
 function Users({ data, onLogout }) {
+    const [loading, setLoading] = useState(false);
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
@@ -12,57 +14,71 @@ function Users({ data, onLogout }) {
     const [selectedRole, setSelectedRole] = useState('');
     const navigate = useNavigate();
 
+    const token = localStorage.getItem('token');
+
     useEffect(() => {
-        const token = localStorage.getItem('token');
 
         if (token) {
-            const headers = {
-                'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-                'Content-Type': 'application/json'
-            };
-
-            const fetchUsers = async () => {
-                try {
-                    const response = await fetch('http://localhost:4040/api/manage/users', {
-                        method: 'GET',
-                        headers
-                    });
-                    if (response.ok) {
-                        const res = await response.json();
-                        setUsers(res.data);
-                    }
-                } catch (error) {
-                    console.error('Error fetching users:', error);
-                }
-            };
-
-            const fetchRoles = async () => {
-                try {
-                    const response = await fetch('http://localhost:4040/api/manage/roles', {
-                        method: 'GET',
-                        headers
-                    });
-                    if (response.ok) {
-                        const res = await response.json();
-                        setRoles(res.data || res);
-                    }
-                } catch (error) {
-                    console.error('Error fetching roles:', error);
-                }
-            };
 
             fetchUsers();
             fetchRoles();
         }
     }, []);
 
+    const fetchData = async () => {
+        setLoading(true);
+        await fetchUsers();
+        await fetchRoles();
+        setLoading(false);
+    }
+
+    const fetchUsers = async () => {
+        try {
+            const response = await fetch('http://localhost:4040/api/manage/users', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.status === 401) {
+                await extendSession(data)
+            }
+            if (response.ok) {
+                const res = await response.json();
+                setUsers(res.data);
+            }
+        } catch (error) {
+            console.error('Error fetching users:', error);
+        }
+    };
+
+    const fetchRoles = async () => {
+        try {
+            const response = await fetch('http://localhost:4040/api/manage/roles', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.ok) {
+                const res = await response.json();
+                setRoles(res.data || res);
+            }
+        } catch (error) {
+            console.error('Error fetching roles:', error);
+        }
+    };
+
     const getAccessLevelBadgeColor = (level) => {
         switch (level) {
             case 'root': return 'bg-dark';
             case 'admin': return 'bg-danger';
             case 'manage': case 'manager': return 'bg-warning text-dark';
-            case 'create': return 'bg-primary';
-            case 'user': return 'bg-secondary';
+            case 'quality': case 'tester': return 'bg-success';
+            case 'create': return 'bg-info text-light';
+            case 'user': return 'bg-primary';
             default: return 'bg-secondary';
         }
     };
@@ -177,6 +193,26 @@ function Users({ data, onLogout }) {
                                         <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
                                     </svg>
                                     Add User
+                                </button>
+                                <button
+                                    className="btn btn-outline-primary"
+                                    onClick={() => fetchData()}
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                            Loading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16" style={{ verticalAlign: 'middle' }}>
+                                                <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14zm6-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0z" />
+                                                <path d="M8 4a.5.5 0 0 1 .5.5v3.362l2.236-1.618a.5.5 0 0 1 .894.447l-4 2.9a.5.5 0 0 1-.06.03.5.5 0 0 1-.894-.447l4-2.9a.5.5 0 0 1 .06-.03V4.5A.5.5 0 0 1 8 4z" />
+                                            </svg>
+                                            Refresh
+                                        </>
+                                    )}
                                 </button>
                                 <span className="badge bg-primary rounded-pill p-2 px-3">
                                     {filteredUsers.length}{filteredUsers.length !== users.length ? ` / ${users.length}` : ''} {users.length === 1 ? 'user' : 'users'}
@@ -400,27 +436,27 @@ function Users({ data, onLogout }) {
                                 <div className="card-body p-4">
                                     <div className="text-center mb-4">
                                         {(() => {
-                                                const avatarUrl = getProfilePictureUrl(selectedUser);
-                                                return avatarUrl ? (
-                                                    <AuthImage
-                                                        src={avatarUrl}
-                                                        alt={selectedUser.nickname}
-                                                        className="rounded-circle flex-shrink-0"
-                                                        style={{ width: '96px', height: '96px', objectFit: 'cover' }}
-                                                        fallback={
-                                                            <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white flex-shrink-0"
-                                                                style={{ width: '96px', height: '96px', fontSize: '0.8rem' }}>
-                                                                {selectedUser.nickname ? selectedUser.nickname.charAt(0).toUpperCase() : '?'}
-                                                            </div>
-                                                        }
-                                                    />
-                                                ) : (
-                                                    <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white flex-shrink-0"
-                                                        style={{ width: '34px', height: '34px', fontSize: '0.8rem' }}>
-                                                        {selectedUser.nickname ? selectedUser.nickname.charAt(0).toUpperCase() : '?'}
-                                                    </div>
-                                                );
-                                            })()}
+                                            const avatarUrl = getProfilePictureUrl(selectedUser);
+                                            return avatarUrl ? (
+                                                <AuthImage
+                                                    src={avatarUrl}
+                                                    alt={selectedUser.nickname}
+                                                    className="rounded-circle flex-shrink-0"
+                                                    style={{ width: '96px', height: '96px', objectFit: 'cover' }}
+                                                    fallback={
+                                                        <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white flex-shrink-0"
+                                                            style={{ width: '96px', height: '96px', fontSize: '0.8rem' }}>
+                                                            {selectedUser.nickname ? selectedUser.nickname.charAt(0).toUpperCase() : '?'}
+                                                        </div>
+                                                    }
+                                                />
+                                            ) : (
+                                                <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white flex-shrink-0"
+                                                    style={{ width: '34px', height: '34px', fontSize: '0.8rem' }}>
+                                                    {selectedUser.nickname ? selectedUser.nickname.charAt(0).toUpperCase() : '?'}
+                                                </div>
+                                            );
+                                        })()}
                                         <h5 className="fw-bold mb-1">{selectedUser.nickname || 'Unknown'}</h5>
                                     </div>
 

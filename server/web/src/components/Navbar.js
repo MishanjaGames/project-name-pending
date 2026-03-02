@@ -31,8 +31,19 @@ export const Navbar = ({ data, onLogout }) => {
                     >
                         <span className="navbar-toggler-icon"></span>
                     </button>
-                    <span className="navbar-brand mb-0 h5 mx-auto">Admin Panel</span>
-                    <div style={{ width: '40px' }}></div> {/* Spacer for centering */}
+                    {!isSidebarOpen && (
+                        <span className="navbar-brand mb-0 h5 mx-auto">Admin Panel</span>
+                    )}
+                    <div style={{ width: '31px' }}>
+                        {!isSidebarOpen && (
+                        <button className="btn btn-outline-light btn-sm w-100" onClick={onLogout}>
+                            <svg width="16" height="16" fill="currentColor" className="me-2" viewBox="0 0 16 16">
+                                <path fillRule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2z"/>
+                                <path fillRule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z"/>
+                            </svg>
+                        </button>)}
+                    </div> {/* Spacer for centering */}
+                    
                 </div>
             </nav>
 
@@ -133,7 +144,7 @@ export const Navbar = ({ data, onLogout }) => {
                     <div className="mb-3">
                         <small className="text-white-50 d-block mb-1">User:</small>
                         <p className="mb-1 fw-bold text-white text-truncate">{data.nickname}</p>
-                        <small className="text-white-50 d-block text-truncate">{data.email}</small>
+                        <small className="text-white-50 d-block mb-1">{data.email}</small>
                     </div>
                     <button className="btn btn-outline-light btn-sm w-100" onClick={onLogout}>
                         <svg width="16" height="16" fill="currentColor" className="me-2" viewBox="0 0 16 16">

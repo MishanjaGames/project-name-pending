@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 
-function EditLevel({ data, onLogout}) {
+function EditLevel({ data, onLogout }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const [levelName, setLevelName] = useState('');
@@ -36,7 +36,7 @@ function EditLevel({ data, onLogout}) {
 
       if (directionsRes.ok) {
         const directionsData = await directionsRes.json();
-        
+
         // Ensure data is an array
         if (Array.isArray(directionsData)) {
           setDirections(directionsData);
@@ -120,7 +120,7 @@ function EditLevel({ data, onLogout}) {
       <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="mb-0">Edit Level</h2>
-          <button 
+          <button
             className="btn btn-outline-secondary"
             onClick={() => navigate('/manage/levels')}
           >
@@ -174,8 +174,8 @@ function EditLevel({ data, onLogout}) {
                   </div>
 
                   <div className="d-flex gap-2">
-                    <button 
-                      type="submit" 
+                    <button
+                      type="submit"
                       className="btn btn-primary"
                       disabled={saving}
                     >
@@ -206,7 +206,7 @@ function EditLevel({ data, onLogout}) {
 
             <div className="alert alert-warning mt-3">
               <i className="bi bi-exclamation-triangle me-2"></i>
-              <strong>Warning:</strong> Changing this level's direction or name 
+              <strong>Warning:</strong> Changing this level's direction or name
               will affect all courses associated with this level.
             </div>
           </div>

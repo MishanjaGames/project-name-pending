@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { extendSession } from "./utils/utils";
+
 import Login from './pages/Login';
 import Main from './pages/Main';
 import Courses from './pages/Courses';
@@ -19,11 +21,14 @@ import EditUser from './pages/EditUser';
 import EditRole from './pages/EditRole';
 import EditCourse from './pages/EditCourse';
 import CoursePreview from './pages/CoursePreview';
+import ViewCourse from './pages/ViewCourse';
+import CreatorForm from './pages/CreatorForm';
 
 function App() {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userData, setUserData] = useState({
+    id: '',
     nickname: '',
     email: '',
     role: ''
@@ -43,9 +48,14 @@ function App() {
             }
           });
 
+          if (response.status === 401) {
+            await extendSession(userData)
+          }
+
           if (response.ok) {
             const data = await response.json();
             setUserData({
+              _id: data.user._id,
               nickname: data.user.nickname,
               email: data.user.email,
               role: data.user.role
@@ -62,7 +72,7 @@ function App() {
 
       fetchUserData();
     }
-  }, []);
+  }, [isLoggedIn]);
 
   const handleLogin = (user) => {
     setUserData({
@@ -100,8 +110,13 @@ function App() {
             <Main data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
         } />
+        {/* Apply Form */}
+        <Route path="/creator/apply" element={
+          isLoggedIn ?
+            <CreatorForm data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
 
-        
         {/* Courses Routes */}
         <Route path="/manage/courses" element={
           isLoggedIn ?
@@ -121,6 +136,11 @@ function App() {
         <Route path="/manage/course/preview/:id" element={
           isLoggedIn ?
             <CoursePreview data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/course/view/:id" element={
+          isLoggedIn ?
+            <ViewCourse data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
         } />
         {/* Settings Route */}

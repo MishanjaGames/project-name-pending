@@ -31,6 +31,7 @@ const userSchema = new Schema({
     role: {
         ref: 'roles',
         type: Schema.Types.ObjectId,
+        default: '698f4d58ab4593a2bd660336',
         required: false
     },
     email: {
@@ -47,9 +48,15 @@ const userSchema = new Schema({
         required: false
     },
     courses: [{
-        ref: 'courses',
-        type: Schema.Types.ObjectId,
-        required: false
+        _id: {
+            ref: 'courses',
+            type: Schema.Types.ObjectId,
+            required: false
+        },
+        process: {
+            type: Schema.Types.Double,
+            required: false
+        }
     }],
     links: [{
         type: {

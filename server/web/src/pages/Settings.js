@@ -7,7 +7,7 @@ function Settings({ data, onLogout }) {
     const [selectedDate, setSelectedDate] = useState('today');
     const [loading, setLoading] = useState(false);
     const [autoRefresh, setAutoRefresh] = useState(true);
-    const [refreshInterval, setRefreshInterval] = useState(5); // seconds
+    const [refreshInterval, setRefreshInterval] = useState(30); // seconds
     const [lastUpdate, setLastUpdate] = useState(null);
     const [error, setError] = useState('');
 

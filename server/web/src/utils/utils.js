@@ -1,46 +1,63 @@
 import { useCallback, useEffect, useRef } from "react"
 
 export function useTimeout(callback, delay) {
-    const callbackRef = useRef(callback)
-    const timeoutRef = useRef()
-    useEffect(() => {
-        callbackRef.current = callback
-    }, [callback])
-    const set = useCallback(() => {
-        timeoutRef.current = setTimeout(() => callbackRef.current(), delay)
-    }, [delay])
-    const clear = useCallback(() => {
-        timeoutRef.current && clearTimeout(timeoutRef.current)
-    }, [])
-    useEffect(() => {
-        set()
-        return clear
-    }, [delay, set, clear])
-    const reset = useCallback(() => {
-        clear()
-        set()
-    }, [clear, set])
-    return { reset, clear }
+  const callbackRef = useRef(callback)
+  const timeoutRef = useRef()
+  useEffect(() => {
+    callbackRef.current = callback
+  }, [callback])
+  const set = useCallback(() => {
+    timeoutRef.current = setTimeout(() => callbackRef.current(), delay)
+  }, [delay])
+  const clear = useCallback(() => {
+    timeoutRef.current && clearTimeout(timeoutRef.current)
+  }, [])
+  useEffect(() => {
+    set()
+    return clear
+  }, [delay, set, clear])
+  const reset = useCallback(() => {
+    clear()
+    set()
+  }, [clear, set])
+  return { reset, clear }
 }
 
 export const saveToken = (token) => {
-    localStorage.setItem("token", token);
+  localStorage.setItem("token", token);
 };
- 
+
 export const getToken = () => {
-    return localStorage.getItem("token");
+  return localStorage.getItem("token");
 };
- 
+
 export const removeToken = () => {
-    localStorage.removeItem("token");
+  localStorage.removeItem("token");
 };
- 
+
+export const extendSession = async (data) => {
+  const token = localStorage.getItem('token')
+  const req = await fetch('http://localhost:4040/api/auth/ext-session', {
+    method: 'POST',
+    headers: {
+      'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ data })
+  });
+  if (req.ok) {
+    const data = await req.json();
+    localStorage.removeItem('token')
+    localStorage.setItem('token', `${data.tokenType} ${data.token}`)
+  }
+}
+
 export const isAuthenticated = () => {
-    const token = getToken();
-    if (token){
-        return true;
-    }
-    return false;
+  const token = getToken();
+  if (token) {
+    return true;
+  }
+  return false;
 }
 
 // Format uptime from seconds to human-readable format
@@ -55,7 +72,7 @@ export const formatUptime = (seconds) => {
   const secs = Math.floor(seconds % 60);
 
   const parts = [];
-  
+
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);
@@ -72,7 +89,7 @@ export const formatLaunchTime = (timestamp) => {
 
   try {
     const date = new Date(timestamp);
-    
+
     // Check if date is valid
     if (isNaN(date.getTime())) {
       return 'Invalid date';
@@ -139,4 +156,3 @@ export const getTimeAgo = (timestamp) => {
     return 'Unknown';
   }
 };
- 

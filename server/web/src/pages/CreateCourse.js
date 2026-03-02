@@ -520,7 +520,10 @@ function CreateCourse({ data, onLogout }) {
                                                 id="direction"
                                                 name="direction"
                                                 value={formData.direction}
-                                                onChange={handleChange}
+                                                onChange={(e) => {
+                                                    handleChange(e);
+                                                    setFormData(prev => ({ ...prev, level: '' }));
+                                                }}
                                             >
                                                 <option value="">Select direction</option>
                                                 {directions.map((dir) => (
@@ -545,16 +548,22 @@ function CreateCourse({ data, onLogout }) {
                                                 name="level"
                                                 value={formData.level}
                                                 onChange={handleChange}
+                                                disabled={!formData.direction}
                                             >
                                                 <option value="">Select level</option>
-                                                {levels.map((lvl) => (
-                                                    <option key={lvl._id} value={lvl.levelName}>
-                                                        {lvl.levelName}
-                                                    </option>
-                                                ))}
+                                                {levels
+                                                    .filter(lvl => lvl.directionName === formData.direction)
+                                                    .map((lvl) => (
+                                                        <option key={lvl._id} value={lvl.levelName}>
+                                                            {lvl.levelName}
+                                                        </option>
+                                                    ))}
                                             </select>
                                             {errors.level && (
                                                 <div className="invalid-feedback">{errors.level}</div>
+                                            )}
+                                            {!formData.direction && (
+                                                <small className="text-muted">Select direction first</small>
                                             )}
                                         </div>
 
@@ -597,10 +606,6 @@ function CreateCourse({ data, onLogout }) {
                                                         accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip"
                                                     />
                                                     <label htmlFor="contentFiles" className="btn btn-outline-primary">
-                                                        <svg width="16" height="16" fill="currentColor" className="me-2" viewBox="0 0 16 16">
-                                                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
-                                                            <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" />
-                                                        </svg>
                                                         <i className="bi bi-upload me-1"></i>
                                                         Choose Files to Upload
                                                     </label>
@@ -609,7 +614,7 @@ function CreateCourse({ data, onLogout }) {
                                                 <small className="text-muted d-block mb-3">
                                                     <i className="bi bi-info-circle me-1"></i>
                                                     These files will be available to use in your course content (volumes/chapters).
-                                                    Max 50MB per file. Supported: Videos, Audio, Images, PDFs, Documents.
+                                                    Max 512MB per file. Supported: Videos, Audio, Images, PDFs, Documents.
                                                 </small>
 
                                                 {/* Selected Files Display */}

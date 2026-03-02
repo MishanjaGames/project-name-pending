@@ -92,7 +92,7 @@ function EditDirection({ data, onLogout }) {
       <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="mb-0">Edit Direction</h2>
-          <button 
+          <button
             className="btn btn-outline-secondary"
             onClick={() => navigate('/manage/directions')}
           >
@@ -124,8 +124,8 @@ function EditDirection({ data, onLogout }) {
                   </div>
 
                   <div className="d-flex gap-2">
-                    <button 
-                      type="submit" 
+                    <button
+                      type="submit"
                       className="btn btn-primary"
                       disabled={saving}
                     >
@@ -156,7 +156,7 @@ function EditDirection({ data, onLogout }) {
 
             <div className="alert alert-warning mt-3">
               <i className="bi bi-exclamation-triangle me-2"></i>
-              <strong>Warning:</strong> Changing this direction name will affect 
+              <strong>Warning:</strong> Changing this direction name will affect
               all associated levels and courses using this direction.
             </div>
           </div>

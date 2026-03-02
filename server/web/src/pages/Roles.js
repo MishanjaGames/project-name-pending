@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
+import { extendSession } from "../utils/utils";
 
 function Roles({ data, onLogout }) {
+    const [loading, setLoading] = useState(false);
     const [roles, setRoles] = useState([]);
     const [selectedRole, setSelectedRole] = useState(null);
     const [showModal, setShowModal] = useState(false);
@@ -10,33 +12,41 @@ function Roles({ data, onLogout }) {
     const [selectedAccessLevel, setSelectedAccessLevel] = useState('');
     const navigate = useNavigate();
 
+    const token = localStorage.getItem('token');
+
     useEffect(() => {
-        const token = localStorage.getItem('token');
 
         if (token) {
-            const headers = {
-                'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-                'Content-Type': 'application/json'
-            };
-
-            const fetchRoles = async () => {
-                try {
-                    const response = await fetch('http://localhost:4040/api/manage/roles', {
-                        method: 'GET',
-                        headers
-                    });
-                    if (response.ok) {
-                        const res = await response.json();
-                        setRoles(res.data || res);
-                    }
-                } catch (error) {
-                    console.error('Error fetching roles:', error);
-                }
-            };
-
             fetchRoles();
         }
     }, []);
+
+    const fetchData = async () => {
+        setLoading(true);
+        await fetchRoles();
+        setLoading(false);
+    }
+
+    const fetchRoles = async () => {
+        try {
+            const response = await fetch('http://localhost:4040/api/manage/roles', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (response.status === 401) {
+                await extendSession(data)
+            }
+            if (response.ok) {
+                const res = await response.json();
+                setRoles(res.data || res);
+            }
+        } catch (error) {
+            console.error('Error fetching roles:', error);
+        }
+    };
 
     const uniqueAccessLevels = [...new Set(roles.map(r => r.accessLevel))].sort((a, b) => a - b);
 
@@ -98,8 +108,9 @@ function Roles({ data, onLogout }) {
         switch (level) {
             case 'root': return 'bg-dark';
             case 'admin': return 'bg-danger';
-            case 'manage': return 'bg-warning text-dark';
-            case 'create': return 'bg-info text-dark';
+            case 'manage': case 'manager': return 'bg-warning text-dark';
+            case 'quality': return 'bg-success';
+            case 'create': return 'bg-info text-light';
             case 'user': return 'bg-primary';
             default: return 'bg-secondary';
         }
@@ -136,6 +147,26 @@ function Roles({ data, onLogout }) {
                                         <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
                                     </svg>
                                     Add Role
+                                </button>
+                                <button
+                                    className="btn btn-outline-primary"
+                                    onClick={() => fetchData()}
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                            Loading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16" style={{ verticalAlign: 'middle' }}>
+                                                <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14zm6-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0z" />
+                                                <path d="M8 4a.5.5 0 0 1 .5.5v3.362l2.236-1.618a.5.5 0 0 1 .894.447l-4 2.9a.5.5 0 0 1-.06.03.5.5 0 0 1-.894-.447l4-2.9a.5.5 0 0 1 .06-.03V4.5A.5.5 0 0 1 8 4z" />
+                                            </svg>
+                                            Refresh
+                                        </>
+                                    )}
                                 </button>
                                 <span className="badge bg-primary rounded-pill p-2 px-3">
                                     {filteredRoles.length}{filteredRoles.length !== roles.length ? ` / ${roles.length}` : ''} {roles.length === 1 ? 'role' : 'roles'}

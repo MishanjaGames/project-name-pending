@@ -105,23 +105,23 @@ function EditCourse({ data, onLogout }) {
                     if (filesRes.ok) {
                         const res = await filesRes.json();
                         const allFiles = res.data || res.files || [];
-                        
+
                         // Filter out:
                         // 1. Thumbnail files (contains 'thumbnail' in name or first image file)
                         // 2. System-generated text files (pattern: vol-*-ch-*-item-*-*.txt)
                         const files = allFiles.filter((file) => {
                             const fileName = (file.originalName || file.filename || '').toLowerCase();
-                            
+
                             // Exclude thumbnails
-                            const isThumbnail = fileName.includes('thumbnail') || 
-                                              (fileName.endsWith('.png') && allFiles.indexOf(file) === 0 && file.mimetype?.startsWith('image/'));
-                            
+                            const isThumbnail = fileName.includes('thumbnail') ||
+                                (fileName.endsWith('.png') && allFiles.indexOf(file) === 0 && file.mimetype?.startsWith('image/'));
+
                             // Exclude system text files
                             const isSystemText = isSystemTextFile(file.originalName || file.filename || '');
-                            
+
                             return !isThumbnail && !isSystemText;
                         });
-                        
+
                         setExistingFiles(files);
                     }
 
@@ -376,16 +376,16 @@ function EditCourse({ data, onLogout }) {
                         if (filesRes.ok) {
                             const res = await filesRes.json();
                             const allFiles = res.data || res.files || [];
-                            
+
                             // Apply same filtering as initial load
                             const files = allFiles.filter((file) => {
                                 const fileName = (file.originalName || file.filename || '').toLowerCase();
-                                const isThumbnail = fileName.includes('thumbnail') || 
-                                                  (fileName.endsWith('.png') && allFiles.indexOf(file) === 0 && file.mimetype?.startsWith('image/'));
+                                const isThumbnail = fileName.includes('thumbnail') ||
+                                    (fileName.endsWith('.png') && allFiles.indexOf(file) === 0 && file.mimetype?.startsWith('image/'));
                                 const isSystemText = isSystemTextFile(file.originalName || file.filename || '');
                                 return !isThumbnail && !isSystemText;
                             });
-                            
+
                             setExistingFiles(files);
                         }
                     } catch (err) {

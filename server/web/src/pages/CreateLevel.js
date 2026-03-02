@@ -20,13 +20,13 @@ function CreateLevel({ data, onLogout }) {
     setLoading(true);
     try {
       const response = await fetch('http://localhost:4040/api/directions');
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      const {data} = await response.json();
-      
+
+      const { data } = await response.json();
+
       // Ensure data is an array
       if (Array.isArray(data)) {
         setDirections(data);
@@ -105,7 +105,7 @@ function CreateLevel({ data, onLogout }) {
       <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="mb-0">Create Level</h2>
-          <button 
+          <button
             className="btn btn-outline-secondary"
             onClick={() => navigate('/manage/levels')}
           >
@@ -175,8 +175,8 @@ function CreateLevel({ data, onLogout }) {
                       </div>
 
                       <div className="d-flex gap-2">
-                        <button 
-                          type="submit" 
+                        <button
+                          type="submit"
                           className="btn btn-primary"
                           disabled={saving}
                         >
@@ -207,8 +207,8 @@ function CreateLevel({ data, onLogout }) {
 
                 <div className="alert alert-info mt-3">
                   <i className="bi bi-info-circle me-2"></i>
-                  <strong>Note:</strong> Levels help organize courses within a direction. 
-                  For example, "Programming" direction might have "Beginner", "Intermediate", 
+                  <strong>Note:</strong> Levels help organize courses within a direction.
+                  For example, "Programming" direction might have "Beginner", "Intermediate",
                   and "Advanced" levels.
                 </div>
               </>

@@ -1,6 +1,7 @@
 import { Navbar } from "../components/Navbar";
 import { useState, useEffect } from "react";
 import { formatLaunchTime, formatUptime, getTimeAgo, useTimeout } from "../utils/utils";
+import { extendSession } from "../utils/utils";
 
 function Main({ data, onLogout }) {
   const [serverStatus, setServerStatus] = useState({
@@ -39,6 +40,10 @@ function Main({ data, onLogout }) {
           'Content-Type': 'application/json'
         }
       });
+
+      if (response.status === 401) {
+        extendSession(data)
+      }
 
       if (response.ok) {
         const res = await response.json();
