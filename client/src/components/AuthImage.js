@@ -1,9 +1,5 @@
 import { useEffect, useState } from 'react';
 
-/**
- * AuthImage component - Fetches images with authentication headers
- * to avoid 401 errors when displaying protected images
- */
 function AuthImage({ src, alt, className, style, fallback }) {
     const [imageSrc, setImageSrc] = useState(null);
     const [error, setError] = useState(false);
@@ -23,12 +19,11 @@ function AuthImage({ src, alt, className, style, fallback }) {
                     return;
                 }
 
+                // ИСПРАВЛЕНИЕ: Правильный формат токена для твоего проекта
                 const headers = {
-                    'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`
+                    'Authorization': `Bearer ${token}`
                 };
 
-                // Handle both relative and absolute URLs
-                // Ensure src starts with / if it's a relative path
                 let imageUrl;
                 if (src.startsWith('http://') || src.startsWith('https://')) {
                     imageUrl = src;
@@ -59,7 +54,6 @@ function AuthImage({ src, alt, className, style, fallback }) {
 
         fetchImage();
 
-        // Cleanup function
         return () => {
             isMounted = false;
             if (imageSrc && imageSrc.startsWith('blob:')) {

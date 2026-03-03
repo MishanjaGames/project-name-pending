@@ -8,10 +8,7 @@ function NavBar() {
   const navigate = useNavigate();
   const { lang, setLang, t, theme, setTheme } = useContext(SettingsContext);
   
-  // ИЗМЕНЕНИЕ: Берем не totalItems, а сам массив items
   const { items } = useCart(); 
-  
-  // Считаем уникальные курсы (просто длина массива)
   const uniqueItemsCount = items.length;
 
   const [showDropdown, setShowDropdown] = useState(false);
@@ -58,7 +55,6 @@ function NavBar() {
 
           <button className="btn btn-outline-primary me-3" onClick={() => navigate('/cart')} aria-label="Cart">
             <i className="bi bi-cart" aria-hidden="true"></i>
-            {/* ИЗМЕНЕНИЕ: Показываем uniqueItemsCount вместо totalItems */}
             {uniqueItemsCount > 0 && <span className="badge bg-danger ms-2">{uniqueItemsCount}</span>}
           </button>
 
@@ -77,52 +73,65 @@ function NavBar() {
           {(() => {
             const u = getUser();
             return u ? (
-              <div className="dropdown" ref={dropdownRef}>
-                <button 
-                  className={`btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2 ${showDropdown ? 'show' : ''}`}
-                  type="button"
-                  onClick={() => setShowDropdown(!showDropdown)}
-                  aria-expanded={showDropdown}
-                >
-                  <i className="bi bi-person-circle"></i>
-                </button>
+              <div className="d-flex align-items-center">
+                
+                {/* Кнопка показывается только ролям из базы данных, имеющим права */}
+                {['create', 'manage', 'admin', 'root'].includes(u.role) && (
+                  <button 
+                    className="btn btn-success me-3 fw-bold" 
+                    onClick={() => navigate('/add-course')}
+                  >
+                    <i className="bi bi-plus-circle me-1"></i> {t('createCourseBtn')}
+                  </button>
+                )}
 
-                <ul className={`dropdown-menu dropdown-menu-end ${showDropdown ? 'show' : ''} ${theme === 'dark' ? 'dropdown-menu-dark' : ''}`} style={{ minWidth: '220px' }}>
-                  
-                  <li>
-                    <button className="dropdown-item" onClick={() => { navigate('/account'); setShowDropdown(false); }}>
-                      <i className="bi bi-person me-2"></i> {t('account')}
-                    </button>
-                  </li>
+                <div className="dropdown" ref={dropdownRef}>
+                  <button 
+                    className={`btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2 ${showDropdown ? 'show' : ''}`}
+                    type="button"
+                    onClick={() => setShowDropdown(!showDropdown)}
+                    aria-expanded={showDropdown}
+                  >
+                    <i className="bi bi-person-circle"></i>
+                  </button>
 
-                  <li>
-                    <button className="dropdown-item" onClick={() => { navigate('/settings'); setShowDropdown(false); }}>
-                      <i className="bi bi-gear me-2"></i> {t('settings')}
-                    </button>
-                  </li>
+                  <ul className={`dropdown-menu dropdown-menu-end ${showDropdown ? 'show' : ''} ${theme === 'dark' ? 'dropdown-menu-dark' : ''}`} style={{ minWidth: '220px' }}>
+                    
+                    <li>
+                      <button className="dropdown-item" onClick={() => { navigate('/account'); setShowDropdown(false); }}>
+                        <i className="bi bi-person me-2"></i> {t('account')}
+                      </button>
+                    </li>
 
-                  <li><hr className="dropdown-divider" /></li>
-                  
-                  <li>
-                    <button className="dropdown-item d-flex justify-content-between align-items-center" onClick={toggleTheme}>
-                      <span>
-                        <i className={`bi ${theme === 'light' ? 'bi-moon' : 'bi-sun'} me-2`}></i> 
-                        {theme === 'light' ? t('dark') : t('light')}
-                      </span>
-                      <div className="form-check form-switch m-0">
-                        <input className="form-check-input" type="checkbox" checked={theme === 'dark'} readOnly style={{ pointerEvents: 'none' }} />
-                      </div>
-                    </button>
-                  </li>
+                    <li>
+                      <button className="dropdown-item" onClick={() => { navigate('/settings'); setShowDropdown(false); }}>
+                        <i className="bi bi-gear me-2"></i> {t('settings')}
+                      </button>
+                    </li>
 
-                  <li><hr className="dropdown-divider" /></li>
+                    <li><hr className="dropdown-divider" /></li>
+                    
+                    <li>
+                      <button className="dropdown-item d-flex justify-content-between align-items-center" onClick={toggleTheme}>
+                        <span>
+                          <i className={`bi ${theme === 'dark' ? 'bi-moon-stars-fill text-info' : 'bi-sun-fill text-warning'} me-2`}></i> 
+                          {theme === 'dark' ? 'Dark' : 'Light'}
+                        </span>
+                        <div className="form-check form-switch m-0">
+                          <input className="form-check-input" type="checkbox" checked={theme === 'dark'} readOnly style={{ pointerEvents: 'none' }} />
+                        </div>
+                      </button>
+                    </li>
 
-                  <li>
-                    <button className="dropdown-item text-danger" onClick={handleLogout}>
-                      <i className="bi bi-box-arrow-right me-2"></i> {t('logout') || 'Logout'}
-                    </button>
-                  </li>
-                </ul>
+                    <li><hr className="dropdown-divider" /></li>
+
+                    <li>
+                      <button className="dropdown-item text-danger" onClick={handleLogout}>
+                        <i className="bi bi-box-arrow-right me-2"></i> {t('logout') || 'Logout'}
+                      </button>
+                    </li>
+                  </ul>
+                </div>
               </div>
             ) : (
               <>

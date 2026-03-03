@@ -8,6 +8,13 @@ function CartPage() {
   const { items, updateQty, removeItem, clearCart, totalItems, totalPrice } = useCart();
   const { t } = useContext(SettingsContext);
 
+  // --- УМНЫЙ ПЕРЕВОДЧИК ---
+  // Если библиотека возвращает сырой ключ (перевода нет), показываем fallback текст
+  const safeTranslate = (key, fallback) => {
+    const res = t(key);
+    return res === key ? fallback : res;
+  };
+
   // --- СОСТОЯНИЕ ПРОМОКОДА ---
   const [promoCode, setPromoCode] = useState('');
   const [promoDiscount, setPromoDiscount] = useState(0);
@@ -29,13 +36,17 @@ function CartPage() {
   };
 
   const checkoutHandler = () => {
-  const userData = prompt(`Enter your payment details for $${finalPrice.toFixed(2)}:`);
+    const userData = prompt(`Enter your payment details for $${finalPrice.toFixed(2)}:`);
+    
+    if (userData) {
+      console.log("User entered:", userData);
+      alert("Payment successful! (Simulated)");
+    }
+
+    clearCart();
+    navigate('/search');
+  };
   
-  if (userData) {
-    console.log("User entered:", userData);
-    alert("Payment successful! (Simulated)");
-  }
-};
   // Итоговая цена
   const finalPrice = Math.max(0, totalPrice - autoDiscountAmount - promoDiscount);
 
@@ -51,11 +62,12 @@ function CartPage() {
       {/* ЗАГОЛОВОК */}
       <div className="d-flex justify-content-between align-items-center mb-5">
         <div>
-          <h2 className="fw-bold mb-1">{t('cart') || 'Shopping Cart'}</h2>
+          {/* ИСПОЛЬЗУЕМ БЕЗОПАСНЫЙ ПЕРЕВОД */}
+          <h2 className="fw-bold mb-1">{safeTranslate('cartTitle', 'Shopping Cart')}</h2>
           <p className="text-muted mb-0">
             {totalItems > 0 
               ? `You have ${totalItems} course${totalItems !== 1 ? 's' : ''} in your cart` 
-              : 'Your cart is empty'}
+              : safeTranslate('yourCartIsEmpty', 'Your cart is empty')}
           </p>
         </div>
         {totalItems > 0 && (
@@ -63,23 +75,25 @@ function CartPage() {
             className="btn btn-outline-danger rounded-pill px-4" 
             onClick={() => { if(window.confirm('Are you sure?')) clearCart(); }}
           >
-            <i className="bi bi-trash3 me-2"></i> {t('clear') || 'Clear Cart'}
+            <i className="bi bi-trash3 me-2"></i> {safeTranslate('clear', 'Clear Cart')}
           </button>
         )}
       </div>
 
       {items.length === 0 ? (
-      // ПУСТОЙ КОРЗИНА
+      // ПУСТАЯ КОРЗИНА
         <div className="text-center py-5">
-          <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '100px', height: '100px' }}>
+          {/* Поменял bg-light на bg-secondary bg-opacity-10, чтобы в темной теме кружок было видно */}
+          <div className="bg-secondary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '100px', height: '100px' }}>
             <i className="bi bi-cart-x fs-1 text-muted"></i>
           </div>
-          <h4 className="fw-bold mb-3">{t('yourCartIsEmpty') || 'Your cart is empty'}</h4>
+          {/* ИСПОЛЬЗУЕМ БЕЗОПАСНЫЙ ПЕРЕВОД */}
+          <h4 className="fw-bold mb-3">{safeTranslate('yourCartIsEmpty', 'Your cart is empty')}</h4>
           <p className="text-muted mb-4" style={{ maxWidth: '400px', margin: '0 auto' }}>
-            Looks like you haven't added any courses yet. Explore our catalog to find something interesting!
+            {safeTranslate('cart.emptyDesc', "Looks like you haven't added any courses yet. Explore our catalog to find something interesting!")}
           </p>
           <button className="btn btn-primary btn-lg rounded-pill px-5 shadow-sm" onClick={() => navigate('/search')}>
-            Start Shopping
+            {safeTranslate('cart.startShopping', "Start Shopping")}
           </button>
         </div>
       ) : (

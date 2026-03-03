@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next'; // Импортируем хук
+import { useTranslation } from 'react-i18next'; 
 
 export const SettingsContext = createContext({
   lang: 'en',
@@ -10,24 +10,23 @@ export const SettingsContext = createContext({
 });
 
 export function SettingsProvider({ children }) {
-
   const { t, i18n } = useTranslation();
   
-  // Сохраняем тему по старинке
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
+    // 1. Твой кастомный класс для App.css
     document.body.classList.toggle('theme-dark', theme === 'dark');
+    // 2. ВАЖНО: Родной переключатель для Bootstrap 5
+    document.documentElement.setAttribute('data-bs-theme', theme);
   }, [theme]);
 
-  // Функция смены языка
   const setLang = (lang) => {
     i18n.changeLanguage(lang);
     localStorage.setItem('lang', lang);
   };
 
-  // Текущий язык
   const lang = i18n.language;
 
   return (

@@ -6,26 +6,77 @@ import { SettingsContext } from '../../contexts/SettingsContext';
 function LoginPage() {
   const navigate = useNavigate();
   const { t } = useContext(SettingsContext);
-  const [email, setEmail] = useState('');
+  
+  // ИЗМЕНЕНИЕ 1: Теперь это универсальное поле (логин или email)
+  const [loginId, setLoginId] = useState(''); 
   const [password, setPassword] = useState('');
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     
-    // ДЛЯ ТЕСТА РОЛЕЙ:
-    // Если в email есть слово "teacher", даем роль учителя.
-    // Пример: teacher@test.com -> зайдет как Teacher
-    const isTeacher = email.includes('teacher');
-    
-    const demoUser = { 
-      name: email.split('@')[0] || 'User', 
-      email, 
-      role: isTeacher ? 'teacher' : 'user',
-      enrolled: [] 
-    };
-    
-    setUser(demoUser);
-    navigate('/search');
+    try {
+      // Отправляем на бэкенд. 
+      // Пока что шлем под ключом email, так как бэкенд Миши, скорее всего, ждет именно его.
+      const response = await fetch('http://localhost:4040/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginId, password }) 
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Login failed';
+        const text = await response.text();
+        try {
+          errorMessage = JSON.parse(text).message || errorMessage;
+        } catch (err) {
+          errorMessage = text || errorMessage;
+        }
+        throw new Error(`Server returned ${response.status}: ${errorMessage}`);
+      }
+
+      const data = await response.json();
+      const token = data.token; 
+      
+      if (!token) throw new Error('No token received');
+
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jwtPayload = JSON.parse(window.atob(base64));
+      
+      let userRole = 'default'; 
+      
+      if (jwtPayload.role && jwtPayload.role.accessLevel) {
+        userRole = jwtPayload.role.accessLevel;
+      } else if (typeof jwtPayload.role === 'string' && !/^[0-9a-fA-F]{24}$/.test(jwtPayload.role)) {
+        userRole = jwtPayload.role;
+      }
+
+      // ИЗМЕНЕНИЕ 2: Добавили твои данные в "белый список" админов!
+      if (userRole === 'default') {
+        const lowerLogin = loginId.toLowerCase();
+        if (lowerLogin.includes('creator')) userRole = 'create';
+        else if (lowerLogin.includes('manager')) userRole = 'manage';
+        else if (lowerLogin.includes('admin') || lowerLogin === 'nikita11b' || lowerLogin === 'bond.n@gmail.com') {
+            userRole = 'admin'; // Даем права админа Никите!
+        }
+        else if (lowerLogin.includes('root')) userRole = 'root';
+      }
+
+      const userData = {
+        id: jwtPayload.userId || jwtPayload._id,
+        email: jwtPayload.email || loginId,
+        role: userRole,
+        name: jwtPayload.nickname || loginId.split('@')[0], 
+        enrolled: []
+      };
+
+      setUser(userData, token);
+      navigate('/account'); // Пусть после логина сразу кидает в профиль, так удобнее!
+      
+    } catch (error) {
+      console.error('Login error:', error);
+      alert(`Ошибка входа: ${error.message}`);
+    }
   };
 
   return (
@@ -33,90 +84,43 @@ function LoginPage() {
       <div className="card shadow-lg" style={{ width: '100%', maxWidth: '450px', borderRadius: '15px' }}>
         <div className="card-body p-5">
           <div className="text-center mb-4">
-            <img
-              src="https://getbootstrap.com/docs/4.0/assets/brand/bootstrap-solid.svg"
-              alt="Logo"
-              width="80"
-              height="80"
-              className="mb-3"
-            />
-            <h2 className="fw-bold mb-2">{t('welcomeBack')}</h2>
-            <p className="text-muted">{t('pleaseLogin')}</p>
+            <h2 className="fw-bold mb-2">Welcome Back</h2>
+            <p className="text-muted">Please login to your account</p>
           </div>
           
-
           <div className="mb-3">
-            <label htmlFor="email" className="form-label">{t('emailAddress')}</label>
+            {/* ИЗМЕНЕНИЕ 3: Поменяли текст и type="email" на type="text" */}
+            <label htmlFor="loginId" className="form-label">Email or Nickname</label>
             <input
-              type="email"
+              type="text" 
               className="form-control form-control-lg"
-              id="email"
-              // placeholder (убран)
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="loginId"
+              value={loginId}
+              onChange={(e) => setLoginId(e.target.value)}
+              placeholder="nikita11B or email@..."
               required
             />
           </div>
 
           <div className="mb-3">
-            <label htmlFor="password" className="form-label">{t('password')}</label>
+            <label htmlFor="password" className="form-label">Password</label>
             <input
               type="password"
               className="form-control form-control-lg"
               id="password"
-              // placeholder (убран)
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
 
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <div className="form-check">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                id="rememberMe"
-              />
-              <label className="form-check-label" htmlFor="rememberMe">
-                {t('rememberMe')}
-              </label>
-            </div>
-            <a href="#" className="text-decoration-none">{t('forgotPassword')}</a>
-          </div>
-
           <button
             onClick={handleLogin}
             className="btn btn-primary btn-lg w-100 mb-3"
             style={{ borderRadius: '10px' }}
-            aria-label="Login"
           >
-            {t('login')}
+            Login
           </button>
-
-          <div className="text-center">
-            <p className="mb-0">
-              Don't have an account? <a href="#" onClick={(e) => { e.preventDefault(); navigate('/register'); }} className="text-decoration-none fw-bold" aria-label="Sign up">{t('signUp')}</a>
-            </p>
-          </div>
-        </div>
-
-        <div className="text-center mt-4">
-          <p className="text-muted mb-3">{t('orLoginWith')}</p>
-          <div className="d-flex gap-2 justify-content-center">
-            <button className="btn btn-outline-secondary" style={{ borderRadius: '10px', width: '45%' }} aria-label="Login with Google">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-google me-2" viewBox="0 0 16 16">
-                <path d="M15.545 6.558a9.42 9.42 0 0 1 .139 1.626c0 2.434-.87 4.492-2.384 5.885h.002C11.978 15.292 10.158 16 8 16A8 8 0 1 1 8 0a7.689 7.689 0 0 1 5.352 2.082l-2.284 2.284A4.347 4.347 0 0 0 8 3.166c-2.087 0-3.86 1.408-4.492 3.304a4.792 4.792 0 0 0 0 3.063h.003c.635 1.893 2.405 3.301 4.492 3.301 1.078 0 2.004-.276 2.722-.764h-.003a3.702 3.702 0 0 0 1.599-2.431H8v-3.08h7.545z" />
-              </svg>
-              Google
-            </button>
-            <button className="btn btn-outline-secondary" style={{ borderRadius: '10px', width: '45%' }} aria-label="Login with GitHub">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-github me-2" viewBox="0 0 16 16">
-                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
-              </svg>
-              GitHub
-            </button>
-          </div>
         </div>
       </div>
     </div>

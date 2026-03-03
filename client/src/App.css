@@ -217,3 +217,103 @@ body.theme-dark .navbar-dark .navbar-brand:hover,
 body.theme-dark .navbar-dark .btn-link:hover {
   color: #58a6ff !important;
 }
+
+/* ЖЕСТКОЕ ГАШЕНИЕ БЕЛОГО ФОНА В ТЕМНОЙ ТЕМЕ */
+body.theme-dark .bg-white,
+body.theme-dark .page-bg {
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+/* Если включена темная тема, мы насильно перекрашиваем любые белые контейнеры */
+body.theme-dark,
+body.theme-dark #root,
+body.theme-dark .bg-white,
+body.theme-dark .bg-light,
+body.theme-dark .page-bg {
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+/* Фикс для инпутов на странице настроек (чтобы они не сливались с фоном) */
+body.theme-dark input.form-control {
+  background-color: #1c2128 !important;
+  border-color: #30363d !important;
+  color: #e6edf3 !important;
+}
+
+/* --- ФИКС ТЕКСТА В НАВБАРЕ ДЛЯ ТЕМНОЙ ТЕМЫ --- */
+body.theme-dark .navbar-brand,
+body.theme-dark .btn-link {
+  color: #e6edf3 !important; /* Делаем текст светлым */
+}
+
+body.theme-dark .navbar-brand:hover,
+body.theme-dark .btn-link:hover {
+  color: #adb5bd !important; /* Чуть тускнеет при наведении */
+}
+
+/* --- ФИКС ДЛЯ КНОПКИ ПРОФИЛЯ (ЧЕЛОВЕЧЕК) --- */
+body.theme-dark .navbar .dropdown-toggle.btn-outline-secondary {
+  color: #e6edf3 !important; /* Яркий светлый текст и иконка */
+  border-color: #30363d !important; /* Аккуратная темная рамка */
+  background-color: transparent !important; /* Прозрачный фон по умолчанию */
+}
+
+/* Состояние при наведении и когда меню открыто */
+body.theme-dark .navbar .dropdown-toggle.btn-outline-secondary:hover,
+body.theme-dark .navbar .dropdown-toggle.btn-outline-secondary.show {
+  background-color: #21262d !important; /* Легкая подсветка фона */
+  border-color: #8b949e !important; /* Рамка становится светлее */
+  color: #ffffff !important; /* Чисто белый цвет иконки */
+}
+
+/* --- ФИКС ТЕКСТА (ЗАГОЛОВКИ И ЛЕЙБЛЫ) В ТЕМНОЙ ТЕМЕ --- */
+body.theme-dark label,
+body.theme-dark .form-label,
+body.theme-dark h1,
+body.theme-dark h2,
+body.theme-dark h3,
+body.theme-dark h4,
+body.theme-dark h5,
+body.theme-dark h6,
+body.theme-dark p,
+body.theme-dark span {
+  color: var(--text) !important; /* Делаем весь основной текст светлым */
+}
+
+/* Фикс для серого (приглушенного) текста, чтобы он не был слишком ярким */
+body.theme-dark .text-muted {
+  color: var(--muted) !important;
+}
+
+/* Фикс для самих инпутов (если текст внутри них тоже плохо видно) */
+body.theme-dark input,
+body.theme-dark select,
+body.theme-dark textarea {
+  color: var(--text) !important;
+}
+
+/* === ГЛОБАЛЬНЫЙ ФИКС СЕРЫХ КНОПОК В ТЕМНОЙ ТЕМЕ === */
+body.theme-dark .btn-outline-secondary {
+  background-color: var(--card-bg) !important;
+  color: #e6edf3 !important;
+  border-color: #30363d !important;
+}
+
+body.theme-dark .btn-outline-secondary:hover {
+  background-color: #21262d !important;
+  color: #ffffff !important;
+  border-color: #6c757d !important;
+}
+
+/* На всякий случай гасим и btn-light, если где-то осталась */
+body.theme-dark .btn-light {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: var(--text) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+body.theme-dark .btn-light:hover {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}

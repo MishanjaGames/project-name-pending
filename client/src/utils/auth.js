@@ -6,11 +6,20 @@ export function getUser() {
   }
 }
 
-export function setUser(user) {
-  // Гарантируем наличие поля id/_id (нужно в разных частях приложения)
+export function setUser(user, token) {
+  // Гарантируем наличие поля id/_id
   const idVal = user._id || user.id || user.email || ('u_' + Date.now());
   const normalized = { ...user, _id: idVal, id: idVal };
   localStorage.setItem('user', JSON.stringify(normalized));
+
+  // Сохраняем токен, если он пришел от сервера Миши
+  if (token) {
+    localStorage.setItem('token', token);
+  } else if (!localStorage.getItem('token')) {
+    // ВРЕМЕННАЯ ЗАГЛУШКА: если ты логинишься пока без бэкенда
+    // выдаем фейковый токен, чтобы форма создания курса не падала
+    localStorage.setItem('token', 'fake_test_token_for_frontend');
+  }
 }
 
 export function promoteToTeacher() {
@@ -25,6 +34,7 @@ export function promoteToTeacher() {
 
 export function clearUser() {
   localStorage.removeItem('user');
+  localStorage.removeItem('token');
 }
 
 export function isAuthenticated() {
