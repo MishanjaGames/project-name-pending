@@ -17,17 +17,76 @@ function SignUpPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleSignUp = (e) => {
+  const handleSignUp = async (e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
       alert('Passwords do not match!');
       return;
     }
-    const newUser = { name: fullName || email.split('@')[0], email, enrolled: [] };
-    setUser(newUser);
-    console.log('Sign Up:', newUser);
-    // переходим на страницу поиска после регистрации
-    navigate('/search');
+
+    try {
+      // 1. Отправляем данные на реальную регистрацию
+      const regResponse = await fetch('http://localhost:4040/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email,
+          password: password,
+          nickname: fullName || email.split('@')[0],
+          login: email
+        })
+      });
+
+      if (!regResponse.ok) {
+      let errorMsg = 'Registration failed';
+      const text = await regResponse.text(); 
+      try {
+        errorMsg = JSON.parse(text).message || errorMsg;
+      } catch {
+        errorMsg = text || errorMsg;
+      }
+      throw new Error(errorMsg);
+    }
+
+      // 2. Регистрация прошла успешно! Теперь сразу делаем логин, чтобы получить ТОКЕН
+      const loginResponse = await fetch('http://localhost:4040/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (!loginResponse.ok) {
+        throw new Error('Registered successfully, but auto-login failed. Please go to Login page.');
+      }
+
+      const data = await loginResponse.json();
+      const token = data.token;
+
+      if (!token) throw new Error('No token received from server');
+
+      // 3. Расшифровываем токен, чтобы достать данные юзера (id, email, роль)
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jwtPayload = JSON.parse(window.atob(base64));
+
+      const userData = {
+        id: jwtPayload.userId || jwtPayload._id,
+        email: jwtPayload.email || email,
+        role: jwtPayload.role?.accessLevel || jwtPayload.role || 'user',
+        name: fullName || email.split('@')[0],
+        enrolled: []
+      };
+
+      // 4. Сохраняем настоящего юзера и НАСТОЯЩИЙ токен
+      setUser(userData, token);
+      
+      alert('Registration successful!');
+      navigate('/search');
+
+    } catch (error) {
+      console.error('Registration error:', error);
+      alert(`Ошибка регистрации: ${error.message}`);
+    }
   };
 
   return (

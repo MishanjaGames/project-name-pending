@@ -39,33 +39,33 @@ export default function SettingsPage() {
         <form onSubmit={handleSave}>
           <div className="row g-3">
             <div className="col-md-6">
-              <label className="form-label small fw-bold">Nickname</label>
+              <label className="form-label small fw-bold">{t('settingsPage.nickname')}</label>
               <input name="nickname" className="form-control" value={formData.nickname} onChange={handleChange} />
             </div>
             <div className="col-md-6">
-              <label className="form-label small fw-bold">Email</label>
+              <label className="form-label small fw-bold">{t('settingsPage.email')}</label>
               <input name="email" className="form-control" value={formData.email} disabled />
             </div>
             <div className="col-md-6">
-              <label className="form-label small fw-bold">First Name</label>
+              <label className="form-label small fw-bold">{t('settingsPage.firstName')}</label>
               <input name="firstName" className="form-control" value={formData.firstName} onChange={handleChange} />
             </div>
             <div className="col-md-6">
-              <label className="form-label small fw-bold">Last Name</label>
+              <label className="form-label small fw-bold">{t('settingsPage.lastName')}</label>
               <input name="lastName" className="form-control" value={formData.lastName} onChange={handleChange} />
             </div>
             <div className="col-12">
-              <label className="form-label small fw-bold">Phone Number</label>
+              <label className="form-label small fw-bold">{t('settingsPage.phone')}</label>
               <input name="phone" className="form-control" value={formData.phone} onChange={handleChange} placeholder="+380..." />
             </div>
             <div className="col-12">
-              <label className="form-label small fw-bold">GitHub Profile (URL)</label>
+              <label className="form-label small fw-bold">{t('settingsPage.githubProfile')}</label>
               <input name="github" className="form-control" value={formData.github} onChange={handleChange} />
             </div>
           </div>
           <div className="d-flex justify-content-end gap-2 mt-4">
-            <button type="button" className="btn btn-light" onClick={() => navigate('/account')}>Cancel</button>
-            <button type="submit" className="btn btn-primary px-4">Save Changes</button>
+            <button type="button" className="btn btn-light" onClick={() => navigate('/account')}>{t('settingsPage.cancel')}</button>
+            <button type="submit" className="btn btn-primary px-4">{t('settingsPage.save')}</button>
           </div>
         </form>
       </div>

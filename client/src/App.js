@@ -32,9 +32,9 @@ function App() {
             <Route path="/cart" element={<CartPage />} />
             <Route path="/apply-teacher" element={<TeacherRegisterPage />} />
             <Route 
-              path="/instructor/add-course" 
+              path="/add-course" 
               element={
-                <ProtectedRoute roleRequired="teacher">
+                <ProtectedRoute allowedRoles={['create', 'manage', 'admin', 'root']}>
                   <AddCoursePage />
                 </ProtectedRoute>
               } 

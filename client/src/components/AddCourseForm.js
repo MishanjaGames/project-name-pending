@@ -1,321 +1,357 @@
-import React, { useState, useContext, useRef, useEffect } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SettingsContext } from '../contexts/SettingsContext';
 import { getUser } from '../utils/auth';
-import { courseService } from '../api/courseService';
 
 export default function AddCourseForm() {
-  const { t } = useContext(SettingsContext);
-  const navigate = useNavigate();
-  const user = getUser();
-
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    direction: 'Programming',
-    level: 'junior',
-    price: '',
-    links: ''
-  });
-
-  const [imgFile, setImgFile] = useState(null);
-  const [imgPreview, setImgPreview] = useState('');
-  const [videoFiles, setVideoFiles] = useState([null]);
-  const [videoPreviews, setVideoPreviews] = useState(['']);
-  const [learnList, setLearnList] = useState(['']);
-  const imgRef = useRef(null);
-  const videoUrlsRef = useRef([]);
-
-  useEffect(() => {
-    return () => {
-      // освобождаем временные objectURL
-      if (videoUrlsRef.current.length) {
-        videoUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
-        videoUrlsRef.current = [];
-      }
-      if (imgRef.current) {
-        URL.revokeObjectURL(imgRef.current);
-        imgRef.current = null;
-      }
-    };
-  }, []);
-
-  const [loading, setLoading] = useState(false);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleImageSelect = (e) => {
-    const file = e.target.files && e.target.files[0];
-    setImgFile(file || null);
-    if (imgRef.current) { URL.revokeObjectURL(imgRef.current); imgRef.current = null; }
-    if (file) {
-      const obj = URL.createObjectURL(file);
-      imgRef.current = obj;
-      setImgPreview(obj);
-    } else {
-      setImgPreview('');
-    }
-  };
-
-  const handleVideoSelect = (index, e) => {
-    const file = e.target.files && e.target.files[0];
-    setVideoFiles(prev => {
-      const copy = prev.slice();
-      copy[index] = file || null;
-      return copy;
-    });
-
-    setVideoPreviews(prev => {
-      const copy = prev.slice();
-      // освобождаем старый preview, если это blob
-      if (copy[index] && copy[index].startsWith && copy[index].startsWith('blob:')) {
-        try { URL.revokeObjectURL(copy[index]); } catch(_) {}
-      }
-      if (file) {
-        const obj = URL.createObjectURL(file);
-        copy[index] = obj;
-      } else {
-        copy[index] = '';
-      }
-      return copy;
-    });
-  };
-
-  const addVideoItem = () => {
-    setVideoFiles(prev => ([...prev, null]));
-    setVideoPreviews(prev => ([...prev, '']));
-  };
-
-  const removeVideoItem = (index) => {
-    setVideoFiles(prev => prev.filter((_,i)=>i!==index));
-    setVideoPreviews(prev => {
-      const copy = prev.slice();
-      if (copy[index] && copy[index].startsWith && copy[index].startsWith('blob:')) {
-        try { URL.revokeObjectURL(copy[index]); } catch(_) {}
-      }
-      copy.splice(index,1);
-      return copy;
-    });
-  };
-
-  const handleLearnChange = (index, value) => {
-    setLearnList(prev => prev.map((v,i) => i===index?value:v));
-  };
-
-  const addLearnItem = () => setLearnList(prev => ([...prev, '']));
-  const removeLearnItem = (index) => setLearnList(prev => prev.filter((_,i)=>i!==index));
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+    const { t } = useContext(SettingsContext);
+    const navigate = useNavigate();
     
-    try {
-      // Step 1: Create course (without files)
-      const courseData = {
-        title: formData.title,
-        description: formData.description,
-        direction: formData.direction,
-        level: formData.level,
-        price: parseFloat(formData.price) || 0,
-        whatYouWillLearn: learnList.filter(s => s && s.trim())
-      };
+    // Получаем текущего авторизованного пользователя
+    const currentUser = getUser();
+    
+    const [saving, setSaving] = useState(false);
+    const [skillInput, setSkillInput] = useState('');
+    const [errors, setErrors] = useState({});
 
-      const newCourse = await courseService.create(courseData, user);
-      
-      if (!newCourse || !newCourse._id) {
-        throw new Error('Failed to create course - no ID received');
-      }
+    // Состояние формы с дефолтными значениями и АВТОМАТИЧЕСКОЙ подстановкой ID
+    const [formData, setFormData] = useState({
+        userId: currentUser?.id || currentUser?._id || '', 
+        status: 'editing',
+        title: '',
+        description: '',
+        skills: [],
+        direction: 'Programming', // Дефолтное значение
+        level: 'Junior',          // Дефолтное значение
+        price: ''
+    });
 
-      const courseId = newCourse._id;
+    // Состояния файлов
+    const [thumbnailFile, setThumbnailFile] = useState(null);
+    const [thumbnailPreview, setThumbnailPreview] = useState(null);
+    const [contentFiles, setContentFiles] = useState([]);
 
-      // Step 2: Upload thumbnail if provided
-      if (imgFile) {
-        try {
-          await courseService.uploadThumbnail(courseId, imgFile);
-        } catch (error) {
-          console.warn('Thumbnail upload failed, continuing...', error);
+    // Нам больше не нужен useEffect с fetch, мы используем захардкоженные списки
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+    };
+
+    const handleThumbnailChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (!file.type.startsWith('image/')) {
+                setErrors(prev => ({ ...prev, thumbnail: 'Please select an image file' }));
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                setErrors(prev => ({ ...prev, thumbnail: 'Image must be less than 5MB' }));
+                return;
+            }
+            setThumbnailFile(file);
+            setThumbnailPreview(URL.createObjectURL(file));
+            setErrors(prev => ({ ...prev, thumbnail: '' }));
         }
-      }
+    };
 
-      // Step 3: Upload content files if provided
-      const contentFiles = videoFiles.filter(f => f !== null && f !== undefined);
-      if (contentFiles.length > 0) {
-        try {
-          await courseService.uploadContentFiles(courseId, contentFiles);
-        } catch (error) {
-          console.warn('Content files upload failed, continuing...', error);
+    const handleContentFilesChange = (e) => {
+        const files = Array.from(e.target.files);
+        const validFiles = [];
+        for (const file of files) {
+            if (file.size > 50 * 1024 * 1024) {
+                alert(`File ${file.name} is too large. Maximum size is 50MB.`);
+                continue;
+            }
+            validFiles.push(file);
         }
-      }
+        setContentFiles(prev => [...prev, ...validFiles]);
+    };
 
-      alert(t('course.success') || 'Course created successfully!');
-      navigate('/account');
-    } catch (error) {
-      console.error('Error creating course:', error);
-      alert('Error creating course: ' + (error.message || 'Unknown error'));
-    } finally {
-      setLoading(false);
-    }
-  };
+    const removeContentFile = (index) => {
+        setContentFiles(prev => prev.filter((_, i) => i !== index));
+    };
 
-  return (
-    <form onSubmit={handleSubmit}>
-      {/* Заголовок */}
-      <div className="mb-3">
-        <label className="form-label">{t('course.titleLabel')}</label>
-        <input 
-          name="title" 
-          className="form-control" 
-          value={formData.title} 
-          onChange={handleChange} 
-          required 
-        />
-      </div>
+    const renameFile = (file, newName) => {
+        const blob = file.slice(0, file.size, file.type);
+        return new File([blob], newName, { type: file.type });
+    };
 
-      {/* Направление */}
-      <div className="mb-3">
-        <label className="form-label">Direction</label>
-        <select 
-          name="direction" 
-          className="form-select" 
-          value={formData.direction} 
-          onChange={handleChange}
-        >
-          <option value="Programming">Programming</option>
-          <option value="Game Dev">Game Dev</option>
-          <option value="Data Science">Data Science</option>
-          <option value="Design">Design</option>
-        </select>
-      </div>
+    const handleAddSkill = () => {
+        const trimmedSkill = skillInput.trim();
+        if (trimmedSkill && !formData.skills.includes(trimmedSkill)) {
+            setFormData(prev => ({ ...prev, skills: [...prev.skills, trimmedSkill] }));
+            setSkillInput('');
+        }
+    };
 
-      {/* Уровень */}
-      <div className="mb-3">
-        <label className="form-label">Level</label>
-        <select 
-          name="level" 
-          className="form-select" 
-          value={formData.level} 
-          onChange={handleChange}
-        >
-          <option value="junior">Junior</option>
-          <option value="middle">Middle</option>
-          <option value="senior">Senior</option>
-        </select>
-      </div>
+    const handleRemoveSkill = (skillToRemove) => {
+        setFormData(prev => ({ ...prev, skills: prev.skills.filter(skill => skill !== skillToRemove) }));
+    };
 
-      {/* Цена */}
-      <div className="mb-3">
-        <label className="form-label">{t('course.priceLabel')}</label>
-        <div className="input-group">
-          <span className="input-group-text">$</span>
-          <input 
-            type="number" 
-            name="price" 
-            className="form-control" 
-            value={formData.price} 
-            onChange={handleChange} 
-            required 
-            min="0"
-          />
-        </div>
-      </div>
+    const handleSkillInputKeyPress = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleAddSkill();
+        }
+    };
 
-      {/* Описание */}
-      <div className="mb-3">
-        <label className="form-label">{t('course.descriptionLabel')}</label>
-        <textarea 
-          name="description" 
-          className="form-control" 
-          rows="4" 
-          value={formData.description} 
-          onChange={handleChange} 
-        />
-      </div>
+    const validateForm = () => {
+        const newErrors = {};
+        if (!formData.userId) newErrors.userId = 'Owner ID is missing. Please re-login.';
+        if (!formData.title.trim()) newErrors.title = 'Title is required';
+        if (formData.price && isNaN(parseFloat(formData.price))) newErrors.price = 'Price must be a valid number';
 
-      {/* Ссылки убраны — используем локальные файлы или backend links */}
-      {/* Upload cover image */}
-      <div className="mb-3">
-        <label className="form-label fw-bold">Upload cover image</label>
-        <input type="file" accept="image/*" className="form-control" onChange={handleImageSelect} />
-        <div className="form-text small text-muted">Select an image file from your computer.</div>
-      </div>
-      {/* Image Preview */}
-      <div className="mb-4">
-        <label className="form-label">Image Preview</label>
-        <div 
-          className='rounded shadow-sm overflow-hidden border d-flex align-items-center justify-content-center'
-          style={{
-            minHeight: '120px',
-            height: 'auto', 
-            alignItems: 'center', 
-            display: 'flex', 
-            justifyContent: 'center', 
-            backgroundColor: '#2a2a2a'  
-          }}
-        >
-          {imgPreview ? (
-            <img 
-              src={imgPreview}
-              alt="Course Preview"
-              className="img-fluid w-100 h-100"
-              style={{height: 'auto', display: 'block'}}
-              onError={(e) => {e.target.src = 'https://www.freeiconspng.com/uploads/error-icon-15.png'}}
-            />
-          ) : (
-            <div className="text-center text-secondary">
-              <i className="bi bi-image fs-2 d-block"></i>
-              <span style={{fontSize: '0.7rem'}}>No image uploaded</span>
-            </div>
-          )}
-        </div>
-      </div>  
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
 
-      {/* Video upload
-      <div className="mb-4">
-        <label className="form-label fw-bold">Lesson videos</label>
-        <div className="d-grid gap-3 mb-3">
-          {videoPreviews.map((preview, idx) => (
-            <div key={idx} className="border rounded p-3" style={{backgroundColor: '#2a2a2a'}}>
-              <div className="mb-2 d-flex justify-content-between align-items-center">
-                <small className="text-secondary">Video #{idx + 1}</small>
-                <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => removeVideoItem(idx)} disabled={videoPreviews.length === 1}>Remove</button>
-              </div>
-              <input type="file" accept="video/*" className="form-control form-control-dark mb-2" onChange={(e) => handleVideoSelect(idx, e)} />
-              {preview ? (
-                <video src={preview} controls style={{width: '100%', maxHeight: '240px'}} />
-              ) : (
-                <div className="text-secondary small text-center py-4">
-                  <i className="bi bi-film"></i> Select a video file
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!validateForm()) return;
+        setSaving(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const authHeader = `Bearer ${token}`; 
+
+            // ЭТАП 1: Создаем курс
+            const response = await fetch('http://localhost:4040/api/manage/courses', {
+                method: 'POST',
+                headers: {
+                    'Authorization': authHeader,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    userId: formData.userId,
+                    status: formData.status,
+                    title: formData.title,
+                    description: formData.description,
+                    skills: formData.skills,
+                    direction: formData.direction,
+                    level: formData.level,
+                    price: formData.price ? parseFloat(formData.price) : 0
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                alert(`Failed to create course: ${errorData.message || 'Unknown error'}`);
+                setSaving(false);
+                return;
+            }
+
+            const { data: courseData } = await response.json();
+            const courseId = courseData._id || courseData.id; 
+
+            // ЭТАП 2: Загружаем обложку
+            if (thumbnailFile && courseId) {
+                const fileExtension = thumbnailFile.name.split('.').pop();
+                const renamedFile = renameFile(thumbnailFile, `thumbnail.${fileExtension}`);
+                const thumbnailFormData = new FormData();
+                thumbnailFormData.append('file', renamedFile);
+
+                await fetch(`http://localhost:4040/api/manage/courses/${courseId}/files`, {
+                    method: 'POST',
+                    headers: { 'Authorization': authHeader },
+                    body: thumbnailFormData
+                });
+            }
+
+            // ЭТАП 3: Загружаем материалы
+            if (contentFiles.length > 0 && courseId) {
+                const contentFormData = new FormData();
+                contentFiles.forEach(file => {
+                    contentFormData.append('files', file);
+                });
+
+                await fetch(`http://localhost:4040/api/manage/courses/${courseId}/files/multiple`, {
+                    method: 'POST',
+                    headers: { 'Authorization': authHeader },
+                    body: contentFormData
+                });
+            }
+
+            alert('Course created successfully!');
+            navigate('/account'); 
+        } catch (error) {
+            console.error('Error creating course:', error);
+            alert('Error creating course. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            {/* Обложка курса */}
+            <div className="text-center mb-4">
+                {thumbnailPreview ? (
+                    <img
+                        src={thumbnailPreview}
+                        alt="Thumbnail preview"
+                        className="rounded mb-3 shadow-sm"
+                        style={{ width: '200px', height: '120px', objectFit: 'cover' }}
+                    />
+                ) : (
+                    <div className="rounded bg-primary bg-opacity-10 d-flex align-items-center justify-content-center text-primary mx-auto mb-3"
+                        style={{ width: '200px', height: '120px' }}>
+                        <i className="bi bi-image fs-1"></i>
+                    </div>
+                )}
+
+                <div className="mb-2 d-flex justify-content-center gap-2">
+                    <input
+                        type="file" id="thumbnail" className="d-none" accept="image/*"
+                        onChange={handleThumbnailChange}
+                    />
+
+                    {!thumbnailPreview ? (
+                        <label htmlFor="thumbnail" className="btn btn-sm btn-primary">
+                            <i className="bi bi-upload me-2"></i> {t('addCourseForm.uploadCover')}
+                        </label>
+                    ) : (
+                        <>
+                            <label htmlFor="thumbnail" className="btn btn-sm btn-warning">
+                                <i className="bi bi-pencil me-1"></i> {t('addCourseForm.changeCover')}
+                            </label>
+                            <button
+                                type="button" className="btn btn-sm btn-danger"
+                                onClick={() => { setThumbnailFile(null); setThumbnailPreview(null); }}
+                            >
+                                <i className="bi bi-trash me-1"></i> {t('addCourseForm.removeCover')}
+                            </button>
+                        </>
+                    )}
                 </div>
-              )}
+                {errors.thumbnail && <small className="text-danger d-block">{errors.thumbnail}</small>}
             </div>
-          ))}
-        </div>
-        <button type="button" className="btn btn-sm btn-outline-primary" onClick={addVideoItem}>Add video</button>
-      </div> */}
 
-      {/* What you'll learn editor */}
-      <div className="mb-4">
-        <label className="form-label fw-bold">What you'll learn</label>
-        <div className="d-grid gap-2">
-          {learnList.map((item, idx) => (
-            <div className="input-group" key={idx}>
-              <input type="text" className="form-control" value={item} onChange={(e)=>handleLearnChange(idx, e.target.value)} placeholder={`Point ${idx+1}`} />
-              <button type="button" className="btn btn-outline-danger" onClick={()=>removeLearnItem(idx)} disabled={learnList.length===1}>Remove</button>
+            <div className="row g-3">
+                {/* Владелец курса (Скрыт для пользователя, так как берется из профиля) */}
+                {errors.userId && <div className="col-12 text-danger fw-bold">{errors.userId}</div>}
+
+                {/* Название */}
+                <div className="col-12">
+                    <label className="form-label fw-semibold">{t('addCourseForm.courseTitle')} <span className="text-danger">*</span></label>
+                    <input
+                        type="text" className={`form-control ${errors.title ? 'is-invalid' : ''}`}
+                        name="title" value={formData.title} onChange={handleChange}
+                    />
+                    {errors.title && <div className="invalid-feedback">{errors.title}</div>}
+                </div>
+
+                {/* Описание */}
+                <div className="col-12">
+                    <label className="form-label fw-semibold">{t('addCourseForm.description')}</label>
+                    <textarea
+                        className="form-control" name="description"
+                        value={formData.description} onChange={handleChange} rows="4"
+                    />
+                </div>
+
+                {/* Направление */}
+                <div className="col-12 col-md-4">
+                    <label className="form-label fw-semibold">{t('addCourseForm.direction')} <span className="text-danger">*</span></label>
+                    <select
+                        className="form-select" name="direction" 
+                        value={formData.direction} onChange={handleChange}
+                    >
+                        <option value="Programming">Programming</option>
+                        <option value="Game Dev">Game Dev</option>
+                        <option value="Data Science">Data Science</option>
+                        <option value="Design">Design</option>
+                    </select>
+                </div>
+
+                {/* Уровень (Теперь с Guru!) */}
+                <div className="col-12 col-md-4">
+                    <label className="form-label fw-semibold">{t('addCourseForm.level')} <span className="text-danger">*</span></label>
+                    <select
+                        className="form-select" name="level" 
+                        value={formData.level} onChange={handleChange}
+                    >
+                        <option value="Junior">Junior</option>
+                        <option value="Middle">Middle</option>
+                        <option value="Senior">Senior</option>
+                        <option value="Guru">Guru 🚀</option>
+                    </select>
+                </div>
+
+                {/* Цена */}
+                <div className="col-12 col-md-4">
+                    <label className="form-label fw-semibold">{t('addCourseForm.price')} (USD)</label>
+                    <div className="input-group">
+                        <span className="input-group-text">$</span>
+                        <input
+                            type="number" className={`form-control ${errors.price ? 'is-invalid' : ''}`}
+                            name="price" value={formData.price} onChange={handleChange} min="0"
+                        />
+                    </div>
+                </div>
+
+                {/* Skills (Чему вы научитесь) */}
+                <div className="col-12">
+                    <label className="form-label fw-semibold">{t('addCourseForm.skills')}</label>
+                    <div className="input-group mb-2">
+                        <input
+                            type="text" className="form-control" value={skillInput}
+                            onChange={(e) => setSkillInput(e.target.value)} onKeyPress={handleSkillInputKeyPress}
+                            placeholder={t('addCourseForm.skillsPlaceholder')}
+                        />
+                        <button className="btn btn-outline-primary" type="button" onClick={handleAddSkill}>
+                            <i className="bi bi-plus-lg"></i>
+                        </button>
+                    </div>
+                    {formData.skills.length > 0 && (
+                        <div className="d-flex flex-wrap gap-2">
+                            {formData.skills.map((skill, idx) => (
+                                <span key={idx} className="badge bg-primary d-flex align-items-center p-2">
+                                    {skill}
+                                    <i className="bi bi-x-lg ms-2" style={{ cursor: 'pointer' }} onClick={() => handleRemoveSkill(skill)}></i>
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Файлы / Видео */}
+                <div className="col-12 mt-4">
+                    <label className="form-label fw-semibold">{t('addCourseForm.courseMaterials')}</label>
+                    <div className="border rounded p-3 bg-light">
+                        <input
+                            type="file" id="contentFiles" className="d-none" multiple
+                            onChange={handleContentFilesChange}
+                        />
+                        <label htmlFor="contentFiles" className="btn btn-outline-primary mb-3">
+                            <i className="bi bi-upload me-2"></i> {t('addCourseForm.uploadMaterials')}
+                        </label>
+
+                        {contentFiles.length > 0 && (
+                            <ul className="list-group">
+                                {contentFiles.map((file, idx) => (
+                                    <li key={idx} className="list-group-item d-flex justify-content-between align-items-center">
+                                        <span className="text-truncate" style={{maxWidth: '80%'}}>{file.name}</span>
+                                        <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => removeContentFile(idx)}>
+                                            <i className="bi bi-x-lg"></i>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
             </div>
-          ))}
-          <button type="button" className="btn btn-sm btn-outline-primary mt-2" onClick={addLearnItem}>Add point</button>
-        </div>
-      </div>
 
-      <div className="d-flex justify-content-end gap-2">
-        <button type="button" className="btn btn-outline-secondary" onClick={() => navigate(-1)}>Cancel</button>
-        <button type="submit" className="btn btn-primary" disabled={loading}>
-          {loading ? t('course.sending') : t('course.submit')}
-        </button>
-      </div>
-    </form>
-  );
+            <div className="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                <button type="button" className="btn btn-outline-secondary" onClick={() => navigate(-1)} disabled={saving}>{t('addCourseForm.cancel')}</button>
+                <button type="submit" className="btn btn-success" disabled={saving}>
+                    {saving ? (
+                        <><span className="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>{t('addCourseForm.saving')}...</>
+                    ) : t('addCourseForm.createCourse')}
+                </button>
+            </div>
+        </form>
+    );
 }

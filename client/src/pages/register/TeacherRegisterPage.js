@@ -10,8 +10,8 @@ export default function TeacherRegisterPage() {
 
   return (
     <div className="container my-4">
-      <h3>{t('teacherApplicationTitle')}</h3>
-      <p>{t('teacherApplicationLead')}</p>
+      <h3>{t('teacher.formTitle')}</h3>
+      <p>{t('teacher.formDesc')}</p>
       <TeacherForm initialEmail={user?.email} />
     </div>
   );
