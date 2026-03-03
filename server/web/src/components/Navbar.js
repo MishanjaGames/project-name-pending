@@ -102,6 +102,15 @@ export const Navbar = ({ data, onLogout }) => {
                         </li>
                         <li className="nav-item">
                             <Link 
+                                to='/manage/forms' 
+                                className="nav-link text-white d-flex align-items-center"
+                                onClick={closeSidebar}
+                            >
+                                <span>Forms</span>
+                            </Link>
+                        </li>
+                        <li className="nav-item">
+                            <Link 
                                 to='/manage/levels' 
                                 className="nav-link text-white d-flex align-items-center"
                                 onClick={closeSidebar}

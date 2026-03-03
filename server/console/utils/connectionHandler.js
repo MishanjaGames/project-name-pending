@@ -4,7 +4,7 @@ const path = require('path');
 // Dynamic store for API files
 const apiFilesStore = [
     {
-        config: '../config/cfg.mongo',
+        config: '../config/config.mongo',
         path: '../api/mongo',
         fullPath: 'D:\\Files\\Education\\projects and else\\project-name-pending\\server\\console\\api\\mongo.js'
     }

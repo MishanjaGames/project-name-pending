@@ -195,7 +195,7 @@ function CoursePreview({ data, onLogout }) {
         fetch(`http://localhost:4040/api/courses/${id}`).catch(() => null),
         fetch('http://localhost:4040/api/directions').catch(() => null),
         fetch('http://localhost:4040/api/levels').catch(() => null),
-        fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
+        fetch(`http://localhost:4040/api/courses/${id}/files`, {
           headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' }
         }).catch(() => null),
       ]);
@@ -231,7 +231,7 @@ function CoursePreview({ data, onLogout }) {
   const fetchUserData = async () => {
     if (!course?.userId) return;
     try {
-      const res = await fetch(`http://localhost:4040/api/manage/users/${course.userId}`, {
+      const res = await fetch(`http://localhost:4040/api/users/${course.userId}`, {
         headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` }
       });
       if (res.ok) { const { data: d } = await res.json(); setAuthor(d); }

@@ -1,5 +1,5 @@
 const mongo = require('mongoose')
-const config = require('../config/cfg')
+const config = require('../config/config')
 
 module.exports.use = () => {
     // mongo.createConnection(config.DB_URL, { dbName: "P_01" })

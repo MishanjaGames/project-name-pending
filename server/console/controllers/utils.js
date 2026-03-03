@@ -2,7 +2,7 @@ const os = require('os')
 
 const User = require('../models/mongo.users')
 const Course = require('../models/mongo.courses')
-const config = require('../config/cfg')
+const config = require('../config/config')
 
 module.exports.getStatusInfo = async (req, res) => {
     let c = []

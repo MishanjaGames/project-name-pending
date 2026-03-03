@@ -23,6 +23,8 @@ import EditCourse from './pages/EditCourse';
 import CoursePreview from './pages/CoursePreview';
 import ViewCourse from './pages/ViewCourse';
 import CreatorForm from './pages/CreatorForm';
+import Forms from './pages/Forms';
+import ViewForm from './pages/ViewForm';
 
 function App() {
   const navigate = useNavigate();
@@ -110,10 +112,21 @@ function App() {
             <Main data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
         } />
-        {/* Apply Form */}
+
+        {/* Forms */}
         <Route path="/creator/apply" element={
           isLoggedIn ?
-            <CreatorForm data={userData} onLogout={handleLogout} /> :
+            <CreatorForm formType={'creator'} data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/manage/forms/" element={
+          isLoggedIn ?
+            <Forms data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/manage/forms/detail/:id" element={
+          isLoggedIn ?
+            <ViewForm data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
         } />
 

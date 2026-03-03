@@ -3,7 +3,7 @@ const bcrypt = require('bcrypt')
 
 const User = require('../models/mongo.users')
 const Role = require('../models/mongo.roles')
-const config = require('../config/cfg')
+const config = require('../config/config')
 
 const errorHandler = require('./errorHandler')
 
@@ -88,8 +88,9 @@ const comparePermission = (accessLevel, permission) => {
     else {
         if (accessLevel === permission) return true;
         else if (accessLevel === 'root') return true;
-        else if (accessLevel === 'admin' && (permission === 'manage' || permission === 'create' || permission === 'default')) return true;
-        else if (accessLevel === 'manage' && (permission === 'create' || permission === 'default')) return true;
+        else if (accessLevel === 'admin' && (permission === 'manage' || permission === 'quality' || permission === 'create' || permission === 'default')) return true;
+        else if (accessLevel === 'manage' && (permission === 'quality' || permission === 'create' || permission === 'default')) return true;
+        else if (accessLevel === 'quality' && (permission === 'create' || permission === 'default')) return true;
         else if (accessLevel === 'create' && permission === 'default') return true;
         else return false;
     }

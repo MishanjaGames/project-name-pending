@@ -5,6 +5,9 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { Provider } from 'react-redux'
 import { BrowserRouter } from 'react-router-dom';
+import emailjs from "@emailjs/browser";
+
+emailjs.init("Nvm4o7f3CGBjRYtZ5");
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

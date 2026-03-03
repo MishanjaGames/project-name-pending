@@ -4,7 +4,7 @@ const passport = require('passport')
 const morgan = require('morgan')
 const cors = require('cors')
 
-const config = require('./config/cfg')
+const config = require('./config/config')
 const restRouter = require('./routes/rest')
 const { loadAPI, useAPI } = require('./utils/connectionHandler')
 const logger = require('./utils/logger')

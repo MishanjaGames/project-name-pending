@@ -1,7 +1,7 @@
 const JwtStrategy = require('passport-jwt').Strategy
 const ExtractJwt = require('passport-jwt').ExtractJwt
 
-const config = require('../config/cfg')
+const config = require('../config/config')
 const User = require('../models/mongo.users')
  
 const options = {

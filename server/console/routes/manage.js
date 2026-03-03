@@ -3,6 +3,7 @@ const userRouter = require('./users')
 const coursesRouter = require('./courses')
 const roleRouter = require('./roles')
 const filesRouter = require('./manage/files')
+const formsRouter = require('./forms')
 const passport = require('passport')
 const { validate } = require('../utils/utils')
 
@@ -10,5 +11,5 @@ router.use('/courses', passport.authenticate('jwt', {session: false}), validate(
 router.use('/users', passport.authenticate('jwt', {session: false}), validate('manage'), userRouter)
 router.use('/roles', passport.authenticate('jwt', {session: false}), validate('manage'), roleRouter)
 router.use('/files', passport.authenticate('jwt', {session: false}), validate('manage'), filesRouter)
-
+router.use('/forms', passport.authenticate('jwt', {session: false}), validate('quality'), formsRouter)
 module.exports = router

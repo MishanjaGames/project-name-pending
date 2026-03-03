@@ -1,20 +1,12 @@
-const fs = require('fs');
+'use strict';
+
+const fs   = require('fs');
 const path = require('path');
 const multer = require('multer');
 
 // ============================================================================
-// CONFIGURATION
+// SHARED MIME-TYPE CONSTANTS
 // ============================================================================
-
-const UPLOAD_PATHS = {
-    userProfiles: path.join(__dirname, '../../storage/data/u'),
-    courseFiles: path.join(__dirname, '../../storage/data/c')
-};
-
-const FILE_LIMITS = {
-    profilePicture: 5 * 1024 * 1024,  // 5MB
-    courseFile: 512 * 1024 * 1024       // 512MB
-};
 
 const ALLOWED_TYPES = {
     images: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
@@ -27,673 +19,429 @@ const ALLOWED_TYPES = {
         'application/vnd.ms-excel',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'application/json',
-        'text/plain'
+        'text/plain',
     ],
     videos: ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-mpeg'],
-    audio: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/aac', 'audio/flac', 'audio/x-m4a', 'audio/webm'],
-    archives: ['application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed']
+    audio:  ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/aac',
+             'audio/flac', 'audio/x-m4a', 'audio/webm'],
+    archives: ['application/zip', 'application/x-zip-compressed',
+               'application/x-rar-compressed', 'application/x-7z-compressed'],
 };
 
 // ============================================================================
-// DIRECTORY MANAGEMENT
+// UTILITY
 // ============================================================================
 
 /**
- * Ensure base directories exist
+ * Determine a human-readable file type from a filename or MIME string.
+ * @param {string} filenameOrMime
+ * @returns {'image'|'video'|'audio'|'document'|'archive'|'other'}
  */
-function initializeBaseDirs() {
-    if (!fs.existsSync(UPLOAD_PATHS.userProfiles)) {
-        fs.mkdirSync(UPLOAD_PATHS.userProfiles, { recursive: true });
-    }
-    if (!fs.existsSync(UPLOAD_PATHS.courseFiles)) {
-        fs.mkdirSync(UPLOAD_PATHS.courseFiles, { recursive: true });
-    }
-}
-
-initializeBaseDirs();
-
-/**
- * Ensure directory for specific ID exists
- * @param {string} basePath - Base path (userProfiles or courseFiles)
- * @param {string} id - User or Course ID
- */
-function ensureIdDirectory(basePath, id) {
-    const dirPath = path.join(basePath, id);
-    if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-    }
-    return dirPath;
-}
-
-/**
- * Get directory path for specific ID
- * @param {string} type - 'user' or 'course'
- * @param {string} id - User or Course ID
- */
-function getIdDirectory(type, id) {
-    const basePath = type === 'user' ? UPLOAD_PATHS.userProfiles : UPLOAD_PATHS.courseFiles;
-    return ensureIdDirectory(basePath, id);
-}
-
-// ============================================================================
-// MULTER STORAGE CONFIGURATIONS
-// ============================================================================
-
-/**
- * Dynamic storage that uses ID from req.params
- */
-const dynamicStorage = (fileType) => multer.diskStorage({
-    destination: (req, file, cb) => {
-        const id = req.params.id;
-        if (!id) {
-            return cb(new Error('ID parameter is required'), null);
-        }
-        
-        const basePath = fileType === 'profile' ? UPLOAD_PATHS.userProfiles : UPLOAD_PATHS.courseFiles;
-        const dirPath = ensureIdDirectory(basePath, id);
-        cb(null, dirPath);
-    },
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        const nameWithoutExt = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
-        
-        // Don't add timestamp for thumbnail files
-        if (nameWithoutExt === 'thumbnail') {
-            cb(null, `thumbnail${ext}`);
-        } else {
-            cb(null, `${nameWithoutExt}${ext}`);
-        }
-    }
-});
-
-// ============================================================================
-// FILE FILTERS
-// ============================================================================
-
-const imageFilter = (req, file, cb) => {
-    if (ALLOWED_TYPES.images.includes(file.mimetype)) {
-        cb(null, true);
-    } else {
-        cb(new Error('Only image files (JPEG, PNG, GIF, WebP) are allowed'), false);
-    }
-};
-
-const courseFileFilter = (req, file, cb) => {
-    const allAllowed = [
-        ...ALLOWED_TYPES.images,
-        ...ALLOWED_TYPES.documents,
-        ...ALLOWED_TYPES.videos,
-        ...ALLOWED_TYPES.audio,
-        ...ALLOWED_TYPES.archives
-    ];
-    
-    if (allAllowed.includes(file.mimetype)) {
-        cb(null, true);
-    } else {
-        cb(new Error('File type not allowed. Supported: Images, Videos, Audio, Documents (PDF/DOCX), Archives (ZIP)'), false);
-    }
-};
-
-// ============================================================================
-// MULTER INSTANCES
-// ============================================================================
-
-const profileUpload = multer({
-    storage: dynamicStorage('profile'),
-    limits: { fileSize: FILE_LIMITS.profilePicture },
-    fileFilter: imageFilter
-});
-
-const courseUpload = multer({
-    storage: dynamicStorage('course'),
-    limits: { fileSize: FILE_LIMITS.courseFile },
-    fileFilter: courseFileFilter
-});
-
-// ============================================================================
-// MIDDLEWARE EXPORTS
-// ============================================================================
-
-module.exports.uploadProfilePicture = profileUpload.single('profilePicture');
-module.exports.uploadCourseFile = courseUpload.single('file');
-module.exports.uploadCourseFiles = courseUpload.array('files', 10);
-
-// ============================================================================
-// FILE OPERATIONS - USER PROFILE PICTURES
-// ============================================================================
-
-/**
- * Get user's profile picture path
- * Returns first image file found in user's directory
- */
-module.exports.getUserProfilePicture = (userId) => {
-    const userDir = path.join(UPLOAD_PATHS.userProfiles, userId);
-    
-    if (!fs.existsSync(userDir)) {
-        return null;
-    }
-    
-    const files = fs.readdirSync(userDir);
-    const imageFile = files.find(file => {
-        const ext = path.extname(file).toLowerCase();
-        return ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext);
-    });
-    
-    return imageFile ? path.join(userDir, imageFile) : null;
-};
-
-/**
- * Delete user's profile picture
- * Deletes the first image found (assuming one profile pic per user)
- */
-module.exports.deleteUserProfilePicture = (userId) => {
-    const userDir = path.join(UPLOAD_PATHS.userProfiles, userId);
-    
-    if (!fs.existsSync(userDir)) {
-        return false;
-    }
-    
-    const files = fs.readdirSync(userDir);
-    const imageFiles = files.filter(file => {
-        const ext = path.extname(file).toLowerCase();
-        return ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext);
-    });
-    
-    // Delete all images (clean up old ones if multiple exist)
-    imageFiles.forEach(file => {
-        const filePath = path.join(userDir, file);
-        try {
-            fs.unlinkSync(filePath);
-        } catch (error) {
-            console.error(`Error deleting ${filePath}:`, error);
-        }
-    });
-    
-    return imageFiles.length > 0;
-};
-
-/**
- * Rename uploaded profile picture to profile_main{extension}
- * Returns the new filename and path
- */
-module.exports.renameProfilePicture = (userId, uploadedFilename) => {
-    try {
-        const userDir = path.join(UPLOAD_PATHS.userProfiles, userId);
-        const uploadedPath = path.join(userDir, uploadedFilename);
-        
-        if (!fs.existsSync(uploadedPath)) {
-            return null;
-        }
-        
-        const ext = path.extname(uploadedFilename);
-        const newFilename = `profile_main${ext}`;
-        const newPath = path.join(userDir, newFilename);
-        
-        // Delete old profile_main if exists
-        if (fs.existsSync(newPath)) {
-            fs.unlinkSync(newPath);
-        }
-        
-        // Rename the uploaded file
-        fs.renameSync(uploadedPath, newPath);
-        
-        return {
-            filename: newFilename,
-            path: `/api/manage/users/${userId}/profile-picture`,
-            fullPath: newPath
-        };
-    } catch (error) {
-        console.error('Error renaming profile picture:', error);
-        return null;
-    }
-};
-
-/**
- * Get profile picture URL path (for backward compatibility)
- */
-module.exports.getProfilePictureLink = (userId) => {
-    const link = module.exports.buildProfilePictureLink(userId);
-    return link ? link.url : null;
-};
-
-/**
- * Delete entire user directory with all files
- */
-module.exports.deleteUserDirectory = (userId) => {
-    const userDir = path.join(UPLOAD_PATHS.userProfiles, userId);
-    
-    if (!fs.existsSync(userDir)) {
-        return false;
-    }
-    
-    try {
-        fs.rmSync(userDir, { recursive: true, force: true });
-        return true;
-    } catch (error) {
-        console.error(`Error deleting user directory ${userDir}:`, error);
-        return false;
-    }
-};
-
-// ============================================================================
-// FILE OPERATIONS - COURSE FILES
-// ============================================================================
-
-/**
- * Get all files in course directory
- * Returns array of file info objects
- */
-module.exports.getCourseFiles = (courseId) => {
-    const courseDir = path.join(UPLOAD_PATHS.courseFiles, courseId);
-    
-    if (!fs.existsSync(courseDir)) {
-        return [];
-    }
-    
-    const files = fs.readdirSync(courseDir);
-    return files.map(filename => {
-        const filePath = path.join(courseDir, filename);
-        const stats = fs.statSync(filePath);
-        return {
-            url: `/api/files/courses/${courseId}/${filename}`,
-            filename: filename,
-            size: stats.size,
-            created: stats.birthtime,
-            modified: stats.mtime
-        };
-    });
-};
-
-/**
- * Rename uploaded course file to thumbnail{extension} if it's the thumbnail
- * Returns the new filename and path
- */
-module.exports.renameThumbnail = (courseId, uploadedFilename) => {
-    try {
-        const courseDir = path.join(UPLOAD_PATHS.courseFiles, courseId);
-        const uploadedPath = path.join(courseDir, uploadedFilename);
-        
-        if (!fs.existsSync(uploadedPath)) {
-            return null;
-        }
-        
-        const ext = path.extname(uploadedFilename);
-        const newFilename = `thumbnail${ext}`;
-        const newPath = path.join(courseDir, newFilename);
-        
-        // Delete old thumbnail if exists
-        if (fs.existsSync(newPath)) {
-            fs.unlinkSync(newPath);
-        }
-        
-        // Rename the uploaded file
-        fs.renameSync(uploadedPath, newPath);
-        
-        return {
-            filename: newFilename,
-            path: `/api/manage/courses/${courseId}/files/${newFilename}`,
-            fullPath: newPath
-        };
-    } catch (error) {
-        console.error('Error renaming thumbnail:', error);
-        return null;
-    }
-};
-
-/**
- * Get thumbnail URL path (for backward compatibility)
- */
-module.exports.getThumbnailLink = (courseId) => {
-    const link = module.exports.buildThumbnailLink(courseId);
-    return link ? link.url : null;
-};
-
-/**
- * Get all course file links (excluding thumbnail which is at position 0)
- */
-module.exports.getCourseFileLinks = (courseId) => {
-    const courseDir = path.join(UPLOAD_PATHS.courseFiles, courseId);
-    
-    if (!fs.existsSync(courseDir)) {
-        return [];
-    }
-    
-    const files = fs.readdirSync(courseDir)
-        .filter(file => !file.startsWith('thumbnail'));
-    
-    return files.map(file => `/api/manage/courses/${courseId}/files/${file}`);
-};
-
-/**
- * Build complete links array for course [thumbnail at 0, followed by other files]
- */
-module.exports.buildCourseLinks = (courseId) => {
-    const links = [];
-    
-    // Add thumbnail at position 0
-    const thumbnail = module.exports.getThumbnailLink(courseId);
-    if (thumbnail) {
-        links.push(thumbnail);
-    }
-    
-    // Add other files
-    const otherFiles = module.exports.getCourseFileLinks(courseId);
-    links.push(...otherFiles);
-    
-    return links;
-};
-
-/**
- * Get specific course file path
- */
-module.exports.getCourseFilePath = (courseId, filename) => {
-    const filePath = path.join(UPLOAD_PATHS.courseFiles, courseId, filename);
-    return fs.existsSync(filePath) ? filePath : null;
-};
-
-/**
- * Delete specific course file
- */
-module.exports.deleteCourseFile = (courseId, filename) => {
-    const filePath = path.join(UPLOAD_PATHS.courseFiles, courseId, filename);
-    
-    if (!fs.existsSync(filePath)) {
-        return false;
-    }
-    
-    try {
-        fs.unlinkSync(filePath);
-        return true;
-    } catch (error) {
-        console.error(`Error deleting file ${filePath}:`, error);
-        return false;
-    }
-};
-
-/**
- * Delete entire course directory with all files
- */
-module.exports.deleteCourseDirectory = (courseId) => {
-    const courseDir = path.join(UPLOAD_PATHS.courseFiles, courseId);
-    
-    if (!fs.existsSync(courseDir)) {
-        return false;
-    }
-    
-    try {
-        fs.rmSync(courseDir, { recursive: true, force: true });
-        return true;
-    } catch (error) {
-        console.error(`Error deleting course directory ${courseDir}:`, error);
-        return false;
-    }
-};
-
-// ============================================================================
-// FILE SENDING (GET requests)
-// ============================================================================
-
-/**
- * Send user profile picture to client
- * Use in GET /api/users/:id/profile-picture/:filename
- */
-module.exports.sendUserProfilePicture = (req, res) => {
-    try {
-        const userId = req.params.id;
-        const filename = req.params.filename;
-        
-        let filePath;
-        
-        // If filename is provided, use it directly
-        if (filename) {
-            filePath = path.join(UPLOAD_PATHS.userProfiles, userId, filename);
-        } else {
-            // Otherwise find the first profile picture
-            filePath = module.exports.getUserProfilePicture(userId);
-        }
-        
-        if (!filePath || !fs.existsSync(filePath)) {
-            return res.status(404).json({
-                success: false,
-                message: 'Profile picture not found'
-            });
-        }
-        
-        // Set cache headers
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-        res.sendFile(filePath);
-        
-    } catch (error) {
-        console.error('Error sending profile picture:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error retrieving profile picture'
-        });
-    }
-};
-
-/**
- * Send course file to client
- * Use in GET /api/courses/:id/files/:filename
- */
-module.exports.sendCourseFile = (req, res) => {
-    try {
-        const courseId = req.params.id;
-        const filename = req.params.filename;
-        const filePath = module.exports.getCourseFilePath(courseId, filename);
-        
-        if (!filePath) {
-            return res.status(404).json({
-                success: false,
-                message: 'File not found'
-            });
-        }
-        
-        // Check if download or inline
-        const disposition = req.query.download === 'true' ? 'attachment' : 'inline';
-        res.setHeader('Content-Disposition', `${disposition}; filename="${filename}"`);
-        res.setHeader('Cache-Control', 'private, max-age=3600');
-        
-        res.sendFile(filePath);
-        
-    } catch (error) {
-        console.error('Error sending course file:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error retrieving file'
-        });
-    }
-};
-
-/**
- * List all course files (GET without specific filename)
- * Use in GET /api/courses/:id/files
- */
-module.exports.listCourseFiles = (req, res) => {
-    try {
-        const courseId = req.params.id;
-        const files = module.exports.getCourseFiles(courseId);
-        
-        res.status(200).json({
-            success: true,
-            courseId: courseId,
-            count: files.length,
-            files: files
-        });
-        
-    } catch (error) {
-        console.error('Error listing course files:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error listing files'
-        });
-    }
-};
-
-// ============================================================================
-// ERROR HANDLER
-// ============================================================================
-
-module.exports.handleUploadError = (err, req, res, next) => {
-    if (err instanceof multer.MulterError) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({
-                success: false,
-                message: 'File too large'
-            });
-        }
-        if (err.code === 'LIMIT_FILE_COUNT') {
-            return res.status(400).json({
-                success: false,
-                message: 'Too many files'
-            });
-        }
-        return res.status(400).json({
-            success: false,
-            message: 'Upload error: ' + err.message
-        });
-    }
-    
-    if (err) {
-        return res.status(400).json({
-            success: false,
-            message: err.message || 'Upload error'
-        });
-    }
-    
-    next();
-};
-
-// ============================================================================
-// UTILITIES
-// ============================================================================
-
-/**
- * Check if user has profile picture
- */
-module.exports.hasUserProfilePicture = (userId) => {
-    return module.exports.getUserProfilePicture(userId) !== null;
-};
-
-/**
- * Get course file count
- */
-module.exports.getCourseFileCount = (courseId) => {
-    return module.exports.getCourseFiles(courseId).length;
-};
-
-// ============================================================================
-// LINK OBJECT BUILDERS - Create proper link objects with full paths
-// ============================================================================
-
-/**
- * Build a link object for profile picture with full path
- * @param {string} userId - User ID
- * @returns {Object|null} Link object with full path and metadata
- */
-module.exports.buildProfilePictureLink = (userId) => {
-    const userDir = path.join(UPLOAD_PATHS.userProfiles, userId);
-    
-    if (!fs.existsSync(userDir)) {
-        return null;
-    }
-    
-    const files = fs.readdirSync(userDir);
-    const profileFile = files.find(file => file.startsWith('profile_main'));
-    
-    if (!profileFile) {
-        return null;
-    }
-    
-    return {
-        type: 'image',
-        url: `/api/files/users/${userId}/${profileFile}`,
-        filename: profileFile,
-        accessLevel: 'default',
-        description: 'Profile picture'
-    };
-};
-
-/**
- * Build a link object for course thumbnail with full path
- * @param {string} courseId - Course ID
- * @returns {Object|null} Link object with full path and metadata
- */
-module.exports.buildThumbnailLink = (courseId) => {
-    const courseDir = path.join(UPLOAD_PATHS.courseFiles, courseId);
-    
-    if (!fs.existsSync(courseDir)) {
-        return null;
-    }
-    
-    const files = fs.readdirSync(courseDir);
-    const thumbnailFile = files.find(file => file.startsWith('thumbnail'));
-    
-    if (!thumbnailFile) {
-        return null;
-    }
-    
-    return {
-        type: 'image',
-        url: `/api/files/courses/${courseId}/${thumbnailFile}`,
-        filename: thumbnailFile,
-        accessLevel: 'default',
-        description: 'Course thumbnail'
-    };
-};
-
-/**
- * Build link objects for all course files (non-thumbnail)
- * @param {string} courseId - Course ID
- * @param {string} accessLevel - Minimum access level for these files (default: 'default')
- * @returns {Array} Array of link objects with full paths
- */
-module.exports.buildCourseFileLinks = (courseId, accessLevel = 'default') => {
-    const courseDir = path.join(UPLOAD_PATHS.courseFiles, courseId);
-    
-    if (!fs.existsSync(courseDir)) {
-        return [];
-    }
-    
-    const files = fs.readdirSync(courseDir)
-        .filter(file => !file.startsWith('thumbnail'));
-    
-    return files.map(file => {
-        const ext = path.extname(file).toLowerCase();
-        let type = 'document';
-        
-        // Determine file type
-        if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext)) {
-            type = 'image';
-        } else if (['.mp4', '.webm', '.ogg', '.mov', '.avi'].includes(ext)) {
-            type = 'video';
-        } else if (['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt'].includes(ext)) {
-            type = 'document';
-        }
-        
-        return {
-            type: type,
-            url: `/api/files/courses/${courseId}/${file}`,
-            filename: file,
-            accessLevel: accessLevel,
-            description: file
-        };
-    });
-};
-
-/**
- * Determine file type based on MIME type
- * @param {string} mimetype - MIME type from uploaded file
- * @returns {string} File type (image, video, audio, document, archive, other)
- */
-module.exports.getFileType = (mimetype) => {
-    if (ALLOWED_TYPES.images.includes(mimetype)) return 'image';
-    if (ALLOWED_TYPES.videos.includes(mimetype)) return 'video';
-    if (ALLOWED_TYPES.audio.includes(mimetype)) return 'audio';
-    if (ALLOWED_TYPES.documents.includes(mimetype)) return 'document';
-    if (ALLOWED_TYPES.archives.includes(mimetype)) return 'archive';
+function getFileType(filenameOrMime) {
+    const s = filenameOrMime.toLowerCase();
+    if (['.jpg','.jpeg','.png','.gif','.webp'].some(e => s.endsWith(e)) || s.startsWith('image/'))  return 'image';
+    if (['.mp4','.webm','.mov','.avi'].some(e => s.endsWith(e))         || s.startsWith('video/'))  return 'video';
+    if (['.mp3','.wav','.aac','.flac','.m4a'].some(e => s.endsWith(e)) || s.startsWith('audio/'))  return 'audio';
+    if (['.pdf','.doc','.docx','.xls','.xlsx','.ppt','.pptx','.txt','.json'].some(e => s.endsWith(e))
+        || s.startsWith('application/') || s.startsWith('text/')) return 'document';
+    if (['.zip','.rar','.7z'].some(e => s.endsWith(e))) return 'archive';
     return 'other';
-};
+}
 
-// Export paths for reference
-module.exports.paths = UPLOAD_PATHS;
+// ============================================================================
+// EntityFileHandler — one instance per entity type (users, courses, forms/…)
+// ============================================================================
+
+class EntityFileHandler {
+    /**
+     * @param {string} entityName   - slug used in URL paths (e.g. 'courses', 'forms/creator-application')
+     * @param {object} config
+     * @param {string}   config.basePath       - absolute FS path for this entity's files
+     * @param {number}   [config.maxFileSize]  - bytes, default 10 MB
+     * @param {string[]} [config.allowedTypes] - MIME whitelist
+     * @param {string}   [config.serveBasePath]- URL prefix for built links
+     */
+    constructor(entityName, config) {
+        this.entityName    = entityName;
+        this.basePath      = config.basePath;
+        this.maxFileSize   = config.maxFileSize   ?? 10 * 1024 * 1024;
+        this.allowedTypes  = config.allowedTypes  ?? [...ALLOWED_TYPES.images, ...ALLOWED_TYPES.documents];
+        this.serveBasePath = config.serveBasePath ?? `/api/files/${entityName}`;
+
+        fs.mkdirSync(this.basePath, { recursive: true });
+        this._multer = this._buildMulter();
+    }
+
+    // ── Multer factory (disk storage) ─────────────────────────────────────────
+
+    _buildMulter() {
+        const self = this;
+
+        const storage = multer.diskStorage({
+            destination(req, file, cb) {
+                const id  = req.params.id;
+                const sub = req.query.subdir ?? '';
+                if (!id) return cb(new Error('ID parameter is required for disk uploads'));
+                const dir = path.join(self.basePath, id, sub);
+                fs.mkdirSync(dir, { recursive: true });
+                cb(null, dir);
+            },
+            filename(req, file, cb) {
+                const ext   = path.extname(file.originalname);
+                const stem  = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_\-.]/g, '_');
+                const alias = req.query.rename;
+                cb(null, alias ? `${alias}${ext}` : `${stem}_${Date.now()}${ext}`);
+            },
+        });
+
+        const fileFilter = (req, file, cb) => {
+            this.allowedTypes.includes(file.mimetype)
+                ? cb(null, true)
+                : cb(new Error(`File type "${file.mimetype}" not allowed for "${this.entityName}"`));
+        };
+
+        return multer({ storage, limits: { fileSize: this.maxFileSize }, fileFilter });
+    }
+
+    // ── Multer middleware shortcuts (disk storage, requires :id in route) ─────
+
+    /** Single-file upload. @param {string} [field='file'] */
+    single(field = 'file') { return this._multer.single(field); }
+
+    /** Multi-file upload. @param {string} [field='files'] @param {number} [max=20] */
+    array(field = 'files', max = 20) { return this._multer.array(field, max); }
+
+    /** Named-fields upload. @param {Array<{name:string, maxCount?:number}>} fieldsArray */
+    fields(fieldsArray) { return this._multer.fields(fieldsArray); }
+
+    /** Accept any file field (disk storage). Route must expose :id. */
+    any() { return this._multer.any(); }
+
+    // ── Memory-storage upload (does NOT require :id in route) ─────────────────
+
+    /**
+     * Returns a multer middleware that stores files in memory as Buffers.
+     * Use this for new-submission routes where the entity ID is not yet known.
+     * The controller is responsible for writing `req.files[n].buffer` to disk.
+     *
+     * @param {number} [maxFileSizeMb] - override per-file size limit in MB
+     */
+    anyMemory(maxFileSizeMb) {
+        const limit      = (maxFileSizeMb ?? this.maxFileSize / (1024 * 1024)) * 1024 * 1024;
+        const fileFilter = (req, file, cb) => {
+            this.allowedTypes.includes(file.mimetype)
+                ? cb(null, true)
+                : cb(new Error(`File type "${file.mimetype}" not allowed for "${this.entityName}"`));
+        };
+        return multer({
+            storage:  multer.memoryStorage(),
+            limits:   { fileSize: limit },
+            fileFilter,
+        }).any();
+    }
+
+    // ── Error handler middleware ──────────────────────────────────────────────
+
+    handleError(err, req, res, next) {
+        if (err instanceof multer.MulterError) {
+            const msg = err.code === 'LIMIT_FILE_SIZE'  ? 'File too large'
+                      : err.code === 'LIMIT_FILE_COUNT' ? 'Too many files'
+                      : `Upload error: ${err.message}`;
+            return res.status(400).json({ success: false, message: msg });
+        }
+        if (err) return res.status(400).json({ success: false, message: err.message ?? 'Upload error' });
+        next();
+    }
+
+    // ── Directory helpers ─────────────────────────────────────────────────────
+
+    entityDir(id, sub = '') {
+        return sub ? path.join(this.basePath, id, sub) : path.join(this.basePath, id);
+    }
+
+    ensureDir(id, sub = '') {
+        const dir = this.entityDir(id, sub);
+        fs.mkdirSync(dir, { recursive: true });
+        return dir;
+    }
+
+    // ── File listing ──────────────────────────────────────────────────────────
+
+    listFiles(id, sub = '') {
+        const dir = this.entityDir(id, sub);
+        if (!fs.existsSync(dir)) return [];
+
+        return fs.readdirSync(dir)
+            .filter(f => fs.statSync(path.join(dir, f)).isFile())
+            .map(filename => {
+                const filePath = path.join(dir, filename);
+                const stats    = fs.statSync(filePath);
+                const url      = sub
+                    ? `${this.serveBasePath}/${id}/${sub}/${filename}`
+                    : `${this.serveBasePath}/${id}/${filename}`;
+                return {
+                    filename,
+                    originalName: filename,
+                    url,
+                    size:     stats.size,
+                    created:  stats.birthtime,
+                    modified: stats.mtime,
+                    type:     getFileType(filename),
+                };
+            });
+    }
+
+    // ── Single-file operations ────────────────────────────────────────────────
+
+    getFilePath(id, filename, sub = '') {
+        const p = path.join(this.entityDir(id, sub), filename);
+        return fs.existsSync(p) ? p : null;
+    }
+
+    deleteFile(id, filename, sub = '') {
+        const p = this.getFilePath(id, filename, sub);
+        if (!p) return false;
+        try { fs.unlinkSync(p); return true; }
+        catch (e) { console.error(`[${this.entityName}] deleteFile:`, e); return false; }
+    }
+
+    deleteAllFiles(id) {
+        const dir = this.entityDir(id);
+        if (!fs.existsSync(dir)) return false;
+        try { fs.rmSync(dir, { recursive: true, force: true }); return true; }
+        catch (e) { console.error(`[${this.entityName}] deleteAllFiles:`, e); return false; }
+    }
+
+    renameFile(id, uploadedFilename, newBaseName, sub = '') {
+        try {
+            const dir = this.entityDir(id, sub);
+            const src = path.join(dir, uploadedFilename);
+            if (!fs.existsSync(src)) return null;
+            const ext = path.extname(uploadedFilename);
+            const dst = path.join(dir, `${newBaseName}${ext}`);
+            if (fs.existsSync(dst)) fs.unlinkSync(dst);
+            fs.renameSync(src, dst);
+            const url = sub
+                ? `${this.serveBasePath}/${id}/${sub}/${newBaseName}${ext}`
+                : `${this.serveBasePath}/${id}/${newBaseName}${ext}`;
+            return { filename: `${newBaseName}${ext}`, url };
+        } catch (e) {
+            console.error(`[${this.entityName}] renameFile:`, e);
+            return null;
+        }
+    }
+
+    // ── Express request handlers ──────────────────────────────────────────────
+
+    sendFileHandler() {
+        return (req, res) => {
+            const { id, filename, subdir = '' } = req.params;
+            const filePath = this.getFilePath(id, filename, subdir);
+            if (!filePath) {
+                return res.status(404).json({ success: false, message: 'File not found' });
+            }
+            const disposition = req.query.download === 'true' ? 'attachment' : 'inline';
+            res.setHeader('Content-Disposition', `${disposition}; filename="${filename}"`);
+            res.setHeader('Cache-Control', 'private, max-age=3600');
+            res.sendFile(filePath);
+        };
+    }
+
+    listFilesHandler() {
+        return (req, res) => {
+            const { id } = req.params;
+            const sub    = req.query.subdir ?? '';
+            const files  = this.listFiles(id, sub);
+            res.json({ success: true, entityId: id, count: files.length, files });
+        };
+    }
+
+    // ── Link / metadata builders ─────────────────────────────────────────────
+
+    buildFileLink(id, filename, sub = '', meta = {}) {
+        const url = sub
+            ? `${this.serveBasePath}/${id}/${sub}/${filename}`
+            : `${this.serveBasePath}/${id}/${filename}`;
+        return { type: getFileType(filename), url, filename, accessLevel: 'default', ...meta };
+    }
+
+    buildLinksFromUploaded(id, multerFiles, sub = '', meta = {}) {
+        return (multerFiles ?? []).map(f =>
+            this.buildFileLink(id, f.filename, sub, {
+                originalName: f.originalname,
+                size:         f.size,
+                mimeType:     f.mimetype,
+                ...meta,
+            })
+        );
+    }
+}
+
+// ============================================================================
+// FileHandlerRegistry — central registry of all EntityFileHandlers
+// ============================================================================
+
+class FileHandlerRegistry {
+    constructor() {
+        this._map = new Map();
+    }
+
+    /**
+     * Register a new entity type.
+     * @param {string} name   - entity slug (e.g. 'courses', 'forms/creator-application')
+     * @param {object} config - passed to EntityFileHandler constructor
+     * @returns {this}        - supports fluent chaining
+     */
+    register(name, config) {
+        if (this._map.has(name)) {
+            console.warn(`[FileHandlerRegistry] Overwriting handler for '${name}'`);
+        }
+        this._map.set(name, new EntityFileHandler(name, config));
+        return this;
+    }
+
+    /**
+     * Retrieve a registered handler.
+     * @param {string} name
+     * @returns {EntityFileHandler}
+     */
+    get(name) {
+        if (!this._map.has(name)) {
+            throw new Error(`No file handler registered for entity '${name}'`);
+        }
+        return this._map.get(name);
+    }
+
+    /**
+     * Get an existing handler, or lazily register one with defaults if absent.
+     *
+     * Useful for dynamic entity types like form submissions — new form types
+     * can be served without any backend changes.
+     *
+     * @param {string} name              - entity slug (e.g. 'forms/support-ticket')
+     * @param {object} [overrideConfig]  - optional config overrides (merged with defaults)
+     * @returns {EntityFileHandler}
+     */
+    getOrCreate(name, overrideConfig = {}) {
+        if (!this._map.has(name)) {
+            // Derive a filesystem-safe slug from the name
+            const slug = name.replace(/[^a-zA-Z0-9_-]/g, '_');
+            const defaultConfig = {
+                basePath:      path.join(STORAGE_ROOT, 'forms', slug),
+                maxFileSize:   10 * 1024 * 1024,
+                allowedTypes:  [...ALLOWED_TYPES.images, ...ALLOWED_TYPES.documents, ...ALLOWED_TYPES.archives],
+                serveBasePath: `/api/files/${name}`,
+            };
+            this.register(name, { ...defaultConfig, ...overrideConfig });
+        }
+        return this._map.get(name);
+    }
+
+    has(name)  { return this._map.has(name); }
+    list()     { return [...this._map.keys()]; }
+}
+
+// ============================================================================
+// PRE-CONFIGURED REGISTRY
+// Add new entity types here — no changes needed elsewhere in this file.
+// Form types are auto-registered on first request via getOrCreate().
+// ============================================================================
+
+const STORAGE_ROOT = path.join(__dirname, '../../storage/data');
+
+const registry = new FileHandlerRegistry()
+
+    // ── Users (profile pictures) ─────────────────────────────────────────────
+    .register('users', {
+        basePath:      path.join(STORAGE_ROOT, 'u'),
+        maxFileSize:   5 * 1024 * 1024,
+        allowedTypes:  ALLOWED_TYPES.images,
+        serveBasePath: '/api/files/users',
+    })
+
+    // ── Courses (thumbnails + content files) ─────────────────────────────────
+    .register('courses', {
+        basePath:    path.join(STORAGE_ROOT, 'c'),
+        maxFileSize: 512 * 1024 * 1024,
+        allowedTypes: [
+            ...ALLOWED_TYPES.images,
+            ...ALLOWED_TYPES.documents,
+            ...ALLOWED_TYPES.videos,
+            ...ALLOWED_TYPES.audio,
+            ...ALLOWED_TYPES.archives,
+        ],
+        serveBasePath: '/api/files/courses',
+    });
+
+// ── Form types are NOT pre-registered here.  ─────────────────────────────────
+// registry.getOrCreate('forms/creator-application') is called at runtime
+// by the router middleware, which auto-creates an entry under:
+//   storage/data/forms/forms_creator-application/
+//
+// To override defaults for a specific form type, call register() explicitly:
+//
+//   registry.register('forms/creator-application', {
+//     basePath:    path.join(STORAGE_ROOT, 'forms', 'creator-application'),
+//     maxFileSize: 20 * 1024 * 1024,
+//     allowedTypes: [...ALLOWED_TYPES.images, ...ALLOWED_TYPES.documents],
+//   });
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+module.exports = {
+    // ── Core classes ─────────────────────────────────────────────────────────
+    registry,
+    EntityFileHandler,
+    FileHandlerRegistry,
+    ALLOWED_TYPES,
+    getFileType,
+
+    // ── Convenience shortcuts (backward-compatible) ───────────────────────────
+    uploadProfilePicture: registry.get('users').single('profilePicture'),
+    uploadCourseFile:     registry.get('courses').single('file'),
+    uploadCourseFiles:    registry.get('courses').array('files', 10),
+    handleUploadError:    (err, req, res, next) => registry.get('courses').handleError(err, req, res, next),
+
+    // users
+    getUserProfilePicture(userId) {
+        return registry.get('users').listFiles(userId)
+            .find(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f.filename))?.url ?? null;
+    },
+    deleteUserProfilePicture(userId) {
+        const h = registry.get('users');
+        h.listFiles(userId).forEach(f => h.deleteFile(userId, f.filename));
+    },
+    deleteUserDirectory:   (userId) => registry.get('users').deleteAllFiles(userId),
+    buildProfilePictureLink(userId) {
+        const h = registry.get('users');
+        const f = h.listFiles(userId).find(f => f.filename.startsWith('profile_main'));
+        return f ? h.buildFileLink(userId, f.filename, '', { description: 'Profile picture' }) : null;
+    },
+    renameProfilePicture: (userId, uploaded) =>
+        registry.get('users').renameFile(userId, uploaded, 'profile_main'),
+
+    // courses
+    getCourseFiles:      (courseId)           => registry.get('courses').listFiles(courseId),
+    getCourseFilePath:   (courseId, filename) => registry.get('courses').getFilePath(courseId, filename),
+    deleteCourseFile:    (courseId, filename) => registry.get('courses').deleteFile(courseId, filename),
+    deleteCourseDirectory:(courseId)          => registry.get('courses').deleteAllFiles(courseId),
+    sendCourseFile:      registry.get('courses').sendFileHandler(),
+    listCourseFiles:     registry.get('courses').listFilesHandler(),
+    buildThumbnailLink(courseId) {
+        const h = registry.get('courses');
+        const f = h.listFiles(courseId).find(f => f.filename.startsWith('thumbnail'));
+        return f ? h.buildFileLink(courseId, f.filename, '', { description: 'Course thumbnail' }) : null;
+    },
+    renameThumbnail: (courseId, uploaded) =>
+        registry.get('courses').renameFile(courseId, uploaded, 'thumbnail'),
+
+    // legacy path references
+    paths: {
+        userProfiles: path.join(STORAGE_ROOT, 'u'),
+        courseFiles:  path.join(STORAGE_ROOT, 'c'),
+    },
+};
