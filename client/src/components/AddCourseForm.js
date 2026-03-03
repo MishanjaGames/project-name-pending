@@ -272,7 +272,7 @@ export default function AddCourseForm() {
         </div>
       </div>  
 
-      {/* Video upload */}
+      {/* Video upload
       <div className="mb-4">
         <label className="form-label fw-bold">Lesson videos</label>
         <div className="d-grid gap-3 mb-3">
@@ -294,7 +294,7 @@ export default function AddCourseForm() {
           ))}
         </div>
         <button type="button" className="btn btn-sm btn-outline-primary" onClick={addVideoItem}>Add video</button>
-      </div>
+      </div> */}
 
       {/* What you'll learn editor */}
       <div className="mb-4">
