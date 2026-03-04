@@ -462,12 +462,6 @@ function Users({ data, onLogout }) {
 
                                     <table className="table table-sm table-borderless mb-0">
                                         <tbody>
-                                            {selectedUser._id && (
-                                                <tr>
-                                                    <td className="text-muted fw-semibold small text-uppercase py-2">ID</td>
-                                                    <td className="py-2"><code className="small">{selectedUser._id}</code></td>
-                                                </tr>
-                                            )}
                                             <tr>
                                                 <td className="text-muted fw-semibold small text-uppercase py-2" style={{ width: '35%' }}>Email</td>
                                                 <td className="py-2">{selectedUser.email || '—'}</td>

@@ -585,12 +585,6 @@ function Courses({ data, onLogout }) {
                                                             <td className="py-2 small">{formatDate(selectedCourse.updatedAt)}</td>
                                                         </tr>
                                                     )}
-                                                    {selectedCourse._id && (
-                                                        <tr>
-                                                            <td className="text-muted fw-semibold small text-uppercase py-2">ID</td>
-                                                            <td className="py-2"><code className="small">{selectedCourse._id}</code></td>
-                                                        </tr>
-                                                    )}
                                                 </tbody>
                                             </table>
                                         </div>

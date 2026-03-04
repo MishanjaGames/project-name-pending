@@ -37,6 +37,10 @@ const courseSchema = new Schema({
         type: Number,
         required: false
     },
+    followers: {
+        type: Number,
+        required: false
+    },
     price: {
         type: Number,
         required: true

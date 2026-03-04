@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import JSZip from 'jszip';
 import { Navbar } from '../components/Navbar';
 import { extendSession } from "../utils/utils";
 import './CoursePreview.css';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-/** A volume/chapter is a "folder" when its type is container, falsy, or 'none'. */
 const isContainer = (entity) =>
   !entity?.type || entity.type === 'container' || entity.type === 'none';
 
@@ -33,39 +33,64 @@ const typeColor = (t) => ({
   other: 'text-muted',
 })[t] || 'text-muted';
 
-// Volume / Chapter allowed types
+const BASE = 'http://localhost:4040';
+const fu = (url) => (!url || url.startsWith('http') ? url : `${BASE}${url}`);
+const isYouTube = url => url && (/youtu\.be\/|youtube\.com\/(watch|shorts|embed)/.test(url));
+
+const extractYouTubeId = url => {
+  const short  = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  const watch  = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  const shorts = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+  const embed  = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+  return (short || watch || shorts || embed)?.[1] || null;
+};
+
+const YoutubeEmbed = ({ url }) => {
+  const id = extractYouTubeId(url);
+  if (!id) return <video src={fu(url)} controls className="video-player" />;
+  return (
+    <iframe
+      src={`https://www.youtube.com/embed/${id}`}
+      title="YouTube video player" frameBorder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      referrerPolicy="strict-origin-when-cross-origin"
+      allowFullScreen
+      className="video-player"
+    />
+  );
+};
+
 const ENTITY_TYPE_OPTIONS = [
-  { type: 'container', icon: 'bi-folder', label: 'Container' },
-  { type: 'text', icon: 'bi-file-text', label: 'Text' },
-  { type: 'form', icon: 'bi-ui-checks', label: 'Form' },
-  { type: 'image', icon: 'bi-image', label: 'Image' },
-  { type: 'video', icon: 'bi-camera-video', label: 'Video' },
-  { type: 'audio', icon: 'bi-music-note', label: 'Audio' },
-  { type: 'document', icon: 'bi-file-pdf', label: 'Document' },
-  { type: 'archive', icon: 'bi-file-zip', label: 'Archive' },
+  { type: 'container', icon: 'bi-folder',      label: 'Container' },
+  { type: 'text',      icon: 'bi-file-text',   label: 'Text'      },
+  { type: 'form',      icon: 'bi-ui-checks',   label: 'Form'      },
+  { type: 'image',     icon: 'bi-image',        label: 'Image'     },
+  { type: 'video',     icon: 'bi-camera-video', label: 'Video'     },
+  { type: 'audio',     icon: 'bi-music-note',   label: 'Audio'     },
+  { type: 'document',  icon: 'bi-file-pdf',     label: 'Document'  },
+  { type: 'archive',   icon: 'bi-file-zip',     label: 'Archive'   },
 ];
 
 const ITEM_TYPE_OPTIONS = [
-  { type: 'text', icon: 'bi-file-text', label: 'Text' },
-  { type: 'form', icon: 'bi-ui-checks', label: 'Form' },
-  { type: 'image', icon: 'bi-image', label: 'Image' },
-  { type: 'audio', icon: 'bi-music-note', label: 'Audio' },
-  { type: 'video', icon: 'bi-camera-video', label: 'Video' },
-  { type: 'document', icon: 'bi-file-pdf', label: 'Document' },
-  { type: 'archive', icon: 'bi-file-zip', label: 'Archive' },
+  { type: 'text',     icon: 'bi-file-text',   label: 'Text'     },
+  { type: 'form',     icon: 'bi-ui-checks',   label: 'Form'     },
+  { type: 'image',    icon: 'bi-image',        label: 'Image'    },
+  { type: 'audio',    icon: 'bi-music-note',   label: 'Audio'    },
+  { type: 'video',    icon: 'bi-camera-video', label: 'Video'    },
+  { type: 'document', icon: 'bi-file-pdf',     label: 'Document' },
+  { type: 'archive',  icon: 'bi-file-zip',     label: 'Archive'  },
 ];
 
-// ─── parseTextSyntax (module-level so AddItemModal + display components share it) ─
+// ─── parseTextSyntax ──────────────────────────────────────────────────────────
 function parseTextSyntax(text) {
   if (!text) return '';
 
   const encAttr = s => s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const encHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-  // 1. Stash code blocks
   const codeBlocks = [];
   let html = text.replace(/~\(([^)]+)\)\[([\s\S]+?)\]~/g, (_, lang, code) => {
-    const esc = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    const esc = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
     const idx = codeBlocks.length;
     codeBlocks.push(
       `<div class="code-block"><div class="code-header"><span class="code-lang">${lang}</span>` +
@@ -75,48 +100,40 @@ function parseTextSyntax(text) {
     return `\x00CODE${idx}\x00`;
   });
 
-  // 2. Stash [btn:…] tokens BEFORE HTML-escaping so => and quotes survive
-  //    Arrow fn syntax:   [btn:Label|() => expr]   [btn:Label|(x) => { ... }]
-  //    Dot-path syntax:   [btn:Label|fn.path:args]
   const btns = [];
   html = html.replace(/\[btn:([^\|]+)\|([^\]]+)\]/g, (_, label, af) => {
     const isArrow = /^\s*(\(.*?\)|[\w$]+)\s*=>/.test(af);
     let a, p;
-    if (isArrow) {
-      a = af.trim();   // entire thing is the function expression
-      p = '';
-    } else {
-      const ci = af.indexOf(':');
-      a = ci === -1 ? af.trim() : af.slice(0, ci).trim();
-      p = ci === -1 ? '' : af.slice(ci + 1).trim();
-    }
+    if (isArrow) { a = af.trim(); p = ''; }
+    else { const ci = af.indexOf(':'); a = ci === -1 ? af.trim() : af.slice(0, ci).trim(); p = ci === -1 ? '' : af.slice(ci + 1).trim(); }
     const idx = btns.length;
     btns.push({ label, a, p });
     return `\x00BTN${idx}\x00`;
   });
 
-  // 3. HTML-escape the remaining text
-  html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  html = html.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 
-  // 4. Standard syntax transforms (unchanged)
   html = html.replace(/~\(([^\|]+)\)\[([^\]]+)\]~/g, '<code type="$1">$2</code>');
-  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^# (.+)$/gm, '<h1>$1</h1>');
-  html = html.replace(/`\{([^}]+)\}`/g, '<p>$1</p>');
-  html = html.replace(/\{(https?:\/\/[^}]+)\}/g, '<video src="$1" class="video-player" controls></video>');
-  html = html.replace(/\((https?:\/\/[^)]+)\)/g, (_, u) => {
-    const e = u.replace(/youtu\.be\/([a-zA-Z0-9_-]{11})/, 'https://www.youtube.com/embed/$1')
-      .replace(/[?&]v=([a-zA-Z0-9_-]{11})/, 'https://www.youtube.com/embed/$1')
-      .replace(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/, 'https://www.youtube.com/embed/$1');
-    return `<iframe src="${e}" title="video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
-  });
-  html = html.replace(/!\[([^\|]+)\|(https?:\/\/[^\]]+)\]!/g, '<a href="$2" download class="text-download-link"><i class="bi bi-download"></i> $1</a>');
-  html = html.replace(/@(https?:\/\/[^@]+)@/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-  html = html.replace(/#(https?:\/\/[^#]+)#/g, '<img alt="image" class="content-image" src="$1">');
-  html = html.replace(/^(\d+)\.\s(.+)$/gm, '<li class="numbered-item">$2</li>').replace(/(<li class="numbered-item">.*?<\/li>\n?)+/gs, '<ol>$&</ol>');
-  html = html.replace(/^[•\-\*]\s(.+)$/gm, '<li>$1</li>').replace(/(<li>.*?<\/li>\n?)+/gs, '<ul>$&</ul>');
-  html = html.replace(/\\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;').replace(/\\n/g, '<br>');
+  html = html.replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>');
+  html = html.replace(/`\{([^}]+)\}`/g,'<p>$1</p>');
+  html = html.replace(/\{(https?:\/\/[^}]+)\}/g,'<video src="$1" class="video-player" controls></video>');
 
-  // 5. Restore code blocks and btns
+  html = html.replace(/\((https?:\/\/[^)]+)\)/g, (_, u) => {
+    const short  = u.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    const watch  = u.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    const shorts = u.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+    const id = (short || watch || shorts)?.[1];
+    const e = id ? `https://www.youtube.com/embed/${id}` : u;
+    return `\n    <iframe src="${e}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
+  });
+
+  html = html.replace(/!\[([^\|]+)\|(https?:\/\/[^\]]+)\]!/g,'<a href="$2" download class="text-download-link"><i class="bi bi-download"></i> $1</a>');
+  html = html.replace(/@(https?:\/\/[^@]+)@/g,'<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+  html = html.replace(/#(https?:\/\/[^#]+)#/g,'<img alt="image" class="content-image" src="$1">');
+  html = html.replace(/^(\d+)\.\s(.+)$/gm,'<li class="numbered-item">$2</li>').replace(/(<li class="numbered-item">.*?<\/li>\n?)+/gs,'<ol>$&</ol>');
+  html = html.replace(/^[•\-\*]\s(.+)$/gm,'<li>$1</li>').replace(/(<li>.*?<\/li>\n?)+/gs,'<ul>$&</ul>');
+  html = html.replace(/\\t/g,'&nbsp;&nbsp;&nbsp;&nbsp;').replace(/\\n/g,'<br>');
+
   html = html.replace(/\x00CODE(\d+)\x00/g, (_, i) => codeBlocks[+i]);
   html = html.replace(/\x00BTN(\d+)\x00/g, (_, i) => {
     const { label, a, p } = btns[+i];
@@ -151,23 +168,21 @@ function CoursePreview({ data, onLogout }) {
   const [localTextContent, setLocalTextContent] = useState({});
   const [textFilesToUpload, setTextFilesToUpload] = useState({});
   const [editingTitle, setEditingTitle] = useState(null);
+  const [filesToDelete, setFilesToDelete] = useState([]);
 
-  // Drag state
   const [draggedVolume, setDraggedVolume] = useState(null);
   const [draggedChapter, setDraggedChapter] = useState(null);
   const [draggedItem, setDraggedItem] = useState(null);
 
-  // Modal state
-  const [showAddItemModal, setShowAddItemModal] = useState(null); // {vi,ci,type,afterIndex?}
-  const [showFormModal, setShowFormModal] = useState(null); // {vi,ci,afterIndex?}
-  const [editingItem, setEditingItem] = useState(null); // {vi,ci,ii,item}
-  const [editingForm, setEditingForm] = useState(null); // {vi,ci,ii,item}
-  const [showAddEntityModal, setShowAddEntityModal] = useState(null); // {kind,vi?,afterIndex}
-  const [entityEdit, setEntityEdit] = useState(null); // {kind,vi?,ci?,entity}
-  const [entityFormModal, setEntityFormModal] = useState(null); // {kind,vi?,afterIndex} → opens FormEditorModal
+  const [showAddItemModal, setShowAddItemModal] = useState(null);
+  const [showFormModal, setShowFormModal] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
+  const [editingForm, setEditingForm] = useState(null);
+  const [showAddEntityModal, setShowAddEntityModal] = useState(null);
+  const [entityEdit, setEntityEdit] = useState(null);
+  const [entityFormModal, setEntityFormModal] = useState(null);
 
-  // ── Bootstrap ──────────────────────────────────────────────────────────────
-  useEffect(() => { fetchData(); setRole(data.role); checkCCourse(); }, [id]);
+  useEffect(() => { fetchData(); setRole(data.role); }, [id]);
   useEffect(() => { if (course) fetchUserData(); }, [course?.userId]);
   useEffect(() => {
     const h = e => { if (hasChanges) { e.preventDefault(); e.returnValue = 'Unsaved changes!'; } };
@@ -175,10 +190,14 @@ function CoursePreview({ data, onLogout }) {
     return () => window.removeEventListener('beforeunload', h);
   }, [hasChanges]);
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
-  const checkCCourse = async () => {
+  const checkCCourse = async (fetchedCourse) => {
     try {
-      const res = await fetch(`http://localhost:4040/api/users/${data._id}`, {
+      // Creator always gets access
+      if (fetchedCourse?.userId && String(fetchedCourse.userId) === String(data._id)) {
+        setLocked(false); return;
+      }
+      // Check purchased courses
+      const res = await fetch(`${BASE}/api/users/${data._id}`, {
         headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` }
       });
       if (res.ok) {
@@ -192,16 +211,14 @@ function CoursePreview({ data, onLogout }) {
     setLoading(true);
     try {
       const [courseRes, dirRes, lvlRes, filesRes] = await Promise.all([
-        fetch(`http://localhost:4040/api/courses/${id}`).catch(() => null),
-        fetch('http://localhost:4040/api/directions').catch(() => null),
-        fetch('http://localhost:4040/api/levels').catch(() => null),
-        fetch(`http://localhost:4040/api/courses/${id}/files`, {
+        fetch(`${BASE}/api/courses/${id}`).catch(() => null),
+        fetch(`${BASE}/api/directions`).catch(() => null),
+        fetch(`${BASE}/api/levels`).catch(() => null),
+        fetch(`${BASE}/api/courses/${id}/files`, {
           headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' }
         }).catch(() => null),
       ]);
-      if (courseRes.status === 401) {
-        await extendSession(data)
-      }
+      if (courseRes?.status === 401) await extendSession(data);
       if (courseRes?.ok) {
         const { data: d } = await courseRes.json();
         if (d) {
@@ -213,6 +230,7 @@ function CoursePreview({ data, onLogout }) {
               chapters: (v.chapters || []).map(c => ({ ...c, type: c.type || 'container' }))
             }))
           );
+          await checkCCourse(d); // ← pass course data directly, no race condition
         }
       }
       if (dirRes?.ok) { const d = await dirRes.json(); if (Array.isArray(d.data)) setDirections(d.data); }
@@ -231,7 +249,7 @@ function CoursePreview({ data, onLogout }) {
   const fetchUserData = async () => {
     if (!course?.userId) return;
     try {
-      const res = await fetch(`http://localhost:4040/api/users/${course.userId}`, {
+      const res = await fetch(`${BASE}/api/users/${course.userId}`, {
         headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` }
       });
       if (res.ok) { const { data: d } = await res.json(); setAuthor(d); }
@@ -239,10 +257,12 @@ function CoursePreview({ data, onLogout }) {
   };
 
   // ── Volume CRUD ────────────────────────────────────────────────────────────
-  const saveNewVolume = (afterIndex, ed) => {
+  const saveNewVolume = (afterIndex, ed, vid) => {
+    const newId = vid || `vol-${Date.now()}`;
     const nv = [...volumes];
-    nv.splice(afterIndex + 1, 0, { vid: `vol-${Date.now()}`, title: ed.title || 'New Volume', type: ed.type || 'container', url: ed.url || '', chapters: [] });
+    nv.splice(afterIndex + 1, 0, { vid: newId, title: ed.title || 'New Volume', type: ed.type || 'container', url: ed.url || '', chapters: [] });
     setVolumes(nv); setHasChanges(true);
+    return newId;
   };
 
   const saveEditVolume = (vi, ed) => {
@@ -252,21 +272,29 @@ function CoursePreview({ data, onLogout }) {
   };
 
   const deleteVolume = (vi) => {
-    const v = volumes[vi];
-    const inp = prompt(`Type the volume title to confirm deletion:\n"${v.title}"`);
-    if (inp === v.title) { setVolumes(volumes.filter((_, i) => i !== vi)); setHasChanges(true); alert('Volume deleted.'); }
-    else if (inp !== null) alert('Title mismatch. Cancelled.');
-  };
+  const v = volumes[vi];
+  const inp = prompt(`Type the volume title to confirm deletion:\n"${v.title}"`);
+  if (inp === v.title) {
+    if (v.url) setFilesToDelete(p => [...p, v.url]);
+    v.chapters?.forEach(ch => {
+      if (ch.url) setFilesToDelete(p => [...p, ch.url]);
+      ch.items?.forEach(item => { if (item.url) setFilesToDelete(p => [...p, item.url]); });
+    });
+    setVolumes(volumes.filter((_, i) => i !== vi)); setHasChanges(true); alert('Volume deleted.');
+  } else if (inp !== null) alert('Title mismatch. Cancelled.');
+};
 
   const updateVolumeTitle = (vi, title) => {
     const nv = [...volumes]; nv[vi].title = title; setVolumes(nv); setHasChanges(true);
   };
 
   // ── Chapter CRUD ───────────────────────────────────────────────────────────
-  const saveNewChapter = (vi, afterIndex, ed) => {
+  const saveNewChapter = (vi, afterIndex, ed, cid) => {
+    const newId = cid || `ch-${Date.now()}`;
     const nv = [...volumes];
-    nv[vi].chapters.splice(afterIndex + 1, 0, { cid: `ch-${Date.now()}`, title: ed.title || 'New Chapter', type: ed.type || 'container', url: ed.url || '', items: [] });
+    nv[vi].chapters.splice(afterIndex + 1, 0, { cid: newId, title: ed.title || 'New Chapter', type: ed.type || 'container', url: ed.url || '', items: [] });
     setVolumes(nv); setHasChanges(true);
+    return newId;
   };
 
   const saveEditChapter = (vi, ci, ed) => {
@@ -276,32 +304,54 @@ function CoursePreview({ data, onLogout }) {
   };
 
   const deleteChapter = (vi, ci) => {
-    const ch = volumes[vi].chapters[ci];
-    const inp = prompt(`Type the chapter title to confirm deletion:\n"${ch.title}"`);
-    if (inp === ch.title) { const nv = [...volumes]; nv[vi].chapters = nv[vi].chapters.filter((_, i) => i !== ci); setVolumes(nv); setHasChanges(true); alert('Chapter deleted.'); }
-    else if (inp !== null) alert('Title mismatch. Cancelled.');
-  };
+  const ch = volumes[vi].chapters[ci];
+  const inp = prompt(`Type the chapter title to confirm deletion:\n"${ch.title}"`);
+  if (inp === ch.title) {
+    if (ch.url) setFilesToDelete(p => [...p, ch.url]);
+    ch.items?.forEach(item => { if (item.url) setFilesToDelete(p => [...p, item.url]); });
+    const nv = [...volumes]; nv[vi].chapters = nv[vi].chapters.filter((_, i) => i !== ci);
+    setVolumes(nv); setHasChanges(true); alert('Chapter deleted.');
+  } else if (inp !== null) alert('Title mismatch. Cancelled.');
+};
 
   const updateChapterTitle = (vi, ci, title) => {
     const nv = [...volumes]; nv[vi].chapters[ci].title = title; setVolumes(nv); setHasChanges(true);
+  };
+
+  // ── Schedule entity text/form file ────────────────────────────────────────
+  const _scheduleEntityFile = (entityId, kind, content, isForm, vi, ci) => {
+    const key = `entity-${entityId}`;
+    const payload = isForm ? JSON.stringify(content) : content;
+    const mime = isForm ? 'application/json' : 'text/plain';
+    const ext  = isForm ? '-form.json' : '.txt';
+    const blob = new Blob([payload], { type: mime });
+    const file = new File([blob], `${key}${ext}`, { type: mime });
+    setTextFilesToUpload(p => ({ ...p, [key]: { file, entityId, kind, vi, ci, isEntity: true } }));
+    if (!isForm) setLocalTextContent(p => ({ ...p, [entityId]: content }));
   };
 
   // ── Entity modal dispatcher ────────────────────────────────────────────────
   const handleEntitySave = (ed) => {
     if (showAddEntityModal) {
       const { kind, vi, afterIndex } = showAddEntityModal;
-      if (kind === 'volume') saveNewVolume(afterIndex, ed);
-      if (kind === 'chapter') saveNewChapter(vi, afterIndex, ed);
+      const newId = kind === 'volume' ? `vol-${Date.now()}` : `ch-${Date.now()}`;
+      if (kind === 'volume') saveNewVolume(afterIndex, ed, newId);
+      if (kind === 'chapter') saveNewChapter(vi, afterIndex, ed, newId);
+      if (ed.type === 'text' && ed.content)
+        _scheduleEntityFile(
+          newId, kind, ed.content, false,
+          kind === 'volume' ? afterIndex + 1 : vi,
+          kind === 'chapter' ? afterIndex + 1 : undefined
+        );
       setShowAddEntityModal(null);
-      if (ed.type === 'form') {
-        const newVolumes = kind === 'volume'
-          ? volumes
-          : volumes;
-      }
     } else if (entityEdit) {
       const { kind, vi, ci } = entityEdit;
       if (kind === 'volume') saveEditVolume(vi, ed);
       if (kind === 'chapter') saveEditChapter(vi, ci, ed);
+      if (ed.type === 'text' && ed.content !== undefined) {
+        const entityId = kind === 'volume' ? volumes[vi]?.vid : volumes[vi]?.chapters[ci]?.cid;
+        if (entityId) _scheduleEntityFile(entityId, kind, ed.content, false, vi, ci);
+      }
       setEntityEdit(null);
     }
   };
@@ -311,8 +361,6 @@ function CoursePreview({ data, onLogout }) {
     if (!entityFormModal) return;
     const { kind, vi, afterIndex } = entityFormModal;
     const newId = kind === 'volume' ? `vol-${Date.now()}` : `ch-${Date.now()}`;
-    const key = kind === 'volume' ? `entity-vol-${newId}` : `entity-ch-${volumes[vi]?.vid || 'root'}-${newId}`;
-
     const nv = [...volumes];
     if (kind === 'volume') {
       nv.splice(afterIndex + 1, 0, { vid: newId, title: formData.title, type: 'form', url: '', chapters: [] });
@@ -320,20 +368,11 @@ function CoursePreview({ data, onLogout }) {
       nv[vi].chapters.splice(afterIndex + 1, 0, { cid: newId, title: formData.title, type: 'form', url: '', items: [] });
     }
     setVolumes(nv);
-
-    const blob = new Blob([JSON.stringify(formData.formData)], { type: 'application/json' });
-    setTextFilesToUpload(p => ({
-      ...p,
-      [key]: {
-        file: new File([blob], `${key}-form.json`, { type: 'application/json' }),
-        entityId: newId,
-        kind,
-        vi: kind === 'volume' ? afterIndex + 1 : vi,
-        ci: kind === 'chapter' ? afterIndex + 1 : undefined,
-        isEntity: true,
-      }
-    }));
-
+    _scheduleEntityFile(
+      newId, kind, formData.formData, true,
+      kind === 'volume' ? afterIndex + 1 : vi,
+      kind === 'chapter' ? afterIndex + 1 : undefined
+    );
     setEntityFormModal(null);
     setHasChanges(true);
   };
@@ -360,7 +399,10 @@ function CoursePreview({ data, onLogout }) {
     const nv = [...volumes];
     const items = nv[vi].chapters[ci].items;
     items.splice(afterIndex !== undefined ? afterIndex + 1 : items.length, 0, newItem);
-    setVolumes(nv); _scheduleFile(itemData, newItem, vi, ci);
+    setVolumes(nv);
+    _scheduleFile(itemData, newItem, vi, ci);
+    if (itemData.type === 'text' && itemData.content !== undefined)
+      setLocalTextContent(prev => ({ ...prev, [newItem.iid]: itemData.content }));
     setShowAddItemModal(null); setShowFormModal(null); setHasChanges(true);
   };
 
@@ -369,17 +411,20 @@ function CoursePreview({ data, onLogout }) {
     const orig = nv[vi].chapters[ci].items[ii];
     const updated = { ...orig, type: itemData.type, title: itemData.title, url: itemData.url || orig.url || '' };
     nv[vi].chapters[ci].items[ii] = updated;
-    setVolumes(nv); _scheduleFile(itemData, updated, vi, ci);
+    setVolumes(nv);
+    _scheduleFile(itemData, updated, vi, ci);
     if (itemData.type === 'text' && itemData.content !== undefined)
       setLocalTextContent(prev => ({ ...prev, [updated.iid]: itemData.content }));
     setEditingItem(null); setEditingForm(null); setHasChanges(true);
   };
 
   const deleteContentItem = (vi, ci, ii) => {
-    if (!window.confirm('Delete this item?')) return;
-    const nv = [...volumes]; nv[vi].chapters[ci].items.splice(ii, 1);
-    setVolumes(nv); setHasChanges(true);
-  };
+  if (!window.confirm('Delete this item?')) return;
+  const item = volumes[vi].chapters[ci].items[ii];
+  if (item.url) setFilesToDelete(p => [...p, item.url]);
+  const nv = [...volumes]; nv[vi].chapters[ci].items.splice(ii, 1);
+  setVolumes(nv); setHasChanges(true);
+};
 
   const updateItemTitle = (vi, ci, ii, title) => {
     const nv = [...volumes]; nv[vi].chapters[ci].items[ii].title = title; setVolumes(nv); setHasChanges(true);
@@ -387,15 +432,12 @@ function CoursePreview({ data, onLogout }) {
 
   // ── Drag ───────────────────────────────────────────────────────────────────
   const handleDragOver = e => { if (!editMode) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
-
-  const handleVolumeDragStart = (e, i) => { if (!editMode) return; setDraggedVolume(i); e.dataTransfer.effectAllowed = 'move'; };
-  const handleVolumeDrop = (e, t) => { if (!editMode || draggedVolume === null) return; e.preventDefault(); const nv = [...volumes]; const [m] = nv.splice(draggedVolume, 1); nv.splice(t, 0, m); setVolumes(nv); setDraggedVolume(null); setHasChanges(true); };
-
-  const handleChapterDragStart = (e, vi, ci) => { if (!editMode) return; setDraggedChapter({ vi, ci }); e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); };
-  const handleChapterDrop = (e, tvi, tci) => { if (!editMode || !draggedChapter) return; e.preventDefault(); e.stopPropagation(); const nv = [...volumes]; const [m] = nv[draggedChapter.vi].chapters.splice(draggedChapter.ci, 1); nv[tvi].chapters.splice(tci, 0, m); setVolumes(nv); setDraggedChapter(null); setHasChanges(true); };
-
-  const handleItemDragStart = (e, vi, ci, ii) => { if (!editMode) return; setDraggedItem({ vi, ci, ii }); e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); };
-  const handleItemDrop = (e, tvi, tci, tii) => {
+  const handleVolumeDragStart   = (e, i)        => { if (!editMode) return; setDraggedVolume(i); e.dataTransfer.effectAllowed = 'move'; };
+  const handleVolumeDrop        = (e, t)        => { if (!editMode || draggedVolume === null) return; e.preventDefault(); const nv = [...volumes]; const [m] = nv.splice(draggedVolume, 1); nv.splice(t, 0, m); setVolumes(nv); setDraggedVolume(null); setHasChanges(true); };
+  const handleChapterDragStart  = (e, vi, ci)   => { if (!editMode) return; setDraggedChapter({ vi, ci }); e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); };
+  const handleChapterDrop       = (e, tvi, tci) => { if (!editMode || !draggedChapter) return; e.preventDefault(); e.stopPropagation(); const nv = [...volumes]; const [m] = nv[draggedChapter.vi].chapters.splice(draggedChapter.ci, 1); nv[tvi].chapters.splice(tci, 0, m); setVolumes(nv); setDraggedChapter(null); setHasChanges(true); };
+  const handleItemDragStart     = (e, vi, ci, ii) => { if (!editMode) return; setDraggedItem({ vi, ci, ii }); e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); };
+  const handleItemDrop          = (e, tvi, tci, tii) => {
     if (!editMode || !draggedItem) return; e.preventDefault(); e.stopPropagation();
     if (draggedItem.vi !== tvi || draggedItem.ci !== tci) { setDraggedItem(null); return; }
     const nv = [...volumes]; const [m] = nv[draggedItem.vi].chapters[draggedItem.ci].items.splice(draggedItem.ii, 1); nv[tvi].chapters[tci].items.splice(tii, 0, m); setVolumes(nv); setDraggedItem(null); setHasChanges(true);
@@ -404,54 +446,209 @@ function CoursePreview({ data, onLogout }) {
   // ── Course field helpers ───────────────────────────────────────────────────
   const handleCourseFieldChange = (f, v) => { setEditableCourse(p => ({ ...p, [f]: v })); setHasChanges(true); };
   const handleSkillChange = (i, v) => { const s = [...editableCourse.skills]; s[i] = v; setEditableCourse(p => ({ ...p, skills: s })); setHasChanges(true); };
-  const addSkill = () => { setEditableCourse(p => ({ ...p, skills: [...p.skills, ''] })); setHasChanges(true); };
-  const removeSkill = (i) => { setEditableCourse(p => ({ ...p, skills: p.skills.filter((_, x) => x !== i) })); setHasChanges(true); };
+  const addSkill    = ()    => { setEditableCourse(p => ({ ...p, skills: [...p.skills, ''] })); setHasChanges(true); };
+  const removeSkill = (i)   => { setEditableCourse(p => ({ ...p, skills: p.skills.filter((_, x) => x !== i) })); setHasChanges(true); };
   const handleThumbnailChange = e => {
     const file = e.target.files[0]; if (!file) return;
     const r = new FileReader(); r.onloadend = () => { setEditableCourse(p => ({ ...p, thumbnail: r.result })); setHasChanges(true); }; r.readAsDataURL(file);
   };
 
   // ── Save ───────────────────────────────────────────────────────────────────
-  const resetUnsaved = () => { setTextFilesToUpload({}); setLocalTextContent({}); setHasChanges(false); setTextRefreshKey(k => k + 1); };
+  // NOTE: localTextContent is NOT cleared here — cleared only after fetchData completes
+  const resetUnsaved = () => {
+    setTextFilesToUpload({});
+    setHasChanges(false);
+    setTextRefreshKey(k => k + 1);
+  };
 
   const handleSaveChanges = async () => {
     if (isSaving) return;
     setIsSaving(true);
     try {
       const urlUpdates = {};
+
       if (Object.keys(textFilesToUpload).length) {
         const results = await Promise.all(Object.entries(textFilesToUpload).map(async ([key, fd]) => {
           const form = new FormData(); form.append('file', fd.file);
-          const res = await fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
-            method: 'POST', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` }, body: form
+          const res = await fetch(`${BASE}/api/manage/courses/${id}/files`, {
+            method: 'POST',
+            headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` },
+            body: form
           }).catch(() => null);
-          if (res?.ok) { const r = await res.json(); const url = r.data?.link?.url || r.data?.url || r.url; if (url) urlUpdates[key] = { url, ...fd }; }
+          if (res?.ok) {
+            const r = await res.json();
+            const url = r.data?.link?.url || r.data?.url || r.data?.path
+                      || r.data?.file?.url || r.data?.file?.path
+                      || r.url || r.path || r.link?.url;
+            if (url) urlUpdates[key] = { url, ...fd };
+          }
           return !!res?.ok;
         }));
-        if (results.some(ok => !ok)) { alert('Some files failed. Changes discarded.'); resetUnsaved(); await fetchData(); return; }
+
+        if (results.some(ok => !ok)) {
+          alert('Some files failed. Changes discarded.');
+          resetUnsaved(); setLocalTextContent({}); await fetchData(); return;
+        }
       }
-      const applyUrls = items => items.map(item => { const m = Object.values(urlUpdates).find(u => u.itemId === item.iid); return m ? { ...item, url: m.url } : item; });
-      const applyEntityUrl = entity => {
-        const m = Object.values(urlUpdates).find(u => u.isEntity && u.entityId === (entity.vid || entity.cid));
-        return m ? { ...entity, url: m.url } : entity;
+
+      // Apply uploaded URLs back onto volumes/chapters/items
+      const applyEntityUrl = (entity) => {
+        const eid = entity.vid || entity.cid;
+        const key = `entity-${eid}`;
+        if (urlUpdates[key]) return { ...entity, url: urlUpdates[key].url };
+        return entity;
       };
+
+      const applyItemUrls = items => items.map(item => {
+        const m = Object.values(urlUpdates).find(u => u.itemId === item.iid);
+        return m ? { ...item, url: m.url } : item;
+      });
+
       const newVolumes = volumes.map(v => {
         const updatedVol = applyEntityUrl(v);
-        return { ...updatedVol, chapters: updatedVol.chapters.map(c => { const updatedCh = applyEntityUrl(c); return { ...updatedCh, items: applyUrls(updatedCh.items) }; }) };
+        return {
+          ...updatedVol,
+          chapters: updatedVol.chapters.map(c => {
+            const updatedCh = applyEntityUrl(c);
+            return { ...updatedCh, items: applyItemUrls(updatedCh.items) };
+          })
+        };
       });
-      const res = await fetch(`http://localhost:4040/api/manage/courses/${id}`, {
-        method: 'PUT', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
+
+      const res = await fetch(`${BASE}/api/manage/courses/${id}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...editableCourse, volumes: newVolumes })
       });
-      if (res.ok) { setCourse({ ...editableCourse, volumes: newVolumes }); setEditableCourse({ ...editableCourse, volumes: newVolumes }); setVolumes(newVolumes); resetUnsaved(); setEditMode(false); await fetchData(); alert('Saved!'); }
-      else { alert(`Server error ${res.status}. Changes discarded.`); resetUnsaved(); await fetchData(); }
-    } catch (e) { alert(`Save failed: ${e.message}`); resetUnsaved(); await fetchData(); }
-    finally { setIsSaving(false); }
+
+      if (res.ok) {
+        setCourse({ ...editableCourse, volumes: newVolumes });
+        setEditableCourse({ ...editableCourse, volumes: newVolumes });
+        setVolumes(newVolumes);
+        resetUnsaved();
+        setEditMode(false);
+        await fetchData();
+        setLocalTextContent({}); // clear AFTER reload so content stays visible during save
+        alert('Saved!');
+        if (filesToDelete.length) {
+          await Promise.allSettled(filesToDelete.map(url =>
+            fetch(`${BASE}/api/manage/courses/${id}/files`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url })
+            })
+          ));
+          setFilesToDelete([]);
+        }
+      } else {
+        alert(`Server error ${res.status}. Changes discarded.`);
+        resetUnsaved(); setLocalTextContent({}); await fetchData();
+      }
+    } catch (e) {
+      alert(`Save failed: ${e.message}`);
+      resetUnsaved(); setLocalTextContent({}); await fetchData();
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  // ── Misc ───────────────────────────────────────────────────────────────────
+  const handleExportZip = async () => {
+    try {
+      const zip = new JSZip();
+
+      // Collect all URLs from course
+      const allUrls = [];
+      volumes.forEach(v => {
+        if (v.url) allUrls.push(v.url);
+        v.chapters?.forEach(c => {
+          if (c.url) allUrls.push(c.url);
+          c.items?.forEach(i => { if (i.url) allUrls.push(i.url); });
+        });
+      });
+      if (editableCourse?.links?.[0]?.url) allUrls.push(editableCourse.links[0].url);
+
+      // Fetch and add each file
+      const urlMap = {};
+      await Promise.allSettled(allUrls.map(async url => {
+        try {
+          const fullUrl = fu(url);
+          const res = await fetch(fullUrl, { headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` } });
+          if (!res.ok) return;
+          const blob = await res.blob();
+          const filename = `files/${url.split('/').pop()}`;
+          zip.file(filename, blob);
+          urlMap[url] = filename;
+        } catch {}
+      }));
+
+      // Save course JSON with url map
+      zip.file('course.json', JSON.stringify({ ...editableCourse, volumes, urlMap }, null, 2));
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${editableCourse.title || 'course'}-backup.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) { alert('Export failed: ' + e.message); }
+  };
+
+  const handleImportZip = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    if (!window.confirm('This will overwrite current course data. Continue?')) return;
+    try {
+      const zip = await JSZip.loadAsync(file);
+
+      const courseJson = await zip.file('course.json')?.async('string');
+      if (!courseJson) { alert('Invalid backup: missing course.json'); return; }
+      const { urlMap, volumes: bkVols, ...bkCourse } = JSON.parse(courseJson);
+
+      // Re-upload all files and build new URL map
+      const newUrlMap = {};
+      await Promise.allSettled(Object.entries(urlMap).map(async ([origUrl, zipPath]) => {
+        try {
+          const blob = await zip.file(zipPath)?.async('blob');
+          if (!blob) return;
+          const form = new FormData();
+          form.append('file', new File([blob], zipPath.split('/').pop()));
+          const res = await fetch(`${BASE}/api/manage/courses/${id}/files`, {
+            method: 'POST',
+            headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` },
+            body: form
+          });
+          if (res.ok) {
+            const r = await res.json();
+            const newUrl = r.data?.link?.url || r.data?.url || r.data?.path || r.url;
+            if (newUrl) newUrlMap[origUrl] = newUrl;
+          }
+        } catch {}
+      }));
+
+      // Remap URLs in volumes
+      const remapUrl = url => newUrlMap[url] || url;
+      const remappedVolumes = bkVols.map(v => ({
+        ...v, url: remapUrl(v.url),
+        chapters: v.chapters?.map(c => ({
+          ...c, url: remapUrl(c.url),
+          items: c.items?.map(i => ({ ...i, url: remapUrl(i.url) }))
+        }))
+      }));
+
+      const updatedCourse = { ...bkCourse, volumes: remappedVolumes };
+      const res = await fetch(`${BASE}/api/manage/courses/${id}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedCourse)
+      });
+
+      if (res.ok) { alert('Import successful!'); await fetchData(); }
+      else alert('Import failed: server error ' + res.status);
+    } catch (err) { alert('Import failed: ' + err.message); }
+    e.target.value = '';
+  };
+
   const handleAddToCart = () => alert(`Added "${course.title}" to cart!`);
-  const handleEnroll = () => alert(`Enrolled in "${course.title}"!`);
+  const handleEnroll    = () => alert(`Enrolled in "${course.title}"!`);
   const formatDate = ds => new Date(ds).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const renderStars = r => {
     const s = []; const f = Math.floor(r);
@@ -470,30 +667,27 @@ function CoursePreview({ data, onLogout }) {
       </div>
     </>
   );
-
-  const isAdmin = data.role && ['admin', 'root', 'manager', 'create'].includes(role.roleName);
+  
   const hasContent = volumes.length > 0;
 
-  // ── CHANGE 1: add onScrollToItem to sharedItemProps ─────────────────────
   const sharedItemProps = {
     editMode, locked, expandedItems, setExpandedItems, editingTitle, setEditingTitle,
     textRefreshKey, localTextContent, volumes, setExpandedChapters, setExpandedVolumes,
     onUpdateTitle: updateItemTitle,
-    onEditItem: (vi, ci, ii) => setEditingItem({ vi, ci, ii, item: volumes[vi].chapters[ci].items[ii] }),
-    onEditForm: (vi, ci, ii) => setEditingForm({ vi, ci, ii, item: volumes[vi].chapters[ci].items[ii] }),
+    onEditItem:  (vi, ci, ii) => setEditingItem({ vi, ci, ii, item: volumes[vi].chapters[ci].items[ii] }),
+    onEditForm:  (vi, ci, ii) => setEditingForm({ vi, ci, ii, item: volumes[vi].chapters[ci].items[ii] }),
     onDeleteItem: deleteContentItem,
-    onDragStart: handleItemDragStart,
-    onDragOver: handleDragOver,
-    onDrop: handleItemDrop,
-    // Scroll to a specific item: expands its volume → chapter → item, then scrolls
+    onDragStart:  handleItemDragStart,
+    onDragOver:   handleDragOver,
+    onDrop:       handleItemDrop,
     onScrollToItem: (vi, ci, ii) => {
-      const vol = volumes[vi];
-      const ch = vol?.chapters[ci];
+      const vol  = volumes[vi];
+      const ch   = vol?.chapters[ci];
       const item = ch?.items[ii];
       if (!vol || !ch || !item) return;
-      setExpandedVolumes(p => ({ ...p, [vol.vid]: true }));
-      setExpandedChapters(p => ({ ...p, [ch.cid]: true }));
-      setExpandedItems(p => ({ ...p, [item.iid]: true }));
+      setExpandedVolumes(p  => ({ ...p, [vol.vid]:  true }));
+      setExpandedChapters(p => ({ ...p, [ch.cid]:   true }));
+      setExpandedItems(p    => ({ ...p, [item.iid]: true }));
       setTimeout(() => {
         const el = document.getElementById(`item-${item.iid}`);
         if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -518,8 +712,8 @@ function CoursePreview({ data, onLogout }) {
             <div className="course-info-section">
               <div className="mobile-thumbnail">
                 {editMode
-                  ? <div className="thumbnail-upload"><input type="file" accept="image/*" onChange={handleThumbnailChange} id="mob-thumb" style={{ display: 'none' }} /><label htmlFor="mob-thumb" className="thumbnail-upload-label"><img src={'http://localhost:4040' + editableCourse.links[0].url} alt="" /><div className="thumbnail-overlay"><i className="bi bi-camera"></i><span>Change Photo</span></div></label></div>
-                  : <img src={'http://localhost:4040' + editableCourse.links[0].url} alt="" />}
+                  ? <div className="thumbnail-upload"><input type="file" accept="image/*" onChange={handleThumbnailChange} id="mob-thumb" style={{ display: 'none' }} /><label htmlFor="mob-thumb" className="thumbnail-upload-label"><img src={fu(editableCourse.links[0].url)} alt="" /><div className="thumbnail-overlay"><i className="bi bi-camera"></i><span>Change Photo</span></div></label></div>
+                  : <img src={fu(editableCourse.links[0].url)} alt="" />}
               </div>
 
               <div className="title-price-row">
@@ -556,7 +750,7 @@ function CoursePreview({ data, onLogout }) {
               <div className="ratings-section">
                 <span className="rating-number">{course.ratings}</span>
                 <div className="stars">{renderStars(course.ratings)}</div>
-                <span className="students-count">({course.ratingsCount} students)</span>
+                <span className="students-count">({course.followers} students)</span>
               </div>
 
               <div className="course-meta">
@@ -565,18 +759,16 @@ function CoursePreview({ data, onLogout }) {
                 <span className="meta-item">Last updated {formatDate(course.updatedAt)}</span>
               </div>
 
-              {locked ?
-                <div className="mobile-buttons">
-                  <button className={`btn btn-primary btn-lg w-100 mb-2 ${!locked ? 'disabled' : ''}`} onClick={handleAddToCart}>Add to Cart</button>
-                  <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>Enroll Now</button>
-                  <p className="guarantee-text">30-Day Money-Back Guarantee</p>
-                </div>
-                :
-                <div className="mobile-buttons">
-                  <button className={`btn btn-primary btn-lg w-100 mb-2 ${!locked ? 'disabled' : ''}`} onClick={handleAddToCart}>Add to Cart</button>
-                  <button className="btn btn-outline-secondary btn-lg w-100 " onClick={()=>navigate(`/course/view/${id}`)}>View Course</button>
-                  {/* <p className="guarantee-text">30-Day Money-Back Guarantee</p> */}
-                </div>
+              {locked
+                ? <div className="mobile-buttons">
+                    <button className="btn btn-primary btn-lg w-100 mb-2 " onClick={handleAddToCart}>Add to Cart</button>
+                    <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>Enroll Now</button>
+                    <p className="guarantee-text">30-Day Money-Back Guarantee</p>
+                  </div>
+                : <div className="mobile-buttons">
+                    <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>Add to Cart</button>
+                    <button className="btn btn-outline-secondary btn-lg w-100" onClick={() => navigate(`/course/view/${id}`)}>View Course</button>
+                  </div>
               }
 
               <div className="desktop-skills section-card">
@@ -594,27 +786,24 @@ function CoursePreview({ data, onLogout }) {
               <div className="purchase-card">
                 <div className="course-thumbnail">
                   {editMode
-                    ? <div className="thumbnail-upload"><input type="file" accept="image/*" onChange={handleThumbnailChange} id="desk-thumb" style={{ display: 'none' }} /><label htmlFor="desk-thumb" className="thumbnail-upload-label"><img src={'http://localhost:4040' + editableCourse.links[0].url} alt="" /><div className="thumbnail-overlay"><i className="bi bi-camera"></i><span>Change Photo</span></div></label></div>
-                    : <img src={'http://localhost:4040' + editableCourse.links[0].url} alt="" />}
+                    ? <div className="thumbnail-upload"><input type="file" accept="image/*" onChange={handleThumbnailChange} id="desk-thumb" style={{ display: 'none' }} /><label htmlFor="desk-thumb" className="thumbnail-upload-label"><img src={fu(editableCourse.links[0].url)} alt="" /><div className="thumbnail-overlay"><i className="bi bi-camera"></i><span>Change Photo</span></div></label></div>
+                    : <img src={fu(editableCourse.links[0].url)} alt="" />}
                 </div>
                 <div className="purchase-card-body">
                   <div className="price-section">
                     <h2 className="price">{editMode ? <input type="number" className="form-control price-input-desktop" value={editableCourse.price} onChange={e => handleCourseFieldChange('price', parseFloat(e.target.value))} step="0.01" min="0" /> : (course.price > 0 ? '$' + course.price : 'Free')}</h2>
                   </div>
-                  {locked ?
-                    <div className="purchase-buttons">
-                      <button className={`btn btn-primary btn-lg w-100 mb-2 ${!locked ? 'disabled' : ''}`} onClick={handleAddToCart}>Add to Cart</button>
-                      <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>Enroll Now</button>
-                    </div>
-                    :
-                    <div className="purchase-buttons">
-                      <button className={`btn btn-primary btn-lg w-100 mb-2 ${!locked ? 'disabled' : ''}`} onClick={handleAddToCart}>Add to Cart</button>
-                      <button className="btn btn-outline-secondary btn-lg w-100" onClick={()=>navigate(`/course/view/${id}`)}>View Course</button>
-                    </div>
+                  {locked
+                    ? <div className="purchase-buttons">
+                        <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>Add to Cart</button>
+                        <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>Enroll Now</button>
+                      </div>
+                    : <div className="purchase-buttons">
+                        <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>Add to Cart</button>
+                        <button className="btn btn-outline-secondary btn-lg w-100" onClick={() => navigate(`/course/view/${id}`)}>View Course</button>
+                      </div>
                   }
-                  {locked ?
-                  <p className="guarantee-text">30-Day Money-Back Guarantee</p>
-                  : null}
+                  {locked ? <p className="guarantee-text">30-Day Money-Back Guarantee</p> : null}
                 </div>
               </div>
             </div>
@@ -622,7 +811,7 @@ function CoursePreview({ data, onLogout }) {
 
           {/* ══ Course Content ══ */}
           <div className="course-content-section">
-            {isAdmin && (
+            {!locked && (
               <div className="admin-controls">
                 <button className={`btn ${editMode ? 'btn-warning' : 'btn-outline-primary'}`} onClick={() => setEditMode(!editMode)}>
                   <i className="bi bi-pencil-square me-1"></i>{editMode ? 'Exit Edit Mode' : 'Edit Course'}
@@ -632,6 +821,13 @@ function CoursePreview({ data, onLogout }) {
                     {isSaving ? <><span className="spinner-border spinner-border-sm me-1"></span>Saving…</> : <><i className="bi bi-save me-1"></i>Save Changes</>}
                   </button>
                 )}
+                <button className="btn btn-outline-secondary ms-2" onClick={handleExportZip}>
+                  <i className="bi bi-box-arrow-down me-1"></i>Export Backup
+                </button>
+                <label className="btn btn-outline-warning ms-2 mb-0">
+                  <i className="bi bi-box-arrow-in-up me-1"></i>Import Backup
+                  <input type="file" accept=".zip" onChange={handleImportZip} style={{ display: 'none' }} />
+                </label>
               </div>
             )}
 
@@ -664,7 +860,6 @@ function CoursePreview({ data, onLogout }) {
                 <div className="volumes-list">
                   {volumes.map((volume, vi) =>
                     isContainer(volume)
-                      /* ══ CONTAINER VOLUME ══ */
                       ? (
                         <div key={volume.vid} id={`volume-${volume.vid}`}
                           className={`volume-item ${editMode ? 'draggable' : ''}`}
@@ -687,7 +882,7 @@ function CoursePreview({ data, onLogout }) {
                                     : setShowAddEntityModal({ kind: 'chapter', vi, afterIndex: volume.chapters.length - 1, preType: type })}
                                 />
                                 <button className="btn btn-sm btn-outline-primary" onClick={() => setEntityEdit({ kind: 'volume', vi, entity: volume })}><i className="bi bi-pencil"></i></button>
-                                <button className="btn btn-sm btn-outline-danger" onClick={() => deleteVolume(vi)}><i className="bi bi-trash"></i></button>
+                                <button className="btn btn-sm btn-outline-danger"  onClick={() => deleteVolume(vi)}><i className="bi bi-trash"></i></button>
                               </div>
                             )}
                           </div>
@@ -700,7 +895,6 @@ function CoursePreview({ data, onLogout }) {
                                   <div className={`chapters-list ${locked ? 'muted blocked' : ''}`}>
                                     {volume.chapters.map((chapter, ci) =>
                                       isContainer(chapter)
-                                        /* ── CONTAINER CHAPTER ── */
                                         ? (
                                           <div key={chapter.cid} id={`chapter-${chapter.cid}`}
                                             className={`chapter-item ${editMode ? 'draggable' : ''}`}
@@ -717,7 +911,7 @@ function CoursePreview({ data, onLogout }) {
                                                 <div className="header-actions" onClick={e => e.stopPropagation()}>
                                                   <ItemAddDropdown onAdd={type => openAddItem(vi, ci, type)} />
                                                   <button className="btn btn-sm btn-outline-primary" onClick={() => setEntityEdit({ kind: 'chapter', vi, ci, entity: chapter })}><i className="bi bi-pencil"></i></button>
-                                                  <button className="btn btn-sm btn-outline-danger" onClick={() => deleteChapter(vi, ci)}><i className="bi bi-trash"></i></button>
+                                                  <button className="btn btn-sm btn-outline-danger"  onClick={() => deleteChapter(vi, ci)}><i className="bi bi-trash"></i></button>
                                                 </div>
                                               )}
                                             </div>
@@ -732,7 +926,6 @@ function CoursePreview({ data, onLogout }) {
                                             )}
                                           </div>
                                         )
-                                        /* ── CONTENT CHAPTER (not a container) ── */
                                         : (
                                           <ContentEntityView
                                             key={chapter.cid} entity={chapter} entityId={chapter.cid}
@@ -754,7 +947,6 @@ function CoursePreview({ data, onLogout }) {
                           )}
                         </div>
                       )
-                      /* ══ CONTENT VOLUME (not a container) ══ */
                       : (
                         <ContentEntityView
                           key={volume.vid} entity={volume} entityId={volume.vid}
@@ -784,6 +976,7 @@ function CoursePreview({ data, onLogout }) {
           initial={entityEdit?.entity || null}
           preType={showAddEntityModal?.preType || null}
           uploadedFiles={uploadedFiles}
+          initialTextContent={entityEdit?.entity ? localTextContent[entityEdit.entity.vid || entityEdit.entity.cid] : undefined}
           onSave={handleEntitySave}
           onClose={() => { setShowAddEntityModal(null); setEntityEdit(null); }}
         />
@@ -799,15 +992,10 @@ function CoursePreview({ data, onLogout }) {
           onClose={() => setEditingItem(null)} uploadedFiles={uploadedFiles} />
       )}
       {entityFormModal && (
-        <FormEditorModal
-          uploadedFiles={uploadedFiles}
+        <FormEditorModal uploadedFiles={uploadedFiles}
           onSave={handleEntityFormSave}
           onClose={() => setEntityFormModal(null)} />
       )}
-      {/* <FormEditorModal uploadedFiles={uploadedFiles}
-          onSave={d=>saveContentItem(showFormModal.vi,showFormModal.ci,d,showFormModal.afterIndex)}
-          onClose={()=>setShowFormModal(null)}/>
-      )} */}
       {editingForm && (
         <FormEditorModal isEditing initialItem={editingForm.item} uploadedFiles={uploadedFiles}
           onSave={d => updateContentItem(editingForm.vi, editingForm.ci, editingForm.ii, d)}
@@ -845,7 +1033,7 @@ function ItemAddDropdown({ onAdd }) {
   );
 }
 
-// ─── Entity Add Dropdown (for volumes & chapters) ────────────────────────────
+// ─── Entity Add Dropdown ──────────────────────────────────────────────────────
 function EntityAddDropdown({ onAdd, label = 'Add' }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -873,31 +1061,49 @@ function EntityAddDropdown({ onAdd, label = 'Add' }) {
   );
 }
 
-function AddEntityModal({ kind, initial, preType, uploadedFiles, onSave, onClose }) {
-  const [title, setTitle] = useState(initial?.title || '');
-  const [type, setType] = useState(initial?.type || preType || 'container');
-  const [url, setUrl] = useState(initial?.url || '');
-  const [preview, setPreview] = useState(initial?.url || '');
-  const [content, setContent] = useState('');
+// ─── Add Entity Modal ─────────────────────────────────────────────────────────
+function AddEntityModal({ kind, initial, preType, uploadedFiles, initialTextContent, onSave, onClose }) {
+  const [title,    setTitle]    = useState(initial?.title || '');
+  const [type,     setType]     = useState(initial?.type  || preType || 'container');
+  const [url,      setUrl]      = useState(initial?.url   || '');
+  const [preview,  setPreview]  = useState(initial?.url   || '');
+  const [content,  setContent]  = useState(initialTextContent || '');
   const [showHelp, setShowHelp] = useState(false);
-  const [helpGroup, setHelpGroup] = useState(0);
+  const [helpGroup,setHelpGroup]= useState(0);
+  const [loadingText, setLoadingText] = useState(false);
+  const token = localStorage.getItem('token');
 
   const isContent = type && type !== 'container';
-  const isText = type === 'text';
-  const isForm = type === 'form';
-  const isMedia = isContent && !isText && !isForm;
+  const isText    = type === 'text';
+  const isForm    = type === 'form';
+  const isMedia   = isContent && !isText && !isForm;
   const kindLabel = kind === 'volume' ? 'Volume' : 'Chapter';
   const acceptMap = { image: 'image/*', video: 'video/*', audio: 'audio/*', document: '.pdf,.doc,.docx', archive: '.zip,.rar,.7z' };
+
+  // When editing an existing text entity, load from server if not already in local state
+  useEffect(() => {
+    if (initial && initial.type === 'text' && initial.url && !initialTextContent) {
+      setLoadingText(true);
+      const fullUrl = initial.url.startsWith('http') ? initial.url : `${BASE}${initial.url}`;
+      fetch(`${fullUrl}?_=${Date.now()}`, {
+        headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' }
+      })
+        .then(r => r.ok ? r.text() : Promise.reject())
+        .then(t => setContent(t))
+        .catch(() => {})
+        .finally(() => setLoadingText(false));
+    }
+  }, []);
 
   const ff = () => {
     if (!isMedia || !uploadedFiles?.length) return [];
     return uploadedFiles.filter(f => {
       const n = (f.originalName || f.filename || '').toLowerCase();
-      if (type === 'image') return /\.(jpg|jpeg|png|gif|webp)$/i.test(n);
-      if (type === 'video') return /\.(mp4|webm|ogg|mov|avi)$/i.test(n);
-      if (type === 'audio') return /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(n);
+      if (type === 'image')    return /\.(jpg|jpeg|png|gif|webp)$/i.test(n);
+      if (type === 'video')    return /\.(mp4|webm|ogg|mov|avi)$/i.test(n);
+      if (type === 'audio')    return /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(n);
       if (type === 'document') return /\.(pdf|doc|docx)$/i.test(n);
-      if (type === 'archive') return /\.(zip|rar|7z)$/i.test(n);
+      if (type === 'archive')  return /\.(zip|rar|7z)$/i.test(n);
       return false;
     });
   };
@@ -927,7 +1133,6 @@ function AddEntityModal({ kind, initial, preType, uploadedFiles, onSave, onClose
             <label className="form-label">Title</label>
             <input className="form-control" value={title} onChange={e => setTitle(e.target.value)} placeholder={`${kindLabel} title`} />
           </div>
-
           <div className="mb-3">
             <label className="form-label">Type</label>
             <div className="entity-type-picker">
@@ -935,8 +1140,7 @@ function AddEntityModal({ kind, initial, preType, uploadedFiles, onSave, onClose
                 <button key={opt.type}
                   className={`entity-type-btn ${type === opt.type ? 'entity-type-btn--active' : ''}`}
                   onClick={() => { setType(opt.type); setUrl(''); setPreview(''); setContent(''); }}>
-                  <i className={`bi ${opt.icon}`}></i>
-                  <span>{opt.label}</span>
+                  <i className={`bi ${opt.icon}`}></i><span>{opt.label}</span>
                 </button>
               ))}
             </div>
@@ -950,6 +1154,7 @@ function AddEntityModal({ kind, initial, preType, uploadedFiles, onSave, onClose
 
           {isText && (
             <>
+              {loadingText && <div className="alert alert-info mb-2"><span className="spinner-border spinner-border-sm me-2"></span>Loading…</div>}
               <div className="mb-2">
                 <button className="btn btn-sm btn-link px-0" onClick={() => setShowHelp(!showHelp)}>
                   <i className={`bi bi-${showHelp ? 'chevron-up' : 'question-circle'} me-1`}></i>
@@ -975,7 +1180,7 @@ function AddEntityModal({ kind, initial, preType, uploadedFiles, onSave, onClose
               )}
               <div className="mb-3">
                 <label className="form-label">Content</label>
-                <textarea className="form-control" value={content} onChange={e => setContent(e.target.value)} rows="10" />
+                <textarea className="form-control" value={content} onChange={e => setContent(e.target.value)} rows="10" disabled={loadingText} />
               </div>
               {content && (
                 <div className="mb-3">
@@ -998,7 +1203,7 @@ function AddEntityModal({ kind, initial, preType, uploadedFiles, onSave, onClose
               {ff().length > 0 && (
                 <div className="mb-3">
                   <label className="form-label">Select from uploaded files</label>
-                  <select className="form-select" value={url} onChange={e => { setUrl(e.target.value); setPreview(e.target.value ? `http://localhost:4040${e.target.value}` : ''); }}>
+                  <select className="form-select" value={url} onChange={e => { setUrl(e.target.value); setPreview(e.target.value ? `${BASE}${e.target.value}` : ''); }}>
                     <option value="">— Choose a file —</option>
                     {ff().map((f, i) => <option key={i} value={f.url || f.path}>{f.originalName || f.filename}</option>)}
                   </select>
@@ -1021,9 +1226,9 @@ function AddEntityModal({ kind, initial, preType, uploadedFiles, onSave, onClose
               {preview && (
                 <div className="mb-3">
                   <label className="form-label">Preview</label>
-                  {type === 'image' && <img src={preview} alt="" className="img-preview" />}
-                  {type === 'video' && <video src={preview} controls className="video-preview" />}
-                  {type === 'audio' && <audio src={preview} controls className="audio-preview" />}
+                  {type === 'image'    && <img src={preview} alt="" className="img-preview" />}
+                  {type === 'video'    && <video src={preview} controls className="video-preview" />}
+                  {type === 'audio'    && <audio src={preview} controls className="audio-preview" />}
                   {(type === 'document' || type === 'archive') && <div className="alert alert-info"><i className={`bi ${typeIcon(type)} me-2`}></i>{(url || preview).split('/').pop()}</div>}
                 </div>
               )}
@@ -1054,37 +1259,44 @@ function ContentEntityView({ entity, entityId, editMode, locked, expanded, onTog
         {editMode && (
           <div className="header-actions" onClick={e => e.stopPropagation()}>
             <button className="btn btn-sm btn-outline-primary" onClick={onEdit}><i className="bi bi-pencil"></i></button>
-            <button className="btn btn-sm btn-outline-danger" onClick={onDelete}><i className="bi bi-trash"></i></button>
+            <button className="btn btn-sm btn-outline-danger"  onClick={onDelete}><i className="bi bi-trash"></i></button>
           </div>
         )}
       </div>
 
       {(editMode || expanded) && (
         <div className="content-entity-body item-body--expanded">
-          <EntityMedia type={type} url={url} entityId={entityId} textRefreshKey={textRefreshKey} />
+          <EntityMedia type={type} url={url} entityId={entityId} textRefreshKey={textRefreshKey} localTextContent={localTextContent} />
         </div>
       )}
     </div>
   );
 }
 
-function EntityMedia({ type, url, entityId, textRefreshKey }) {
+// ─── Entity Media ─────────────────────────────────────────────────────────────
+function EntityMedia({ type, url, entityId, textRefreshKey, localTextContent }) {
+  if (type === 'text') return (
+    <TextItemDisplay
+      key={`${entityId}-${textRefreshKey}`}
+      url={url} refreshKey={textRefreshKey}
+      localContent={localTextContent?.[entityId]}
+    />
+  );
   if (type === 'form') return <FormItemDisplay key={`${entityId}-${textRefreshKey}`} url={url} refreshKey={textRefreshKey} />;
   if (!url) return <p className="text-muted fst-italic p-2 mb-0">No content URL set.</p>;
-  if (type === 'video') return <div className="video-item"><video src={url} controls className="video-player" /></div>;
-  if (type === 'image') return <div className="image-item"><img src={url} alt="" className="content-image" /></div>;
-  if (type === 'audio') return <div className="audio-item"><audio src={url} controls className="audio-player" /></div>;
-  if (type === 'document') return <div className="document-item"><a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-info"><i className="bi bi-file-pdf me-1"></i>Open Document</a></div>;
-  if (type === 'archive') return <div className="archive-item"><a href={url} download className="btn btn-sm btn-outline-info"><i className="bi bi-file-zip me-1"></i>Download Archive</a></div>;
-  return <a href={url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-secondary m-2"><i className="bi bi-file-earmark me-1"></i>Open File</a>;
+  if (type === 'video') return <div className="video-item"><YoutubeEmbed url={url} /></div>;
+  if (type === 'image')    return <div className="image-item"><img src={fu(url)} alt="" className="content-image" /></div>;
+  if (type === 'audio')    return <div className="audio-item"><audio src={fu(url)} controls className="audio-player" /></div>;
+  if (type === 'document') return <div className="document-item"><a href={fu(url)} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-info"><i className="bi bi-file-pdf me-1"></i>Open Document</a></div>;
+  if (type === 'archive')  return <div className="archive-item"><a href={fu(url)} download className="btn btn-sm btn-outline-info"><i className="bi bi-file-zip me-1"></i>Download Archive</a></div>;
+  return <a href={fu(url)} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-secondary m-2"><i className="bi bi-file-earmark me-1"></i>Open File</a>;
 }
 
-// ─── Content Item View (items inside container chapters) ──────────────────────
+// ─── Content Item View ────────────────────────────────────────────────────────
 function ContentItemView({ item, ii, vi, ci, editMode, locked, expandedItems, setExpandedItems, editingTitle, setEditingTitle, textRefreshKey, localTextContent, volumes, setExpandedChapters, setExpandedVolumes, onUpdateTitle, onEditItem, onEditForm, onDeleteItem, onDragStart, onDragOver, onDrop, onScrollToItem }) {
-  const volume = volumes[vi];
+  const volume  = volumes[vi];
   const chapter = volume?.chapters[ci];
   return (
-    // ── CHANGE 2: id added so move-to-item can scroll to this element ──────
     <div id={`item-${item.iid}`} className={`content-item ${editMode ? 'draggable' : ''}`}
       draggable={editMode}
       onDragStart={e => onDragStart(e, vi, ci, ii)} onDragOver={onDragOver} onDrop={e => onDrop(e, vi, ci, ii)}>
@@ -1096,7 +1308,7 @@ function ContentItemView({ item, ii, vi, ci, editMode, locked, expandedItems, se
             ? <input className="form-control title-edit-input flex-1" value={item.title} onChange={e => onUpdateTitle(vi, ci, ii, e.target.value)} onBlur={() => setEditingTitle(null)} onKeyDown={e => { if (e.key === 'Enter') setEditingTitle(null); }} autoFocus />
             : <span className="item-title flex-1">{item.title}</span>}
           {item.type === 'form'
-            ? <button className="btn btn-sm btn-outline-info" onClick={() => onEditForm(vi, ci, ii)}><i className="bi bi-pencil-fill"></i></button>
+            ? <button className="btn btn-sm btn-outline-info"    onClick={() => onEditForm(vi, ci, ii)}><i className="bi bi-pencil-fill"></i></button>
             : <button className="btn btn-sm btn-outline-primary" onClick={() => onEditItem(vi, ci, ii)}><i className="bi bi-pencil-fill"></i></button>}
           <button className="btn btn-sm btn-danger" onClick={() => onDeleteItem(vi, ci, ii)}><i className="bi bi-trash"></i></button>
         </div>
@@ -1110,16 +1322,16 @@ function ContentItemView({ item, ii, vi, ci, editMode, locked, expandedItems, se
 
       {(editMode || expandedItems[item.iid]) && (
         <div className={`item-body${editMode ? '' : ' item-body--expanded'}`}>
-          {item.type === 'video' && <div className="video-item"><video src={item.url} controls className="video-player" /></div>}
-          {item.type === 'image' && <div className="image-item"><img src={item.url} alt={item.title} className="content-image" /></div>}
-          {item.type === 'audio' && <div className="audio-item"><audio src={item.url} controls className="audio-player" /></div>}
-          {item.type === 'document' && <div className="document-item"><a href={item.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-info"><i className="bi bi-file-pdf me-1"></i>Open Document</a></div>}
-          {item.type === 'archive' && <div className="archive-item"><a href={item.url} download className="btn btn-sm btn-outline-info"><i className="bi bi-file-zip me-1"></i>Download Archive</a></div>}
+          {item.type === 'video' && <div className="video-item"><YoutubeEmbed url={item.url} /></div>}
+          {item.type === 'image'    && <div className="image-item"><img src={fu(item.url)} alt={item.title} className="content-image" /></div>}
+          {item.type === 'audio'    && <div className="audio-item"><audio src={fu(item.url)} controls className="audio-player" /></div>}
+          {item.type === 'document' && <div className="document-item"><a href={fu(item.url)} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-info"><i className="bi bi-file-pdf me-1"></i>Open Document</a></div>}
+          {item.type === 'archive'  && <div className="archive-item"><a href={fu(item.url)} download className="btn btn-sm btn-outline-info"><i className="bi bi-file-zip me-1"></i>Download Archive</a></div>}
           {item.type === 'text' && (
             <TextItemDisplay key={`${item.iid}-${textRefreshKey}`} url={item.url} refreshKey={textRefreshKey} localContent={localTextContent[item.iid]}
               onCloseItem={() => setExpandedItems(p => ({ ...p, [item.iid]: false }))}
               onCloseChapter={chapter ? () => setExpandedChapters(p => ({ ...p, [chapter.cid]: false })) : undefined}
-              onCloseVolume={volume ? () => setExpandedVolumes(p => ({ ...p, [volume.vid]: false })) : undefined}
+              onCloseVolume={volume  ? () => setExpandedVolumes(p  => ({ ...p, [volume.vid]:  false })) : undefined}
               onScrollToVolume={idx => { const el = document.getElementById(`volume-${volumes[idx]?.vid}`); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}
               onScrollToChapter={(idx, cidx) => { const ch = volumes[idx]?.chapters[cidx]; if (ch) { setExpandedChapters(p => ({ ...p, [ch.cid]: true })); setTimeout(() => { const el = document.getElementById(`chapter-${ch.cid}`); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 100); } }}
               onScrollToItem={onScrollToItem}
@@ -1134,9 +1346,9 @@ function ContentItemView({ item, ii, vi, ci, editMode, locked, expandedItems, se
 
 // ─── ITEM_ACTIONS ─────────────────────────────────────────────────────────────
 const ITEM_ACTIONS = {
-  'close-item':    (p, pr) => pr.onCloseItem?.(),
-  'close-chapter': (p, pr) => pr.onCloseChapter?.(),
-  'close-volume':  (p, pr) => pr.onCloseVolume?.(),
+  'close-item':      (p, pr) => pr.onCloseItem?.(),
+  'close-chapter':   (p, pr) => pr.onCloseChapter?.(),
+  'close-volume':    (p, pr) => pr.onCloseVolume?.(),
   'move-to-volume':  (p, pr) => pr.onScrollToVolume?.(parseInt(p, 10) - 1),
   'move-to-chapter': (p, pr) => { const [vi, ci] = p.split(',').map(s => parseInt(s.trim(), 10) - 1); pr.onScrollToChapter?.(vi, ci); },
   'move-to-item':    (p, pr) => { const [vi, ci, ii] = p.split(',').map(s => parseInt(s.trim(), 10) - 1); pr.onScrollToItem?.(vi, ci, ii); },
@@ -1145,47 +1357,30 @@ const ITEM_ACTIONS = {
 function executeJsAction(action, params) {
   try {
     const trimmed = action.trim();
-
-    // ── Arrow function ───────────────────────────────────────────────────────
     if (/^(\(.*?\)|[\w$]+)\s*=>/.test(trimmed)) {
-      // Wrap in parens so `new Function` returns it as an expression value
       const fn = new Function(`return (${trimmed})`)();
       if (typeof fn === 'function') fn();
       return;
     }
-
-    // ── Dot-path call ────────────────────────────────────────────────────────
     const parts = trimmed.split('.');
     let obj = window;
     for (let i = 0; i < parts.length - 1; i++) {
       obj = obj[parts[i]];
-      if (obj == null) {
-        console.warn(`[btn action] '${parts.slice(0, i + 1).join('.')}' is null/undefined`);
-        return;
-      }
+      if (obj == null) { console.warn(`[btn action] '${parts.slice(0, i + 1).join('.')}' is null/undefined`); return; }
     }
     const methodName = parts[parts.length - 1];
     const fn = parts.length === 1 ? window[methodName] : obj[methodName];
-
-    if (typeof fn !== 'function') {
-      console.warn(`[btn action] '${action}' is not a function`);
-      return;
-    }
-
-    // "a, b, c" → ['a','b','c'];  empty params → no args
+    if (typeof fn !== 'function') { console.warn(`[btn action] '${action}' is not a function`); return; }
     const args = params.trim() !== '' ? params.split(',').map(s => s.trim()) : [];
     fn.apply(obj, args);
-  } catch (e) {
-    console.warn('[btn action] error:', e);
-  }
+  } catch (e) { console.warn('[btn action] error:', e); }
 }
 
 // ─── Text Item Display ────────────────────────────────────────────────────────
-// ── CHANGE 4: accept onScrollToItem prop ────────────────────────────────────
 function TextItemDisplay({ url, refreshKey, localContent, onCloseItem, onCloseChapter, onCloseVolume, onScrollToVolume, onScrollToChapter, onScrollToItem }) {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error,   setError]   = useState(null);
   const token = localStorage.getItem('token');
 
   useEffect(() => {
@@ -1194,14 +1389,16 @@ function TextItemDisplay({ url, refreshKey, localContent, onCloseItem, onCloseCh
     setLoading(true); setError(null);
     (async () => {
       try {
-        const res = await fetch(`http://localhost:4040${url}?_=${refreshKey || Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } });
+        const fullUrl = url.startsWith('http') ? url : `${BASE}${url}`;
+        const res = await fetch(`${fullUrl}?_=${refreshKey || Date.now()}`, {
+          headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' }
+        });
         if (res.ok) setContent(await res.text()); else setError('Could not load content');
       } catch (e) { setError('Error: ' + e.message); }
       setLoading(false);
     })();
   }, [url, refreshKey, localContent]);
 
-  // ── CHANGE 5: include onScrollToItem in the action props object ──────────
   const ap = { onCloseItem, onCloseChapter, onCloseVolume, onScrollToVolume, onScrollToChapter, onScrollToItem };
   const handleClick = e => {
     const btn = e.target.closest('[data-action]');
@@ -1210,12 +1407,12 @@ function TextItemDisplay({ url, refreshKey, localContent, onCloseItem, onCloseCh
     const action = btn.getAttribute('data-action');
     const params = btn.getAttribute('data-params') || '';
     const h = ITEM_ACTIONS[action];
-    if (h) h(params, ap);
-    else executeJsAction(action, params);
+    if (h) h(params, ap); else executeJsAction(action, params);
   };
 
   if (loading) return <div className="text-item"><p><em>Loading...</em></p></div>;
-  if (error) return <div className="text-item"><p style={{ color: 'red' }}>{error}</p></div>;
+  if (error)   return <div className="text-item"><p style={{ color: 'red' }}>{error}</p></div>;
+  if (!content) return <div className="text-item"><p className="text-muted fst-italic">No content yet.</p></div>;
   return <div className="text-item" onClick={handleClick}><div dangerouslySetInnerHTML={{ __html: parseTextSyntax(content) }} /></div>;
 }
 
@@ -1223,58 +1420,68 @@ function TextItemDisplay({ url, refreshKey, localContent, onCloseItem, onCloseCh
 const SYNTAX_GROUPS = [
   {
     label: 'Text & Structure', icon: 'bi-text-left', rows: [
-      { format: 'Line break', syntax: '\\n' }, { format: 'Indentation', syntax: '\\t' },
-      { format: 'Heading 1', syntax: '# Text' }, { format: 'Heading 2', syntax: '## Text' }, { format: 'Heading 3', syntax: '### Text' },
-      { format: 'Paragraph', syntax: '`{text}`' }, { format: 'Numbered list', syntax: '1. Item' }, { format: 'Bullet list', syntax: '- Item  or  • Item' },
-      { format: 'Code Snippet', syntax: '~(language)[code]~', note: 'JS, TS, Python, Java, C, C++, C#, Go, Rust, SQL, Bash, PHP, Swift, CSS, HTML…' },
+      { format: 'Line break',    syntax: '\\n' },
+      { format: 'Indentation',   syntax: '\\t' },
+      { format: 'Heading 1',     syntax: '# Text' },
+      { format: 'Heading 2',     syntax: '## Text' },
+      { format: 'Heading 3',     syntax: '### Text' },
+      { format: 'Paragraph',     syntax: '`{text}`' },
+      { format: 'Numbered list', syntax: '1. Item' },
+      { format: 'Bullet list',   syntax: '- Item  or  • Item' },
+      { format: 'Code Snippet',  syntax: '~(language)[code]~', note: 'JS, TS, Python, Java, C, C++, C#, Go, Rust, SQL, Bash, PHP, Swift, CSS, HTML…' },
     ]
   },
   {
     label: 'Media', icon: 'bi-play-circle', rows: [
-      { format: 'Image', syntax: '#https://url#', note: 'Inline image' }, { format: 'Video', syntax: '{https://url.mp4}', note: 'HTML5 player' }, { format: 'YouTube', syntax: '(https://youtube.com/watch?v=ID)', note: 'Also youtu.be/ and /shorts/' },
+      { format: 'Image',   syntax: '#https://url#',        note: 'Inline image' },
+      { format: 'Video',   syntax: '{https://url.mp4}',    note: 'HTML5 player' },
+      { format: 'YouTube', syntax: '(https://youtube.com/watch?v=ID)', note: 'Also youtu.be/ and /shorts/' },
     ]
   },
   {
     label: 'Links & Downloads', icon: 'bi-link-45deg', rows: [
-      { format: 'Link', syntax: '@https://url@', note: 'New tab' }, { format: 'Download', syntax: '![Label|https://url]!', note: 'Download button' },
+      { format: 'Link',     syntax: '@https://url@',          note: 'New tab' },
+      { format: 'Download', syntax: '![Label|https://url]!',  note: 'Download button' },
     ]
   },
   {
     label: 'Buttons', icon: 'bi-ui-radios', rows: [
-      { format: 'Arrow function', syntax: '[btn:Label|() => expr]', note: 'full JS, no args passed in' },
-      { format: 'Arrow (multi-stmt)', syntax: '[btn:Label|() => { stmt1; stmt2; }]', note: 'wrap body in { }' },
-      { format: 'Dot-path call', syntax: '[btn:Label|fn.path:arg1,arg2]', note: 'e.g. alert:Hi  or  console.log:a,b' },
-      { format: 'Dot-path (no args)', syntax: '[btn:Label|functionName]', note: 'e.g. myGlobalFn' },
-      { format: 'Close item', syntax: '[btn:Collapse|close-item]' }, { format: 'Close chapter', syntax: '[btn:Close|close-chapter]' },
-      { format: 'Close volume', syntax: '[btn:Close|close-volume]' }, { format: 'Go to volume', syntax: '[btn:Go|move-to-volume:1]', note: '1-based' },
-      { format: 'Go to chapter', syntax: '[btn:Go|move-to-chapter:1,2]', note: 'vol,ch (1-based)' },
-      { format: 'Go to item', syntax: '[btn:Go|move-to-item:1,2,3]', note: 'vol,ch,item (1-based)' },
+      { format: 'Arrow function',    syntax: '[btn:Label|() => expr]',                note: 'full JS, no args passed in' },
+      { format: 'Arrow (multi-stmt)',syntax: '[btn:Label|() => { stmt1; stmt2; }]',   note: 'wrap body in { }' },
+      { format: 'Dot-path call',     syntax: '[btn:Label|fn.path:arg1,arg2]',         note: 'e.g. alert:Hi  or  console.log:a,b' },
+      { format: 'Dot-path (no args)',syntax: '[btn:Label|functionName]',              note: 'e.g. myGlobalFn' },
+      { format: 'Close item',        syntax: '[btn:Collapse|close-item]' },
+      { format: 'Close chapter',     syntax: '[btn:Close|close-chapter]' },
+      { format: 'Close volume',      syntax: '[btn:Close|close-volume]' },
+      { format: 'Go to volume',      syntax: '[btn:Go|move-to-volume:1]',             note: '1-based' },
+      { format: 'Go to chapter',     syntax: '[btn:Go|move-to-chapter:1,2]',          note: 'vol,ch (1-based)' },
+      { format: 'Go to item',        syntax: '[btn:Go|move-to-item:1,2,3]',           note: 'vol,ch,item (1-based)' },
     ]
   },
 ];
 
-// ─── Add Item Modal ────────────────────────────────────────────────────────────
+// ─── Add Item Modal ───────────────────────────────────────────────────────────
 function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedFiles = [] }) {
-  const [title, setTitle] = useState(initialData?.title || '');
-  const [content, setContent] = useState(initialData?.content || '');
-  const [url, setUrl] = useState(initialData?.url || '');
-  const [preview, setPreview] = useState(initialData?.url || '');
-  const [selFile, setSelFile] = useState('');
+  const [title,    setTitle]    = useState(initialData?.title   || '');
+  const [content,  setContent]  = useState(initialData?.content || '');
+  const [url,      setUrl]      = useState(initialData?.url     || '');
+  const [preview,  setPreview]  = useState(initialData?.url     || '');
+  const [selFile,  setSelFile]  = useState('');
   const [showHelp, setShowHelp] = useState(false);
-  const [helpGroup, setHelpGroup] = useState(0);
+  const [helpGroup,setHelpGroup]= useState(0);
   const [loadingTxt, setLoadingTxt] = useState(false);
-  const [txtErr, setTxtErr] = useState(null);
+  const [txtErr,     setTxtErr]     = useState(null);
   const token = localStorage.getItem('token');
 
   const ff = () => {
     if (type === 'text' || !uploadedFiles?.length) return [];
     return uploadedFiles.filter(f => {
       const n = (f.originalName || f.filename || '').toLowerCase();
-      if (type === 'image') return /\.(jpg|jpeg|png|gif|webp)$/i.test(n);
-      if (type === 'video') return /\.(mp4|webm|ogg|mov|avi)$/i.test(n);
-      if (type === 'audio') return /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(n);
+      if (type === 'image')    return /\.(jpg|jpeg|png|gif|webp)$/i.test(n);
+      if (type === 'video')    return /\.(mp4|webm|ogg|mov|avi)$/i.test(n);
+      if (type === 'audio')    return /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(n);
       if (type === 'document') return /\.(pdf|doc|docx)$/i.test(n);
-      if (type === 'archive') return /\.(zip|rar|7z)$/i.test(n);
+      if (type === 'archive')  return /\.(zip|rar|7z)$/i.test(n);
       return false;
     });
   };
@@ -1282,8 +1489,12 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedF
   useEffect(() => {
     if (isEditing && type === 'text' && initialData?.url && !content) {
       setLoadingTxt(true); setTxtErr(null);
-      fetch(`http://localhost:4040${initialData.url}?_=${Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } })
-        .then(r => r.ok ? r.text() : Promise.reject()).then(t => setContent(t)).catch(() => setTxtErr('Could not load')).finally(() => setLoadingTxt(false));
+      const fullUrl = initialData.url.startsWith('http') ? initialData.url : `${BASE}${initialData.url}`;
+      fetch(`${fullUrl}?_=${Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } })
+        .then(r => r.ok ? r.text() : Promise.reject())
+        .then(t => setContent(t))
+        .catch(() => setTxtErr('Could not load'))
+        .finally(() => setLoadingTxt(false));
     }
   }, []);
 
@@ -1293,7 +1504,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedF
   };
   const handleExisting = e => {
     const v = e.target.value; setSelFile(v);
-    if (v) { const f = uploadedFiles.find(f => f.url === v || f.path === v); if (f) { const fu = (f.url || f.path || '').startsWith('http') ? (f.url || f.path) : `http://localhost:4040${f.url || f.path}`; setUrl(fu); setPreview(fu); } }
+    if (v) { const f = uploadedFiles.find(f => f.url === v || f.path === v); if (f) { const furl = fu(f.url || f.path); setUrl(furl); setPreview(furl); } }
     else { setUrl(''); setPreview(''); }
   };
   const handleSave = () => {
@@ -1317,7 +1528,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedF
           {type === 'text' ? (
             <>
               {loadingTxt && <div className="alert alert-info mb-3"><span className="spinner-border spinner-border-sm me-2"></span>Loading…</div>}
-              {txtErr && <div className="alert alert-danger mb-3">{txtErr}</div>}
+              {txtErr     && <div className="alert alert-danger mb-3">{txtErr}</div>}
               <div className="mb-2"><button className="btn btn-sm btn-link px-0" onClick={() => setShowHelp(!showHelp)}><i className={`bi bi-${showHelp ? 'chevron-up' : 'question-circle'} me-1`}></i>{showHelp ? 'Hide syntax help' : 'Syntax help'}</button></div>
               {showHelp && (
                 <div className="syntax-help-panel mb-3">
@@ -1341,9 +1552,9 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedF
               <div className="text-center my-2"><small className="text-muted">— OR —</small></div>
               <div className="mb-3"><label className="form-label">Enter URL</label><input type="url" className="form-control" value={url} onChange={e => { setUrl(e.target.value); setPreview(e.target.value); setSelFile(''); }} placeholder="https://example.com/file" /></div>
               {preview && <div className="mb-3"><label className="form-label">Preview</label>
-                {type === 'image' && <img src={preview} alt="" className="img-preview" />}
-                {type === 'video' && <video src={preview} controls className="video-preview" />}
-                {type === 'audio' && <audio src={preview} controls className="audio-preview" />}
+                {type === 'image'    && <img src={preview} alt="" className="img-preview" />}
+                {type === 'video'    && <video src={preview} controls className="video-preview" />}
+                {type === 'audio'    && <audio src={preview} controls className="audio-preview" />}
                 {(type === 'document' || type === 'archive') && <div className="alert alert-info"><i className={`bi ${tIcon} me-2`}></i>{preview.split('/').pop()}</div>}
               </div>}
             </>
@@ -1361,37 +1572,41 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedF
 // ─── Form Editor Modal ────────────────────────────────────────────────────────
 function FormEditorModal({ isEditing, initialItem, uploadedFiles = [], onSave, onClose }) {
   const token = localStorage.getItem('token');
-  const genId = () => `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const genId  = () => `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const emptyQ = (type = 'single') => {
     const b = { id: genId(), type, question: '', media: null };
-    if (type === 'single') return { ...b, options: ['', ''], correctIndex: 0 };
-    if (type === 'multiple') return { ...b, options: ['', ''], correctIndices: [] };
+    if (type === 'single')      return { ...b, options: ['', ''], correctIndex: 0 };
+    if (type === 'multiple')    return { ...b, options: ['', ''], correctIndices: [] };
     if (type === 'correlation') return { ...b, pairs: [{ left: '', right: '' }, { left: '', right: '' }] };
-    if (type === 'closed') return { ...b, correctAnswer: '' };
+    if (type === 'closed')      return { ...b, correctAnswer: '' };
     return b;
   };
-  const [title, setTitle] = useState(initialItem?.title || '');
+  const [title,     setTitle]     = useState(initialItem?.title || '');
   const [questions, setQuestions] = useState([]);
-  const [loading, setLoading] = useState(isEditing && !!initialItem?.url);
+  const [loading,   setLoading]   = useState(isEditing && !!initialItem?.url);
 
   useEffect(() => {
     if (isEditing && initialItem?.url) {
       setLoading(true);
-      fetch(`http://localhost:4040${initialItem.url}?_=${Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } })
-        .then(r => r.ok ? r.json() : null).then(d => setQuestions(d?.questions?.length ? d.questions : [emptyQ()])).catch(() => setQuestions([emptyQ()])).finally(() => setLoading(false));
+      const fullUrl = initialItem.url.startsWith('http') ? initialItem.url : `${BASE}${initialItem.url}`;
+      fetch(`${fullUrl}?_=${Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => setQuestions(d?.questions?.length ? d.questions : [emptyQ()]))
+        .catch(() => setQuestions([emptyQ()]))
+        .finally(() => setLoading(false));
     } else { setQuestions([emptyQ()]); }
   }, []);
 
-  const setQ = (i, fn) => setQuestions(p => { const a = [...p]; a[i] = fn(a[i]); return a; });
-  const changeType = (i, t) => setQ(i, q => ({ ...emptyQ(t), id: q.id, question: q.question, media: q.media }));
-  const setOpt = (qi, oi, v) => setQ(qi, q => { const o = [...q.options]; o[oi] = v; return { ...q, options: o }; });
-  const addOpt = (qi) => setQ(qi, q => ({ ...q, options: [...q.options, ''] }));
-  const removeOpt = (qi, oi) => setQ(qi, q => { const o = q.options.filter((_, i) => i !== oi); return { ...q, options: o, correctIndex: q.correctIndex >= o.length ? Math.max(0, o.length - 1) : q.correctIndex, correctIndices: (q.correctIndices || []).filter(i => i !== oi).map(i => i > oi ? i - 1 : i) }; });
-  const setPair = (qi, pi, s, v) => setQ(qi, q => ({ ...q, pairs: q.pairs.map((p, i) => i === pi ? { ...p, [s]: v } : p) }));
-  const addPair = (qi) => setQ(qi, q => ({ ...q, pairs: [...q.pairs, { left: '', right: '' }] }));
-  const removePair = (qi, pi) => setQ(qi, q => ({ ...q, pairs: q.pairs.filter((_, i) => i !== pi) }));
+  const setQ        = (i, fn) => setQuestions(p => { const a = [...p]; a[i] = fn(a[i]); return a; });
+  const changeType  = (i, t)  => setQ(i, q => ({ ...emptyQ(t), id: q.id, question: q.question, media: q.media }));
+  const setOpt      = (qi, oi, v) => setQ(qi, q => { const o = [...q.options]; o[oi] = v; return { ...q, options: o }; });
+  const addOpt      = (qi)    => setQ(qi, q => ({ ...q, options: [...q.options, ''] }));
+  const removeOpt   = (qi, oi)=> setQ(qi, q => { const o = q.options.filter((_, i) => i !== oi); return { ...q, options: o, correctIndex: q.correctIndex >= o.length ? Math.max(0, o.length - 1) : q.correctIndex, correctIndices: (q.correctIndices || []).filter(i => i !== oi).map(i => i > oi ? i - 1 : i) }; });
+  const setPair     = (qi, pi, s, v) => setQ(qi, q => ({ ...q, pairs: q.pairs.map((p, i) => i === pi ? { ...p, [s]: v } : p) }));
+  const addPair     = (qi)    => setQ(qi, q => ({ ...q, pairs: [...q.pairs, { left: '', right: '' }] }));
+  const removePair  = (qi, pi)=> setQ(qi, q => ({ ...q, pairs: q.pairs.filter((_, i) => i !== pi) }));
   const getFF = (mt) => (uploadedFiles || []).filter(f => { const n = (f.originalName || f.filename || '').toLowerCase(); return mt === 'image' ? /\.(jpg|jpeg|png|gif|webp)$/i.test(n) : mt === 'video' ? /\.(mp4|webm|ogg|mov)$/i.test(n) : /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(n); });
-  const handleSave = () => { if (!title.trim()) { alert('Enter form title'); return; } if (questions.find(q => !q.question.trim())) { alert('All questions need text'); return; } onSave({ type: 'form', title, formData: { questions } }); };
+  const handleSave  = () => { if (!title.trim()) { alert('Enter form title'); return; } if (questions.find(q => !q.question.trim())) { alert('All questions need text'); return; } onSave({ type: 'form', title, formData: { questions } }); };
   const QL = { single: 'Single Answer (Radio)', multiple: 'Multiple Answers (Checkboxes)', correlation: 'Correlation (Match)', closed: 'Closed Answer (Text)', open: 'Open Answer (Teacher reviews)' };
 
   return (
@@ -1411,11 +1626,11 @@ function FormEditorModal({ isEditing, initialItem, uploadedFiles = [], onSave, o
                   </div>
                   <textarea className="form-control form-question-text" rows={2} placeholder="Question text…" value={q.question} onChange={e => setQ(qi, q2 => ({ ...q2, question: e.target.value }))} />
                   <FormMediaPicker media={q.media} uploadedFiles={uploadedFiles} getFilteredFiles={getFF} onSet={m => setQ(qi, q2 => ({ ...q2, media: m }))} onClear={() => setQ(qi, q2 => ({ ...q2, media: null }))} />
-                  {q.type === 'single' && <div className="form-options-list mt-2"><p className="form-options-hint">Mark correct:</p>{q.options.map((opt, oi) => <div key={oi} className="form-option-row"><input type="radio" className="form-check-input" name={`c-${q.id}`} checked={q.correctIndex === oi} onChange={() => setQ(qi, q2 => ({ ...q2, correctIndex: oi }))} /><input type="text" className="form-control form-control-sm" value={opt} onChange={e => setOpt(qi, oi, e.target.value)} placeholder={`Option ${oi + 1}`} /><button className="btn btn-sm btn-outline-secondary" onClick={() => removeOpt(qi, oi)} disabled={q.options.length <= 2}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-outline-primary mt-1" onClick={() => addOpt(qi)}><i className="bi bi-plus me-1"></i>Add Option</button></div>}
-                  {q.type === 'multiple' && <div className="form-options-list mt-2"><p className="form-options-hint">Check all correct:</p>{q.options.map((opt, oi) => <div key={oi} className="form-option-row"><input type="checkbox" className="form-check-input" checked={(q.correctIndices || []).includes(oi)} onChange={e => setQ(qi, q2 => { const c = e.target.checked ? [...(q2.correctIndices || []), oi] : (q2.correctIndices || []).filter(i => i !== oi); return { ...q2, correctIndices: c }; })} /><input type="text" className="form-control form-control-sm" value={opt} onChange={e => setOpt(qi, oi, e.target.value)} placeholder={`Option ${oi + 1}`} /><button className="btn btn-sm btn-outline-secondary" onClick={() => removeOpt(qi, oi)} disabled={q.options.length <= 2}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-outline-primary mt-1" onClick={() => addOpt(qi)}><i className="bi bi-plus me-1"></i>Add Option</button></div>}
+                  {q.type === 'single'      && <div className="form-options-list mt-2"><p className="form-options-hint">Mark correct:</p>{q.options.map((opt, oi) => <div key={oi} className="form-option-row"><input type="radio" className="form-check-input" name={`c-${q.id}`} checked={q.correctIndex === oi} onChange={() => setQ(qi, q2 => ({ ...q2, correctIndex: oi }))} /><input type="text" className="form-control form-control-sm" value={opt} onChange={e => setOpt(qi, oi, e.target.value)} placeholder={`Option ${oi + 1}`} /><button className="btn btn-sm btn-outline-secondary" onClick={() => removeOpt(qi, oi)} disabled={q.options.length <= 2}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-outline-primary mt-1" onClick={() => addOpt(qi)}><i className="bi bi-plus me-1"></i>Add Option</button></div>}
+                  {q.type === 'multiple'    && <div className="form-options-list mt-2"><p className="form-options-hint">Check all correct:</p>{q.options.map((opt, oi) => <div key={oi} className="form-option-row"><input type="checkbox" className="form-check-input" checked={(q.correctIndices || []).includes(oi)} onChange={e => setQ(qi, q2 => { const c = e.target.checked ? [...(q2.correctIndices || []), oi] : (q2.correctIndices || []).filter(i => i !== oi); return { ...q2, correctIndices: c }; })} /><input type="text" className="form-control form-control-sm" value={opt} onChange={e => setOpt(qi, oi, e.target.value)} placeholder={`Option ${oi + 1}`} /><button className="btn btn-sm btn-outline-secondary" onClick={() => removeOpt(qi, oi)} disabled={q.options.length <= 2}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-outline-primary mt-1" onClick={() => addOpt(qi)}><i className="bi bi-plus me-1"></i>Add Option</button></div>}
                   {q.type === 'correlation' && <div className="form-corr-list mt-2"><p className="form-options-hint">Left → Right (shuffled for student):</p>{q.pairs.map((pair, pi) => <div key={pi} className="form-corr-row"><span className="form-corr-num">{pi + 1}.</span><input type="text" className="form-control form-control-sm" value={pair.left} onChange={e => setPair(qi, pi, 'left', e.target.value)} placeholder={`Left ${pi + 1}`} /><i className="bi bi-arrow-right text-muted"></i><input type="text" className="form-control form-control-sm" value={pair.right} onChange={e => setPair(qi, pi, 'right', e.target.value)} placeholder={`Match (${String.fromCharCode(65 + pi)})`} /><button className="btn btn-sm btn-outline-secondary" onClick={() => removePair(qi, pi)} disabled={q.pairs.length <= 2}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-outline-primary mt-1" onClick={() => addPair(qi)}><i className="bi bi-plus me-1"></i>Add Pair</button></div>}
-                  {q.type === 'closed' && <div className="mt-2"><label className="form-label form-options-hint">Expected answer:</label><input type="text" className="form-control form-control-sm" value={q.correctAnswer || ''} onChange={e => setQ(qi, q2 => ({ ...q2, correctAnswer: e.target.value }))} placeholder="Correct answer…" /></div>}
-                  {q.type === 'open' && <div className="form-open-hint mt-2"><small className="text-muted"><i className="bi bi-pencil-square me-1"></i>Student writes freely — teacher reviews manually.</small></div>}
+                  {q.type === 'closed'      && <div className="mt-2"><label className="form-label form-options-hint">Expected answer:</label><input type="text" className="form-control form-control-sm" value={q.correctAnswer || ''} onChange={e => setQ(qi, q2 => ({ ...q2, correctAnswer: e.target.value }))} placeholder="Correct answer…" /></div>}
+                  {q.type === 'open'        && <div className="form-open-hint mt-2"><small className="text-muted"><i className="bi bi-pencil-square me-1"></i>Student writes freely — teacher reviews manually.</small></div>}
                 </div>
               ))}
             </div>
@@ -1430,12 +1645,35 @@ function FormEditorModal({ isEditing, initialItem, uploadedFiles = [], onSave, o
 
 // ─── Form Media Picker ────────────────────────────────────────────────────────
 function FormMediaPicker({ media, uploadedFiles, getFilteredFiles, onSet, onClear }) {
-  const [open, setOpen] = useState(false); const [mt, setMt] = useState('image'); const [urlI, setUrlI] = useState(''); const [fc, setFc] = useState('');
+  const [open, setOpen] = useState(false);
+  const [mt,   setMt]   = useState('image');
+  const [urlI, setUrlI] = useState('');
+  const [fc,   setFc]   = useState('');
+
   if (!open && !media) return <button className="btn btn-sm btn-outline-secondary mt-2" onClick={() => setOpen(true)}><i className="bi bi-image me-1"></i>Attach Media</button>;
-  if (media) return <div className="form-media-preview mt-2">{media.type === 'image' && <img src={media.url} alt="" className="form-media-img" />}{media.type === 'video' && <video src={media.url} controls className="form-media-vid" />}{media.type === 'audio' && <audio src={media.url} controls className="form-media-aud" />}<button className="btn btn-sm btn-outline-danger ms-2" onClick={onClear}><i className="bi bi-x me-1"></i>Remove</button></div>;
+  if (media) return (
+    <div className="form-media-preview mt-2">
+      {media.type === 'image' && <img src={media.url} alt="" className="form-media-img" />}
+      {media.type === 'video' && <video src={media.url} controls className="form-media-vid" />}
+      {media.type === 'audio' && <audio src={media.url} controls className="form-media-aud" />}
+      <button className="btn btn-sm btn-outline-danger ms-2" onClick={onClear}><i className="bi bi-x me-1"></i>Remove</button>
+    </div>
+  );
+
   const ff = getFilteredFiles(mt);
-  const toEmbed = u => { const s = u.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/); if (s) return `https://www.youtube.com/embed/${s[1]}`; const w = u.match(/[?&]v=([a-zA-Z0-9_-]{11})/); if (w) return `https://www.youtube.com/embed/${w[1]}`; return u; };
-  const attach = () => { const u = fc ? ((uploadedFiles.find(f => f.url === fc || f.path === fc)?.url) || fc) : urlI.trim(); if (!u) { alert('Select or enter URL'); return; } const fu = mt === 'video' ? toEmbed(u) : u; onSet({ type: mt, url: fu.startsWith('http') ? fu : `http://localhost:4040${fu}` }); setOpen(false); setUrlI(''); setFc(''); };
+  const toEmbed = u => {
+    const s = u.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);   if (s) return `https://www.youtube.com/embed/${s[1]}`;
+    const w = u.match(/[?&]v=([a-zA-Z0-9_-]{11})/);         if (w) return `https://www.youtube.com/embed/${w[1]}`;
+    return u;
+  };
+  const attach = () => {
+    const u = fc ? ((uploadedFiles.find(f => f.url === fc || f.path === fc)?.url) || fc) : urlI.trim();
+    if (!u) { alert('Select or enter URL'); return; }
+    const resolved = mt === 'video' ? toEmbed(u) : u;
+    onSet({ type: mt, url: fu(resolved) });
+    setOpen(false); setUrlI(''); setFc('');
+  };
+
   return (
     <div className="form-media-picker mt-2">
       <div className="d-flex align-items-center gap-2 mb-2">
@@ -1453,26 +1691,75 @@ function FormMediaPicker({ media, uploadedFiles, getFilteredFiles, onSet, onClea
 
 // ─── Form Item Display ────────────────────────────────────────────────────────
 function FormItemDisplay({ url, refreshKey }) {
-  const [formDef, setFormDef] = useState(null); const [answers, setAnswers] = useState({}); const [submitted, setSubmitted] = useState(false); const [loading, setLoading] = useState(true); const [error, setError] = useState(null);
-  const token = localStorage.getItem('token'); const [shuffles] = useState({});
+  const [formDef,   setFormDef]   = useState(null);
+  const [answers,   setAnswers]   = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState(null);
+  const token = localStorage.getItem('token');
+  const [shuffles] = useState({});
   const getShuffled = (id, arr) => { if (!shuffles[id]) shuffles[id] = [...arr].sort(() => Math.random() - .5); return shuffles[id]; };
-  useEffect(() => { if (!url) { setLoading(false); return; } setLoading(true); setAnswers({}); setSubmitted(false); fetch(`http://localhost:4040${url}?_=${refreshKey || Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } }).then(r => r.ok ? r.json() : null).then(d => { if (d?.questions) setFormDef(d); else setError('Could not load form'); }).catch(() => setError('Error loading form')).finally(() => setLoading(false)); }, [url, refreshKey]);
-  const setAns = (id, v) => setAnswers(p => ({ ...p, [id]: v }));
+
+  useEffect(() => {
+    if (!url) { setLoading(false); return; }
+    setLoading(true); setAnswers({}); setSubmitted(false);
+    const fullUrl = url.startsWith('http') ? url : `${BASE}${url}`;
+    fetch(`${fullUrl}?_=${refreshKey || Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.questions) setFormDef(d); else setError('Could not load form'); })
+      .catch(() => setError('Error loading form'))
+      .finally(() => setLoading(false));
+  }, [url, refreshKey]);
+
+  const setAns     = (id, v)  => setAnswers(p => ({ ...p, [id]: v }));
   const toggleMult = (id, oi) => { const c = answers[id] || []; setAns(id, c.includes(oi) ? c.filter(i => i !== oi) : [...c, oi]); };
-  const isCorrect = q => { const a = answers[q.id]; if (q.type === 'single') return a === q.correctIndex; if (q.type === 'multiple') return [...(a || [])].sort().join(',') === [...(q.correctIndices || [])].sort().join(','); if (q.type === 'correlation') return q.pairs.every((p, i) => a && a[i] === p.right); if (q.type === 'closed') return (a || '').trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase(); return null; };
-  const handleSubmit = () => { const ua = (formDef?.questions || []).filter(q => { const a = answers[q.id]; if (q.type === 'multiple') return !a || !a.length; if (q.type === 'open' || q.type === 'closed') return !a || !a.trim(); return a === undefined || a === null; }); if (ua.length && !window.confirm(`${ua.length} unanswered. Submit anyway?`)) return; setSubmitted(true); };
-  const scoreable = (formDef?.questions || []).filter(q => ['single', 'multiple', 'correlation', 'closed'].includes(q.type));
-  const correct = scoreable.filter(q => isCorrect(q) === true).length;
+  const isCorrect  = q => {
+    const a = answers[q.id];
+    if (q.type === 'single')      return a === q.correctIndex;
+    if (q.type === 'multiple')    return [...(a || [])].sort().join(',') === [...(q.correctIndices || [])].sort().join(',');
+    if (q.type === 'correlation') return q.pairs.every((p, i) => a && a[i] === p.right);
+    if (q.type === 'closed')      return (a || '').trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase();
+    return null;
+  };
+  const handleSubmit = () => {
+    const ua = (formDef?.questions || []).filter(q => {
+      const a = answers[q.id];
+      if (q.type === 'multiple') return !a || !a.length;
+      if (q.type === 'open' || q.type === 'closed') return !a || !a.trim();
+      return a === undefined || a === null;
+    });
+    if (ua.length && !window.confirm(`${ua.length} unanswered. Submit anyway?`)) return;
+    setSubmitted(true);
+  };
+
+  const scoreable = (formDef?.questions || []).filter(q => ['single','multiple','correlation','closed'].includes(q.type));
+  const correct   = scoreable.filter(q => isCorrect(q) === true).length;
+
   if (loading) return <div className="form-item-display"><p><em>Loading form…</em></p></div>;
-  if (error) return <div className="form-item-display"><p style={{ color: 'red' }}>{error}</p></div>;
+  if (error)   return <div className="form-item-display"><p style={{ color: 'red' }}>{error}</p></div>;
   if (!formDef) return null;
+
   return (
     <div className="form-item-display">
       {submitted ? (
         <div className="form-results">
           <div className="form-results-header"><i className="bi bi-check-circle-fill text-success me-2"></i><strong>Submitted</strong></div>
           {scoreable.length > 0 && <div className={`form-score ${correct === scoreable.length ? 'form-score--perfect' : correct >= scoreable.length * .6 ? 'form-score--good' : 'form-score--low'}`}>Score: {correct}/{scoreable.length}</div>}
-          <div className="form-review">{formDef.questions.map((q, i) => { const ok = isCorrect(q); const a = answers[q.id]; return (<div key={q.id} className="form-review-item">{q.media && <FormMediaDisplay media={q.media} />}<div className="form-review-q"><strong>Q{i + 1}:</strong> {q.question}</div>{q.type === 'single' && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>{q.options[a] ?? <em>none</em>}{!ok && <span className="ms-2 text-success">✓ {q.options[q.correctIndex]}</span>}</div>}{q.type === 'multiple' && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>{(a || []).map(i => q.options[i]).join(', ') || <em>none</em>}{!ok && <span className="ms-2 text-success">✓ {(q.correctIndices || []).map(i => q.options[i]).join(', ')}</span>}</div>}{q.type === 'correlation' && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>{q.pairs.map((p, pi) => { const g = a ? a[pi] : undefined; return <span key={pi} className={`form-corr-result ${g === p.right ? 'text-success' : 'text-danger'}`}>{p.left}→{g ?? '?'} {g === p.right ? '✓' : `(✓${p.right})`}</span>; })}</div>}{q.type === 'closed' && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>"{a || ''}" {!ok && <span className="ms-2 text-success">✓ "{q.correctAnswer}"</span>}</div>}{q.type === 'open' && <div className="form-review-a form-review-a--open"><i className="bi bi-pencil-square text-muted me-1"></i>{a?.trim() || <em>no answer</em>}<span className="badge bg-secondary ms-2">Teacher reviews</span></div>}</div>); })}
+          <div className="form-review">
+            {formDef.questions.map((q, i) => {
+              const ok = isCorrect(q); const a = answers[q.id];
+              return (
+                <div key={q.id} className="form-review-item">
+                  {q.media && <FormMediaDisplay media={q.media} />}
+                  <div className="form-review-q"><strong>Q{i + 1}:</strong> {q.question}</div>
+                  {q.type === 'single'      && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>{q.options[a] ?? <em>none</em>}{!ok && <span className="ms-2 text-success">✓ {q.options[q.correctIndex]}</span>}</div>}
+                  {q.type === 'multiple'    && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>{(a || []).map(i => q.options[i]).join(', ') || <em>none</em>}{!ok && <span className="ms-2 text-success">✓ {(q.correctIndices || []).map(i => q.options[i]).join(', ')}</span>}</div>}
+                  {q.type === 'correlation' && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>{q.pairs.map((p, pi) => { const g = a ? a[pi] : undefined; return <span key={pi} className={`form-corr-result ${g === p.right ? 'text-success' : 'text-danger'}`}>{p.left}→{g ?? '?'} {g === p.right ? '✓' : `(✓${p.right})`}</span>; })}</div>}
+                  {q.type === 'closed'      && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>"{a || ''}" {!ok && <span className="ms-2 text-success">✓ "{q.correctAnswer}"</span>}</div>}
+                  {q.type === 'open'        && <div className="form-review-a form-review-a--open"><i className="bi bi-pencil-square text-muted me-1"></i>{a?.trim() || <em>no answer</em>}<span className="badge bg-secondary ms-2">Teacher reviews</span></div>}
+                </div>
+              );
+            })}
           </div>
           <button className="btn btn-sm btn-outline-secondary mt-2" onClick={() => { setAnswers({}); setSubmitted(false); Object.keys(shuffles).forEach(k => delete shuffles[k]); }}><i className="bi bi-arrow-counterclockwise me-1"></i>Retry</button>
         </div>
@@ -1482,11 +1769,11 @@ function FormItemDisplay({ url, refreshKey }) {
             <div key={q.id} className="form-q-block">
               {q.media && <FormMediaDisplay media={q.media} />}
               <div className="form-q-label"><strong>Q{i + 1}.</strong> {q.question}</div>
-              {q.type === 'single' && <div className="form-q-options">{q.options.map((opt, oi) => <label key={oi} className={`form-q-option ${answers[q.id] === oi ? 'form-q-option--selected' : ''}`}><input type="radio" name={`a-${q.id}`} className="form-check-input me-2" checked={answers[q.id] === oi} onChange={() => setAns(q.id, oi)} />{opt || <em className="text-muted">(empty)</em>}</label>)}</div>}
+              {q.type === 'single'   && <div className="form-q-options">{q.options.map((opt, oi) => <label key={oi} className={`form-q-option ${answers[q.id] === oi ? 'form-q-option--selected' : ''}`}><input type="radio" name={`a-${q.id}`} className="form-check-input me-2" checked={answers[q.id] === oi} onChange={() => setAns(q.id, oi)} />{opt || <em className="text-muted">(empty)</em>}</label>)}</div>}
               {q.type === 'multiple' && <div className="form-q-options">{q.options.map((opt, oi) => <label key={oi} className={`form-q-option ${(answers[q.id] || []).includes(oi) ? 'form-q-option--selected' : ''}`}><input type="checkbox" className="form-check-input me-2" checked={(answers[q.id] || []).includes(oi)} onChange={() => toggleMult(q.id, oi)} />{opt || <em className="text-muted">(empty)</em>}</label>)}</div>}
               {q.type === 'correlation' && (() => { const ro = getShuffled(q.id, q.pairs.map(p => p.right)); const ca = answers[q.id] || {}; return <div className="form-corr-answer">{q.pairs.map((pair, pi) => <div key={pi} className="form-corr-answer-row"><span className="form-corr-left">{pair.left}</span><select className="form-select form-select-sm form-corr-select" value={ca[pi] || ''} onChange={e => setAns(q.id, { ...ca, [pi]: e.target.value })}><option value="">— Choose —</option>{ro.map((r, ri) => <option key={ri} value={r}>{r}</option>)}</select></div>)}</div>; })()}
-              {q.type === 'closed' && <input type="text" className="form-control form-q-closed" placeholder="Type your answer…" value={answers[q.id] || ''} onChange={e => setAns(q.id, e.target.value)} />}
-              {q.type === 'open' && <textarea className="form-control form-q-open" rows={3} placeholder="Write your answer…" value={answers[q.id] || ''} onChange={e => setAns(q.id, e.target.value)} />}
+              {q.type === 'closed'   && <input type="text" className="form-control form-q-closed" placeholder="Type your answer…" value={answers[q.id] || ''} onChange={e => setAns(q.id, e.target.value)} />}
+              {q.type === 'open'     && <textarea className="form-control form-q-open" rows={3} placeholder="Write your answer…" value={answers[q.id] || ''} onChange={e => setAns(q.id, e.target.value)} />}
             </div>
           ))}
           <button className="btn btn-primary mt-2" onClick={handleSubmit}><i className="bi bi-send me-1"></i>Submit</button>
@@ -1501,7 +1788,9 @@ function FormMediaDisplay({ media }) {
   return (
     <div className="form-q-media">
       {media.type === 'image' && <img src={media.url} alt="" className="form-q-media-img" />}
-      {media.type === 'video' && (media.url.includes('youtube.com/embed') || media.url.includes('youtu.be') ? <iframe src={media.url} title="video" frameBorder="0" allowFullScreen className="form-q-media-iframe" /> : <video src={media.url} controls className="form-q-media-vid" />)}
+      {media.type === 'video' && (media.url.includes('youtube.com/embed') || media.url.includes('youtu.be')
+        ? <iframe src={media.url} title="video" frameBorder="0" allowFullScreen className="form-q-media-iframe" />
+        : <video src={media.url} controls className="form-q-media-vid" />)}
       {media.type === 'audio' && <audio src={media.url} controls className="form-q-media-aud" />}
     </div>
   );

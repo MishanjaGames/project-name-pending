@@ -15,6 +15,7 @@ function EditUser({ data, onLogout }) {
         role: '',
         links: []
     });
+    const [isCurrent, setIsCurrent] = useState(false)
     const [errors, setErrors] = useState({});
 
     // Profile picture state
@@ -24,7 +25,7 @@ function EditUser({ data, onLogout }) {
     // Password reset state
     const [showPasswordSection, setShowPasswordSection] = useState(false);
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-    const [autoGeneratePassword, setAutoGeneratePassword] = useState(true);
+    const [autoGeneratePassword, setAutoGeneratePassword] = useState(false);
     const [newPassword, setNewPassword] = useState('');
     const [currentPasswordHash, setCurrentPasswordHash] = useState('');
     const [hasChanges, setHasChanges] = useState(false);
@@ -47,6 +48,7 @@ function EditUser({ data, onLogout }) {
                     if (response.ok) {
                         const res = await response.json();
                         const user = res.data || res;
+                        setIsCurrent(data._id === user._id)
                         setFormData({
                             nickname: user.nickname || '',
                             email: user.email || '',
@@ -359,6 +361,7 @@ function EditUser({ data, onLogout }) {
                                                 className="d-none"
                                                 accept="image/*"
                                                 onChange={handleProfilePictureChange}
+                                                disabled={!isCurrent}
                                             />
 
                                             {!profilePreview && !getProfilePictureUrl() ? (
@@ -418,6 +421,7 @@ function EditUser({ data, onLogout }) {
                                                                 alert('Error deleting profile picture. Please try again.');
                                                             }
                                                         }}
+                                                        disabled={!isCurrent}
                                                     >
                                                         <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
                                                             <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z" />
@@ -446,6 +450,7 @@ function EditUser({ data, onLogout }) {
                                             value={formData.nickname}
                                             onChange={handleChange}
                                             placeholder="Enter nickname"
+                                            disabled={!isCurrent}
                                         />
                                         {errors.nickname && (
                                             <div className="invalid-feedback">{errors.nickname}</div>
@@ -494,6 +499,7 @@ function EditUser({ data, onLogout }) {
                                             value={formData.email}
                                             onChange={handleChange}
                                             placeholder="Enter email address"
+                                            disabled={!isCurrent}
                                         />
                                         {errors.email && (
                                             <div className="invalid-feedback">{errors.email}</div>
@@ -501,7 +507,7 @@ function EditUser({ data, onLogout }) {
                                     </div>
 
                                     {/* Current Password Field */}
-                                    <div className="mb-3">
+                                    {/* <div className="mb-3">
                                         <label htmlFor="currentPassword" className="form-label fw-semibold">
                                             Current Password
                                         </label>
@@ -533,7 +539,7 @@ function EditUser({ data, onLogout }) {
                                             </button>
                                         </div>
                                         <small className="text-muted">Protected - use password reset below to change</small>
-                                    </div>
+                                    </div> */}
 
                                     {/* Password Reset Section */}
                                     <div className="mb-4">
@@ -543,6 +549,7 @@ function EditUser({ data, onLogout }) {
                                                     type="button"
                                                     className="btn btn-link text-decoration-none text-start w-100 p-0 fw-semibold"
                                                     onClick={() => setShowPasswordSection(!showPasswordSection)}
+                                                    disabled={!isCurrent}
                                                 >
                                                     <svg width="16" height="16" fill="currentColor" className="me-2" viewBox="0 0 16 16">
                                                         <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z" />
@@ -559,6 +566,7 @@ function EditUser({ data, onLogout }) {
                                                             id="autoGenerateNewPassword"
                                                             checked={autoGeneratePassword}
                                                             onChange={handleAutoGeneratePasswordChange}
+                                                            disabled={!isCurrent}
                                                         />
                                                         <label className="form-check-label fw-semibold" htmlFor="autoGenerateNewPassword">
                                                             Auto-generate new password
@@ -581,6 +589,7 @@ function EditUser({ data, onLogout }) {
                                                                     type="button"
                                                                     className="btn btn-outline-secondary"
                                                                     onClick={() => setNewPassword(generatePassword())}
+                                                                    disabled={!isCurrent}
                                                                 >
                                                                     <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                                                                         <path fillRule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z" />
@@ -599,6 +608,7 @@ function EditUser({ data, onLogout }) {
                                                                     setHasChanges(true);
                                                                 }}
                                                                 placeholder="Enter new password"
+                                                                disabled={!isCurrent}
                                                             />
                                                         )}
                                                         <small className="text-muted">{autoGeneratePassword ? 'Click refresh to generate a new password' : 'Minimum 6 characters'}</small>
@@ -615,6 +625,7 @@ function EditUser({ data, onLogout }) {
                                                                 }
                                                                 setHasChanges(true);
                                                             }}
+                                                            disabled={!isCurrent}
                                                         >
                                                             <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
                                                                 <path d="M5.338 1.59a61 61 0 0 0-2.837.856.48.48 0 0 0-.328.39c-.045.1.028.2.11.255l.212.212a.5.5 0 0 0 .334.157 61 61 0 0 0 2.928.16.5.5 0 0 0 .314-.154l.216-.216c.11-.11.252-.126.355-.079.1.046.172.146.172.276v1.803a.5.5 0 0 0 .828.372l2.35-1.758a.5.5 0 0 0 0-.792L9.172.428A.5.5 0 0 0 8.5.9v1.803c0 .13-.072.23-.172.276-.103.048-.244.031-.355-.079l-.216-.216a.5.5 0 0 0-.314-.154 61 61 0 0 0-2.928.16.5.5 0 0 0-.334.157l-.212.212c-.083.054-.156.046-.11-.255a61 61 0 0 0 2.837-.856.48.48 0 0 0 .328-.39c.045-.1-.028-.2-.11-.255l-.212-.212a.5.5 0 0 0-.334-.157 61 61 0 0 0-2.928-.16.5.5 0 0 0-.314.154l-.216.216c-.11.11-.252.126-.355.079-.1-.046-.172-.146-.172-.276V6.5a.5.5 0 0 0-.828-.372l-2.35 1.758a.5.5 0 0 0 0 .792l2.35 1.758a.5.5 0 0 0 .828-.372V9.3c0-.13.072-.23.172-.276.103-.048.244-.031.355.079l.216.216a.5.5 0 0 0 .314.154 61 61 0 0 0 2.928-.16.5.5 0 0 0 .334-.157l.212-.212c.083-.054.156-.046.11.255a61 61 0 0 0-2.837.856.48.48 0 0 0-.328.39c-.045.1.028.2.11.255l.212.212a.5.5 0 0 0 .334.157 61 61 0 0 0 2.928.16.5.5 0 0 0 .314-.154l.216-.216c.11-.11.252-.126.355-.079.1.046.172.146.172.276v1.803a.5.5 0 0 0 .828.372l2.35-1.758a.5.5 0 0 0 0-.792l-2.35-1.758a.5.5 0 0 0-.828.372v1.803c0 .13-.072.23-.172.276-.103.047-.244.03-.355-.08l-.216-.215a.5.5 0 0 0-.314-.154 61 61 0 0 0-2.928.16.5.5 0 0 0-.334-.157l-.212-.212c-.083-.054-.156-.046-.11.255a61 61 0 0 0 2.837.856.48.48 0 0 0 .328.39c.045.1-.028.2-.11.255l-.212.212a.5.5 0 0 0-.334.157 61 61 0 0 0-2.928-.16.5.5 0 0 0-.314.154l-.216.216c-.11.11-.252.126-.355.079-.1-.047-.172-.147-.172-.277V3.5a.5.5 0 0 0-.828-.372l-2.35 1.758a.5.5 0 0 0 0 .792l2.35 1.758a.5.5 0 0 0 .828-.372V3.3c0-.13.072-.23.172-.276.103-.048.244-.031.355.079l.216.216a.5.5 0 0 0 .314.154 61 61 0 0 0 2.928-.16.5.5 0 0 0 .334-.157l.212-.212c.083-.054.156-.046.11.255a61 61 0 0 0-2.837-.856.48.48 0 0 0-.328-.39zm-7.141 2.267a.5.5 0 0 1 .431.866c-.1.168-.19.339-.273.514a.5.5 0 1 1-.906-.329c.09-.188.186-.371.29-.55a.5.5 0 0 1 .458-.501z" />

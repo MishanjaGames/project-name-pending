@@ -31,6 +31,15 @@ const TYPE_COLOR = {
 };
 const typeColor = (t) => TYPE_COLOR[t] || '#6b7280';
 
+const extractYouTubeId = url => {
+  if (!url) return null;
+  const short  = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  const watch  = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  const shorts = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+  const embed  = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+  return (short || watch || shorts || embed)?.[1] || null;
+};
+
 // ─── parseTextSyntax ──────────────────────────────────────────────────────────
 // btn syntax is extracted BEFORE HTML-escaping so that arrow functions
 // containing => / ' / " are not mangled by the escaper.
@@ -88,11 +97,13 @@ function parseTextSyntax(text) {
   html = html.replace(/`\{([^}]+)\}`/g, '<p>$1</p>');
   html = html.replace(/\{(https?:\/\/[^}]+)\}/g, '<video src="$1" class="vc-video-player" controls></video>');
   html = html.replace(/\((https?:\/\/[^)]+)\)/g, (_, u) => {
-    const e = u
-      .replace(/youtu\.be\/([a-zA-Z0-9_-]{11})/, 'https://www.youtube.com/embed/$1')
-      .replace(/[?&]v=([a-zA-Z0-9_-]{11})/, 'https://www.youtube.com/embed/$1')
-      .replace(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/, 'https://www.youtube.com/embed/$1');
-    return `<iframe src="${e}" title="video" frameborder="0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe>`;
+    const short  = u.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    const watch  = u.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    const shorts = u.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+    const embed  = u.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+    const id = (short || watch || shorts || embed)?.[1];
+    const e = id ? `https://www.youtube.com/embed/${id}` : u;
+    return `<iframe src="${e}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
   });
   html = html.replace(/!\[([^\|]+)\|(https?:\/\/[^\]]+)\]!/g,
     '<a href="$2" download class="vc-dl-link"><i class="bi bi-download"></i> $1</a>');
@@ -198,12 +209,17 @@ function ViewCourse({ data, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
-  useEffect(() => { fetchData(); checkAccess(); }, [id]);
+  useEffect(() => { fetchData(); }, [id]);
 
-  const checkAccess = async () => {
+  const checkAccess = async (fetchedCourse) => {
     try {
+      // Creator always gets access
+      if (fetchedCourse?.userId && String(fetchedCourse.userId) === String(data._id)) {
+        setLocked(false); return;
+      }
+      // Check purchased courses
       const res = await fetch(`http://localhost:4040/api/users/${data._id}`, {
-        headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` },
+        headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` }
       });
       if (res.ok) {
         const { data: u } = await res.json();
@@ -221,19 +237,20 @@ function ViewCourse({ data, onLogout }) {
         const { data: d } = await res.json();
         if (d) {
           setCourse(d);
-          const vols = (d.volumes || []).map(v => ({
-            ...v,
-            type: v.type || 'container',
-            chapters: (v.chapters || []).map(c => ({ ...c, type: c.type || 'container' })),
-          }));
-          setVolumes(vols);
+          setVolumes(
+            (d.volumes || []).map(v => ({
+              ...v, type: v.type || 'container',
+              chapters: (v.chapters || []).map(c => ({ ...c, type: c.type || 'container' }))
+            }))
+          );
           // Auto-expand first volume & chapter
-          if (vols.length) {
-            setOpenVolumes({ [vols[0].vid]: true });
-            if (vols[0].chapters?.length) {
-              setOpenChapters({ [vols[0].chapters[0].cid]: true });
+          if (d.volumes.length) {
+            setOpenVolumes({ [d.volumes[0].vid]: true });
+            if (d.volumes[0].chapters?.length) {
+              setOpenChapters({ [d.volumes[0].chapters[0].cid]: true });
             }
           }
+          await checkAccess(d);
         }
       }
     } catch (e) { console.error(e); }
@@ -669,6 +686,20 @@ function TextViewer({ url, token, actionProps }) {
 // ─── Video Viewer ─────────────────────────────────────────────────────────────
 function VideoViewer({ url }) {
   if (!url) return <p className="vc-empty-note">No video URL set.</p>;
+  const ytId = extractYouTubeId(url);
+  if (ytId) return (
+    <div className="vc-video-wrap">
+      <iframe
+        src={`https://www.youtube.com/embed/${ytId}`}
+        title="YouTube video player"
+        frameBorder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        referrerPolicy="strict-origin-when-cross-origin"
+        allowFullScreen
+        className="vc-video-player"
+      />
+    </div>
+  );
   return (
     <div className="vc-video-wrap">
       <video src={url} controls className="vc-video-player" />

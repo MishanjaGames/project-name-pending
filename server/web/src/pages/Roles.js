@@ -380,12 +380,6 @@ function Roles({ data, onLogout }) {
 
                                     <table className="table table-sm table-borderless mb-0">
                                         <tbody>
-                                            {selectedRole._id && (
-                                                <tr>
-                                                    <td className="text-muted fw-semibold small text-uppercase py-2">ID</td>
-                                                    <td className="py-2"><code className="small">{selectedRole._id}</code></td>
-                                                </tr>
-                                            )}
                                             <tr>
                                                 <td className="text-muted fw-semibold small text-uppercase py-2" style={{ width: '35%' }}>Role Name</td>
                                                 <td className="py-2">{selectedRole.roleName || '—'}</td>

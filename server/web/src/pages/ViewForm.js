@@ -369,9 +369,6 @@ function ViewForm({ data, onLogout }) {
                                                 <a href={`mailto:${email}`} className="text-decoration-none text-muted">{email}</a>
                                             </div>
                                         )}
-                                        {submission.userId && (
-                                            <div className="text-muted small">User ID: <code>{submission.userId}</code></div>
-                                        )}
                                     </div>
                                 </div>
 
@@ -462,7 +459,6 @@ function ViewForm({ data, onLogout }) {
                             <div className="card-footer bg-white border-top p-3">
                                 <table className="table table-sm table-borderless mb-0 small">
                                     <tbody>
-                                        <tr><td className="text-muted fw-semibold pe-3">ID</td><td><code style={{ fontSize: "0.7rem" }}>{submission._id}</code></td></tr>
                                         <tr><td className="text-muted fw-semibold pe-3">Form Type</td><td>{config?.title ?? submission.formType}</td></tr>
                                         {email && (
                                             <tr>
