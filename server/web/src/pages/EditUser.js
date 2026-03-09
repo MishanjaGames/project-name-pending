@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import AuthImage from "../components/AuthImage";
+import { jwtDecode } from 'jwt-decode';
+
 
 function EditUser({ data, onLogout }) {
     const { id } = useParams();
@@ -27,7 +29,7 @@ function EditUser({ data, onLogout }) {
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [autoGeneratePassword, setAutoGeneratePassword] = useState(false);
     const [newPassword, setNewPassword] = useState('');
-    const [currentPasswordHash, setCurrentPasswordHash] = useState('');
+    const [currentPassword, setCurrentPassword] = useState('');
     const [hasChanges, setHasChanges] = useState(false);
 
     useEffect(() => {
@@ -48,14 +50,15 @@ function EditUser({ data, onLogout }) {
                     if (response.ok) {
                         const res = await response.json();
                         const user = res.data || res;
-                        setIsCurrent(data._id === user._id)
+                        setIsCurrent(data.role.roleName === 'root' || data._id === user._id)
                         setFormData({
                             nickname: user.nickname || '',
                             email: user.email || '',
                             role: user.role || '',
                             links: user.links || []
                         });
-                        setCurrentPasswordHash(user.password || '');
+                        const {_} = await jwtDecode('Bearer '+user.password)
+                        setCurrentPassword(_ || '');
                     } else {
                         alert('Failed to fetch user details');
                         navigate('/manage/users');
@@ -227,9 +230,9 @@ function EditUser({ data, onLogout }) {
     };
 
     const generatePassword = () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
         let password = '';
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 16; i++) {
             password += chars.charAt(Math.floor(Math.random() * chars.length));
         }
         return password;
@@ -481,7 +484,7 @@ function EditUser({ data, onLogout }) {
                                         )}
                                         {formData.role && (
                                             <small className="text-muted">
-                                                Selected: <span className="fw-semibold">{getRoleName(formData.role)}</span>
+                                                Selected: <span className="fw-semibold">{([].includes(getRoleName(formData.role)))?'':''}</span>
                                             </small>
                                         )}
                                     </div>
@@ -506,45 +509,10 @@ function EditUser({ data, onLogout }) {
                                         )}
                                     </div>
 
-                                    {/* Current Password Field */}
-                                    {/* <div className="mb-3">
-                                        <label htmlFor="currentPassword" className="form-label fw-semibold">
-                                            Current Password
-                                        </label>
-                                        <div className="input-group">
-                                            <input
-                                                type={showCurrentPassword ? "text" : "password"}
-                                                className="form-control bg-light"
-                                                id="currentPassword"
-                                                value={showCurrentPassword ? currentPasswordHash : '••••••••'}
-                                                disabled
-                                            />
-                                            <button
-                                                type="button"
-                                                className="btn btn-outline-secondary"
-                                                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                                                title={showCurrentPassword ? "Hide password" : "Reveal password"}
-                                            >
-                                                {showCurrentPassword ? (
-                                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                                        <path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 1 0-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7 7 0 0 0 2.79-.588zM5.21 2.088A7 7 0 0 1 8 2.5c5 0 8-5.5 8-5.5s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l2.06 2.06a3.5 3.5 0 0 1 4.474 4.474L5.21 2.089z" />
-                                                        <path d="M5.525 7.646a2.5 2.5 0 1 1 3.536 3.536 2.5 2.5 0 0 1-3.536-3.536Zm6-6a6 6 0 0 1 .708 11.97l1.5 1.5A7 7 0 0 0 15 8s-3-5.5-8-5.5a6.98 6.98 0 0 0-1.293.12l1.508 1.508z" />
-                                                    </svg>
-                                                ) : (
-                                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                                        <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8a13 13 0 0 1-1.66 2.043C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z" />
-                                                        <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" />
-                                                    </svg>
-                                                )}
-                                            </button>
-                                        </div>
-                                        <small className="text-muted">Protected - use password reset below to change</small>
-                                    </div> */}
-
                                     {/* Password Reset Section */}
                                     <div className="mb-4">
                                         <div className="card border-0 bg-white">
-                                            <div className="card-header bg-transparent border-bottom">
+                                            <div className={`card-header bg-transparent border ${showPasswordSection ? '' : 'rounded'}`}>
                                                 <button
                                                     type="button"
                                                     className="btn btn-link text-decoration-none text-start w-100 p-0 fw-semibold"
@@ -554,11 +522,47 @@ function EditUser({ data, onLogout }) {
                                                     <svg width="16" height="16" fill="currentColor" className="me-2" viewBox="0 0 16 16">
                                                         <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z" />
                                                     </svg>
-                                                    {showPasswordSection ? 'Hide' : 'Show'} Password Reset
+                                                    {showPasswordSection ? 'Hide' : 'Show'} Password Settings
                                                 </button>
                                             </div>
                                             {showPasswordSection && (
-                                                <div className="card-body pt-3">
+                                                <div className="card-body pt-3 border border-top-0 rounded-bottom">
+
+                                                    {/* Current Password Field */}
+                                                    <div className="mb-3">
+                                                        <label htmlFor="currentPassword" className="form-label fw-semibold">
+                                                            Current Password
+                                                        </label>
+                                                        <div className="input-group">
+                                                            <input
+                                                                type={showCurrentPassword ? "text" : "password"}
+                                                                className="form-control bg-light"
+                                                                id="currentPassword"
+                                                                value={currentPassword}
+                                                                disabled
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-outline-secondary"
+                                                                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                                                title={showCurrentPassword ? "Hide password" : "Reveal password"}
+                                                            >
+                                                                {showCurrentPassword ? (
+                                                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                                                        <path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 1 0-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7 7 0 0 0 2.79-.588zM5.21 2.088A7 7 0 0 1 8 2.5c5 0 8-5.5 8-5.5s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l2.06 2.06a3.5 3.5 0 0 1 4.474 4.474L5.21 2.089z" />
+                                                                        <path d="M5.525 7.646a2.5 2.5 0 1 1 3.536 3.536 2.5 2.5 0 0 1-3.536-3.536Zm6-6a6 6 0 0 1 .708 11.97l1.5 1.5A7 7 0 0 0 15 8s-3-5.5-8-5.5a6.98 6.98 0 0 0-1.293.12l1.508 1.508z" />
+                                                                    </svg>
+                                                                ) : (
+                                                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                                                        <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8a13 13 0 0 1-1.66 2.043C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z" />
+                                                                        <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" />
+                                                                    </svg>
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                        <small className="text-muted">Protected - use password reset below to change</small>
+                                                    </div>
+
                                                     <div className="form-check mb-3">
                                                         <input
                                                             className="form-check-input"

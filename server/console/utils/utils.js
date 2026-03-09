@@ -7,12 +7,19 @@ const config = require('../config/config')
 
 const errorHandler = require('./errorHandler')
 
-module.exports.createToken = (payload, secret, expiresIn) => {
-    return jwt.sign({
-        userId: payload._id,
-        email: payload.email,
-        role: payload.role
-    }, secret, expiresIn || { expiresIn: 60 * 60 * 4 }) // 60 * 60 * 4
+module.exports.createToken = (payload, secret, expiresIn, useTemplate = true) => {
+    if (useTemplate) {
+        return jwt.sign({
+            userId: payload._id,
+            email: payload.email,
+            role: payload.role
+        }, secret, expiresIn || { expiresIn: 60 * 60 * 4 }) // 60 * 60 * 4
+    }
+    else {
+        return jwt.sign({
+            _: payload
+        }, secret, expiresIn || { expiresIn: 60 * 60 * 4 }) // 60 * 60 * 4
+    }
 }
 
 module.exports.parseToken = async (token) => {
@@ -39,10 +46,10 @@ module.exports.extendToken = async (req) => {
             const decoded = jwt.verify(token, config.JWT_SECRET,
                 { ignoreExpiration: true });
             userId = decoded.userId;
-        } 
+        }
         else if (req.body?.data?._id) {
             userId = req.body.data._id;
-        } 
+        }
         else {
             return 'No token or userId provided';
         }

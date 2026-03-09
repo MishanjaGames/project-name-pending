@@ -85,6 +85,29 @@ const userSchema = new Schema({
             required: false
         }
     }],
+    lib: [{
+        type: {
+            type: String,
+            required: false,
+            enum: ['promo', 'productKey']
+        },
+        id: {
+            type: Schema.Types.ObjectId,
+            required: false
+        },
+        title: {
+            type: String,
+            required: true
+        },
+        amount: {
+            type: Number,
+            requred: false
+        },
+        value: [{
+            type: String,
+            required: true
+        }]
+    }],
     createdAt: {
         type: Date,
         default: Date.now()

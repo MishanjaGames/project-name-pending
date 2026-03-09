@@ -4,6 +4,7 @@ const Role = require('../models/mongo.roles')
 const errorHandler = require('../utils/errorHandler')
 const config = require('../config/config')
 const utils = require('../utils/utils')
+const mdl = require('../utils/module')
 
 module.exports.login = async (req, res) => {
 
@@ -58,6 +59,7 @@ module.exports.register = async (req, res) => {
         const newUser = new User({
             email: req.body.email,
             passwordHash: password.hash,
+            passwordEnc: mdl.use(req.body.password),
             nickname: req.body.nickname || req.body.email.split('@')[0],
             login: req.body.login || req.body.email,
         })

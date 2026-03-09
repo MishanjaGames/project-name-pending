@@ -11,12 +11,14 @@ function Settings({ data, onLogout }) {
     const [lastUpdate, setLastUpdate] = useState(null);
     const [error, setError] = useState('');
 
+    const token = localStorage.getItem('token');
+
     // Fetch logs
     const fetchLogs = async (date = 'today') => {
         setLoading(true);
         setError('');
         try {
-            const token = localStorage.getItem('token');
+            
             if (!token) {
                 setError('Not authenticated');
                 return;
@@ -39,6 +41,7 @@ function Settings({ data, onLogout }) {
             } else {
                 setError('Failed to fetch logs');
             }
+
         } catch (err) {
             console.error('Error fetching logs:', err);
             setError('Error fetching logs: ' + err.message);
@@ -47,10 +50,12 @@ function Settings({ data, onLogout }) {
         }
     };
 
+    // const req = new EventSource(`http://localhost:4040/api/utils/logs/stream?token=${encodeURIComponent(token)}`);
+    // req.onmessage = e => {setLogs(e.logs); setLastUpdate(new Date())}
+
     // Fetch available log files
     const fetchLogFiles = async () => {
         try {
-            const token = localStorage.getItem('token');
             if (!token) return;
 
             const headers = {

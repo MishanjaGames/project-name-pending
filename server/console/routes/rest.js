@@ -32,5 +32,5 @@ router.get('/db/drop', utils.validate('admin'), (req, res) => {
     res.status(200).json({ res: 'Dropping connection' })
 })
 
-router.use('/utils', passport.authenticate('jwt', { session: false }), utils.validate('manage'), utilsRouter)
+router.use('/utils', utilsRouter)
 module.exports = router

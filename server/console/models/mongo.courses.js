@@ -12,15 +12,6 @@ const courseSchema = new Schema({
         required: false,
         default: 'editing'
     },
-    title: {
-        type: String,
-        required: true
-    },
-    description: {
-        type: String,
-        required: false,
-        default: ''
-    },
     direction: {
         type: String,
         required: true
@@ -29,11 +20,7 @@ const courseSchema = new Schema({
         type: String,
         required: true
     },
-    skills: [{
-        type: String,
-        required: false
-    }],
-    ratings:{
+    ratings: {
         type: Number,
         required: false
     },
@@ -45,6 +32,30 @@ const courseSchema = new Schema({
         type: Number,
         required: true
     },
+    base_lang: {
+        type: String,
+        required: true,
+        enum: ['en', 'ua']
+    },
+    add_langs:[{
+        type: String,
+        required: true
+    }],
+    trans: [{
+        title: {
+            type: String,
+            required: true
+        },
+        description: {
+            type: String,
+            required: false,
+            default: ''
+        },
+        skills: [{
+            type: String,
+            required: false
+        }],
+    }],
     volumes: [{
         vid: {
             type: String,

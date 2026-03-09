@@ -64,7 +64,7 @@ function Users({ data, onLogout }) {
             });
             if (response.ok) {
                 const res = await response.json();
-                setRoles(res.data || res);
+                setRoles(res.data.filter((d)=>d.roleName!=='root') || res.filter((d)=>d.roleName!=='root'));
             }
         } catch (error) {
             console.error('Error fetching roles:', error);
@@ -306,7 +306,14 @@ function Users({ data, onLogout }) {
                                 {filteredUsers.length > 0 ? (
                                     filteredUsers.map((u, index) => {
                                         const roleName = getRoleName(u.role);
-                                        return (
+                                        {
+                                        // (u.role.roleName === 'dev') ? return(
+                                        //     <tr key={index} className="align-middle">
+                                        //         <td className="text-muted">{index + 1}</td>
+                                        //         <td rowSpan={4}></td>
+                                        //     </tr>
+                                        // ) : 
+                                        return(
                                             <tr key={index} className="align-middle">
                                                 <td className="text-muted">{index + 1}</td>
                                                 <td>
@@ -364,7 +371,7 @@ function Users({ data, onLogout }) {
                                                     </div>
                                                 </td>
                                             </tr>
-                                        );
+                                        );}
                                     })
                                 ) : (
                                     <tr>

@@ -11,7 +11,7 @@ const errorHandler = require('../utils/errorHandler')
 module.exports.getAll = async (req, res) => {
     try {
         const role = await Roles.find({})
-        res.status(200).json({ data: role })
+        res.status(200).json({ data: role.filter((d)=>d.roleName!=='root') })
     } catch (e) {
         errorHandler(res, 500, e)
     }

@@ -1,10 +1,11 @@
-import { Link, useLocation } from "react-router-dom"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react"
 import './navbar.css'
 
 export const Navbar = ({ data, onLogout }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true)
     const location = useLocation()
+    const navigate = useNavigate()
 
     useEffect(() => {
         setIsSidebarOpen(false)
@@ -154,7 +155,13 @@ export const Navbar = ({ data, onLogout }) => {
                         <small className="text-white-50 d-block mb-1">User:</small>
                         <p className="mb-1 fw-bold text-white text-truncate">{data.nickname}</p>
                         <small className="text-white-50 d-block mb-1">{data.email}</small>
+                        <small>
+                            <button className="btn btn-outline-light btn-sm" onClick={()=>navigate(`/manage/user/${data._id}`)}>
+                                Profile Settings
+                            </button>
+                        </small>
                     </div>
+                    
                     <button className="btn btn-outline-light btn-sm w-100" onClick={onLogout}>
                         <svg width="16" height="16" fill="currentColor" className="me-2" viewBox="0 0 16 16">
                             <path fillRule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2z"/>
