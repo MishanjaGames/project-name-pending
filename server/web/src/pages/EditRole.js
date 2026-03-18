@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
+import { UtilityModal } from '../components/UtilityModal';
 
 function EditRole({ data, onLogout }) {
     const { id } = useParams();
@@ -15,6 +16,13 @@ function EditRole({ data, onLogout }) {
         }
     });
     const [errors, setErrors] = useState({});
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal = () => setModal(p => ({ ...p, show: false }));
+    const showInfo = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
+    const isRoot = data?.role?.accessLevel === 'root' || data?.role?.roleName === 'root';
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -39,12 +47,12 @@ function EditRole({ data, onLogout }) {
                             accessLevel: role.accessLevel?.toString() || ''
                         });
                     } else {
-                        alert('Failed to fetch role details');
+                        showInfo('Error', 'Failed to fetch role details');
                         navigate('/manage/roles');
                     }
                 } catch (error) {
                     console.error('Error fetching role:', error);
-                    alert('Error loading role details');
+                    showInfo('Error', 'Error loading role details');
                     navigate('/manage/roles');
                 } finally {
                     setLoading(false);
@@ -128,24 +136,22 @@ function EditRole({ data, onLogout }) {
             });
 
             if (response.ok) {
-                alert('Role updated successfully!');
+                showInfo('Success', 'Role updated successfully!');
                 navigate('/manage/roles');
             } else {
                 const errorData = await response.json();
-                alert(`Failed to update role: ${errorData.message || 'Unknown error'}`);
+                showInfo('Error', `Failed to update role: ${errorData.message || 'Unknown error'}`);
             }
         } catch (error) {
             console.error('Error updating role:', error);
-            alert('Error updating role. Please try again.');
+            showInfo('Error', 'Error updating role. Please try again.');
         } finally {
             setSaving(false);
         }
     };
 
     const handleCancel = () => {
-        if (window.confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
-            navigate('/manage/roles');
-        }
+        showConfirm('Cancel', 'Are you sure you want to cancel? Any unsaved changes will be lost.', () => navigate('/manage/roles'));
     };
 
     const getAccessLevelBadgeColor = (level) => {
@@ -272,7 +278,7 @@ function EditRole({ data, onLogout }) {
                                             <option value="manage">Manage - High-level permissions</option>
                                             <option value="admin">Admin - Full system access</option>
                                             {
-                                                (formData.accessLevel === 'root') ? <option value="root">Root - Full access</option> : null
+                                                (isRoot || formData.accessLevel === 'root') ? <option value="root">Root - Full access</option> : null
                                             }
 
                                         </select>
@@ -346,6 +352,35 @@ function EditRole({ data, onLogout }) {
                     </div>
                 </div>
             </div>
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
         </>
     );
 }

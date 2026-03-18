@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
+import { UtilityModal } from '../components/UtilityModal';
 
 function CreateUser({ data, onLogout }) {
     const navigate = useNavigate();
@@ -14,6 +15,12 @@ function CreateUser({ data, onLogout }) {
         role: ''
     });
     const [errors, setErrors] = useState({});
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete  = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
 
     // Profile picture state
     const [profilePicture, setProfilePicture] = useState(null);
@@ -159,7 +166,7 @@ function CreateUser({ data, onLogout }) {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                alert(`Failed to create user: ${errorData.message || 'Unknown error'}`);
+                showInfo('Error', `Failed to create user: ${errorData.message || 'Unknown error'}`);
                 setSaving(false);
                 return;
             }
@@ -181,20 +188,18 @@ function CreateUser({ data, onLogout }) {
                 });
             }
 
-            alert('User created successfully!');
+            showInfo('Success', 'User created successfully!');
             navigate('/manage/users');
         } catch (error) {
             console.error('Error creating user:', error);
-            alert('Error creating user. Please try again.');
+            showInfo('Error', 'Error creating user. Please try again.');
         } finally {
             setSaving(false);
         }
     };
 
     const handleCancel = () => {
-        if (window.confirm('Are you sure you want to cancel? All entered data will be lost.')) {
-            navigate('/manage/users');
-        }
+        showConfirm('Cancel', 'Are you sure you want to cancel? All entered data will be lost.', () => navigate('/manage/users'));
     };
 
     const getRoleName = (roleId) => {
@@ -466,6 +471,36 @@ function CreateUser({ data, onLogout }) {
                     </div>
                 </div>
             </div>
+
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
         </>
     );
 }

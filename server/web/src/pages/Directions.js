@@ -2,11 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { extendSession } from "../utils/utils";
+import { UtilityModal } from '../components/UtilityModal';
 
 function Directions({ data, onLogout }) {
   const navigate = useNavigate();
   const [directions, setDirections] = useState([]);
   const [loading, setLoading] = useState(true);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete  = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
@@ -40,41 +47,26 @@ function Directions({ data, onLogout }) {
     } catch (err) {
       console.error('Error fetching directions:', err);
       setDirections([]); // Set to empty array on error
-      alert('Failed to load directions. Please check your connection.');
+      showInfo('Error', 'Failed to load directions. Please check your connection.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (directions) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete direction "${directions.directionName}"?\n\nThis action cannot be undone.`
-    );
-
-    if (confirmed) {
-      let i = prompt(`You confirmed to proceed deleting direction "${directions.directionName}" \n\n This action cannot be undone.
-                \n Please enter direction's name to continue.`)
-      if (i === directions.directionName) {
-        alert(`Role "${directions.directionName}" is DELETING. \n This action cannot be undone.`)
-
+  const handleDelete = (directions) => {
+    showDelete('Delete Direction',
+      `You are about to permanently delete direction "${directions.directionName}". This cannot be undone.`,
+      directions.directionName, "Type the direction's name to confirm",
+      async () => {
         try {
           const token = localStorage.getItem('token');
           const response = await fetch(`http://localhost:4040/api/directions/${directions._id}`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-              'Content-Type': 'application/json'
-            }
+            method: 'DELETE', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
           });
-          if (response.ok) {
-            alert(`Direction "${directions.directionName}" is DELETED.`)
-            fetchDirections()
-          }
-        } catch (error) {
-          console.error('Error deleting direction:', error);
-        }
+          if (response.ok) { showInfo('Deleted', `Direction "${directions.directionName}" has been deleted.`); fetchDirections(); }
+        } catch (e) { showInfo('Error', 'Failed to delete direction.'); }
       }
-    }
+    );
   };
 
   const filteredDirections = Array.isArray(directions)
@@ -201,7 +193,23 @@ function Directions({ data, onLogout }) {
           <small>Total: {filteredDirections.length} direction(s)</small>
         </div>
       </div>
+        <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
     </>
+
   );
 }
 

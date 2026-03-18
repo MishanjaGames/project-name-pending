@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
+import { UtilityModal } from '../components/UtilityModal';
 
 function CreateDirection({ data, onLogout }) {
   const navigate = useNavigate();
   const [directionName, setDirectionName] = useState('');
   const [loading, setLoading] = useState(false);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
 
   const token = localStorage.getItem('token');
 
@@ -13,7 +19,7 @@ function CreateDirection({ data, onLogout }) {
     e.preventDefault();
 
     if (!directionName.trim()) {
-      alert('Please enter a direction name');
+      showInfo('Validation', 'Please enter a direction name');
       return;
     }
 
@@ -32,15 +38,15 @@ function CreateDirection({ data, onLogout }) {
       });
 
       if (response.ok) {
-        alert('Direction created successfully');
+        showInfo('Success', 'Direction created successfully');
         navigate('/manage/directions');
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to create direction');
+        showInfo('Error', error.message || 'Failed to create direction');
       }
     } catch (err) {
       console.error('Error creating direction:', err);
-      alert('Failed to create direction');
+      showInfo('Error', 'Failed to create direction');
     } finally {
       setLoading(false);
     }
@@ -122,7 +128,19 @@ function CreateDirection({ data, onLogout }) {
           </div>
         </div>
       </div>
+        <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
     </>
+
   );
 }
 

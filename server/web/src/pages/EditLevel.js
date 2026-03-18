@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
+import { UtilityModal } from '../components/UtilityModal';
 
 function EditLevel({ data, onLogout }) {
   const navigate = useNavigate();
@@ -9,6 +10,12 @@ function EditLevel({ data, onLogout }) {
   const [directionName, setDirectionName] = useState('');
   const [directions, setDirections] = useState([]);
   const [loading, setLoading] = useState(true);
+  // ── Modal state ──────────────────────────────────────────────────────────
+  const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+  const closeModal = () => setModal(p => ({ ...p, show: false }));
+  const showInfo = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+  const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+  const showDelete = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -29,7 +36,7 @@ function EditLevel({ data, onLogout }) {
         setLevelName(levelData.levelName);
         setDirectionName(levelData.directionName);
       } else {
-        alert('Level not found');
+        showInfo('Error', 'Level not found');
         navigate('/manage/levels');
         return;
       }
@@ -51,7 +58,7 @@ function EditLevel({ data, onLogout }) {
     } catch (err) {
       console.error('Error fetching data:', err);
       setDirections([]);
-      alert('Failed to load data. Please check your connection.');
+      showInfo('Error', 'Failed to load data. Please check your connection.');
       navigate('/manage/levels');
     } finally {
       setLoading(false);
@@ -62,12 +69,12 @@ function EditLevel({ data, onLogout }) {
     e.preventDefault();
 
     if (!levelName.trim()) {
-      alert('Please enter a level name');
+      showInfo('Validation', 'Please enter a level name');
       return;
     }
 
     if (!directionName) {
-      alert('Please select a direction');
+      showInfo('Validation', 'Please select a direction');
       return;
     }
 
@@ -87,15 +94,15 @@ function EditLevel({ data, onLogout }) {
       });
 
       if (response.ok) {
-        alert('Level updated successfully');
+        showInfo('Success', 'Level updated successfully');
         navigate('/manage/levels');
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to update level');
+        showInfo('Error', error.message || 'Failed to update level');
       }
     } catch (err) {
       console.error('Error updating level:', err);
-      alert('Failed to update level');
+      showInfo('Error', 'Failed to update level');
     } finally {
       setSaving(false);
     }
@@ -212,6 +219,36 @@ function EditLevel({ data, onLogout }) {
           </div>
         </div>
       </div>
+
+      <UtilityModal
+        show={modal.show}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        danger={modal.danger}
+        confirmToken={modal.confirmToken}
+        tokenLabel={modal.tokenLabel}
+        deleteLabel={modal.deleteLabel || 'Delete'}
+        onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+        onDelete={() => { modal.onDelete?.(); closeModal(); }}
+        onCancel={modal.onCancel || closeModal}
+        onClose={modal.onClose || closeModal}
+      />
+
+      <UtilityModal
+        show={modal.show}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        danger={modal.danger}
+        confirmToken={modal.confirmToken}
+        tokenLabel={modal.tokenLabel}
+        deleteLabel={modal.deleteLabel || 'Delete'}
+        onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+        onDelete={() => { modal.onDelete?.(); closeModal(); }}
+        onCancel={modal.onCancel || closeModal}
+        onClose={modal.onClose || closeModal}
+      />
     </>
   );
 }

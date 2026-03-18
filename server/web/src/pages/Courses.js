@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import { extendSession } from "../utils/utils";
 import AuthImage from "../components/AuthImage";
+import { UtilityModal } from '../components/UtilityModal';
 
 function Courses({ data, onLogout }) {
     const [courses, setCourses] = useState([]);
@@ -10,6 +11,12 @@ function Courses({ data, onLogout }) {
     const [users, setUsers] = useState([]);
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal = () => setModal(p => ({ ...p, show: false }));
+    const showInfo = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
     const [searchText, setSearchText] = useState('');
     const [selectedStatus, setSelectedStatus] = useState(''); // filter by status
     const [selectedDirection, setSelectedDirection] = useState(''); // filter by direction
@@ -105,7 +112,7 @@ function Courses({ data, onLogout }) {
         const userInfo = getUserInfo(c.userId);
         const matchesText =
             !text ||
-            (c.title || '').toLowerCase().includes(text) ||
+            (c.trans?.[0]?.title || '').toLowerCase().includes(text) ||
             (userInfo.nickname || '').toLowerCase().includes(text) ||
             (userInfo.email || '').toLowerCase().includes(text) ||
             (c.direction || '').toLowerCase().includes(text) ||
@@ -120,45 +127,25 @@ function Courses({ data, onLogout }) {
         setShowModal(true);
     };
 
-    const closeModal = () => {
-        setShowModal(false);
-        setSelectedCourse(null);
-    };
-
     const handleEdit = (course) => {
         navigate(`/manage/course/${course._id}`);
     };
 
-    const handleDelete = async (course) => {
-        const confirmed = window.confirm(
-            `Are you sure you want to delete course "${course.title}" (${getUserInfo(course.userId).email})?\n\nThis action cannot be undone.`
-        );
-
-        if (confirmed) {
-            let i = prompt(`You confirmed to proceed deleting course "${course.title}" (${getUserInfo(course.userId).email}) \n\n This action cannot be undone.
-                \n Please enter course's author's email name to continue.`)
-            if (i === getUserInfo(course.userId).email) {
-                alert(`Course "${course.title}" (${getUserInfo(course.userId).email}) is DELETING. \n This action cannot be undone.`)
-
+    const handleDelete = (course) => {
+        const authorEmail = getUserInfo(course.userId).email;
+        showDelete('Delete Course',
+            `You are about to permanently delete course "${course.trans?.[0]?.title}" by ${authorEmail}. This cannot be undone.`,
+            authorEmail, "Type the author's email to confirm",
+            async () => {
                 try {
                     const token = localStorage.getItem('token');
                     const response = await fetch(`http://localhost:4040/api/manage/courses/${course._id}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-                            'Content-Type': 'application/json'
-                        }
+                        method: 'DELETE', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
                     });
-                    if (response.ok) {
-                        alert(`Course "${course.title}" (${getUserInfo(course.userId).email}) is DELETED.`)
-                        fetchCourses()
-                        fetchUsers()
-                    }
-                } catch (error) {
-                    console.error('Error deleting course:', error);
-                }
+                    if (response.ok) { showInfo('Deleted', `Course "${course.trans?.[0]?.title}" has been deleted.`); fetchCourses(); fetchUsers(); }
+                } catch (e) { showInfo('Error', 'Failed to delete course.'); }
             }
-        }
+        );
     };
 
     // Helper function to get badge color based on status
@@ -369,7 +356,7 @@ function Courses({ data, onLogout }) {
                                                                 return thumbnailUrl ? (
                                                                     <AuthImage
                                                                         src={thumbnailUrl}
-                                                                        alt={c.title}
+                                                                        alt={c.trans?.[0]?.title}
                                                                         className="rounded flex-shrink-0"
                                                                         style={{ width: '34px', height: '34px', objectFit: 'cover' }}
                                                                         fallback={
@@ -392,7 +379,7 @@ function Courses({ data, onLogout }) {
                                                                     </div>
                                                                 );
                                                             })()}
-                                                            <span className="fw-semibold">{c.title || 'Untitled'}</span>
+                                                            <span className="fw-semibold">{c.trans?.[0]?.title || 'Untitled'}</span>
                                                         </div>
                                                     </td>
                                                     <td>
@@ -482,7 +469,7 @@ function Courses({ data, onLogout }) {
                                             return thumbnailUrl ? (
                                                 <AuthImage
                                                     src={thumbnailUrl}
-                                                    alt={selectedCourse.title}
+                                                    alt={selectedCourse.trans?.[0]?.title}
                                                     className="rounded flex-shrink-0"
                                                     style={{ width: '96px', height: '96px', objectFit: 'cover' }}
                                                     fallback={
@@ -505,7 +492,7 @@ function Courses({ data, onLogout }) {
                                                 </div>
                                             );
                                         })()}
-                                        <h5 className="fw-bold mb-2">{selectedCourse.title || 'Untitled'}</h5>
+                                        <h5 className="fw-bold mb-2">{selectedCourse.trans?.[0]?.title || 'Untitled'}</h5>
                                         <span className={`badge rounded-pill ${getStatusBadgeColor(selectedCourse.status)}`}>
                                             {selectedCourse.status || '—'}
                                         </span>
@@ -531,7 +518,7 @@ function Courses({ data, onLogout }) {
                                                     </tr>
                                                     <tr>
                                                         <td className="text-muted fw-semibold small text-uppercase py-2">Title</td>
-                                                        <td className="py-2">{selectedCourse.title || '—'}</td>
+                                                        <td className="py-2">{selectedCourse.trans?.[0]?.title || '—'}</td>
                                                     </tr>
                                                     <tr>
                                                         <td className="text-muted fw-semibold small text-uppercase py-2">Status</td>
@@ -553,18 +540,18 @@ function Courses({ data, onLogout }) {
                                                         <td className="text-muted fw-semibold small text-uppercase py-2">Price</td>
                                                         <td className="py-2 fw-semibold">{selectedCourse.price ? `$${selectedCourse.price}` : '—'}</td>
                                                     </tr>
-                                                    {selectedCourse.description && (
+                                                    {selectedCourse.trans?.[0]?.description && (
                                                         <tr>
                                                             <td className="text-muted fw-semibold small text-uppercase py-2 align-top">Description</td>
-                                                            <td className="py-2">{selectedCourse.description}</td>
+                                                            <td className="py-2">{selectedCourse.trans?.[0]?.description}</td>
                                                         </tr>
                                                     )}
-                                                    {selectedCourse.skills && selectedCourse.skills.length > 0 && (
+                                                    {selectedCourse.trans?.[0]?.skills && selectedCourse.trans[0].skills.length > 0 && (
                                                         <tr>
                                                             <td className="text-muted fw-semibold small text-uppercase py-2 align-top">Skills</td>
                                                             <td className="py-2">
                                                                 <div className="d-flex flex-wrap gap-1">
-                                                                    {selectedCourse.skills.map((skill, idx) => (
+                                                                    {selectedCourse.trans[0].skills.map((skill, idx) => (
                                                                         <span key={idx} className="badge bg-light text-dark border">
                                                                             {skill}
                                                                         </span>
@@ -618,6 +605,20 @@ function Courses({ data, onLogout }) {
                     </div>
                 </>
             )}
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
         </>
     );
 }

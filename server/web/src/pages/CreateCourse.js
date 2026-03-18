@@ -1,739 +1,398 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
+import { UtilityModal } from '../components/UtilityModal';
+
+const LANG_LABELS = { en: "English", ua: "Ukrainian" };
+const ALL_LANGS   = ["en", "ua"];
+const emptyTrans  = () => ({ title: "", description: "", skills: [] });
 
 function CreateCourse({ data, onLogout }) {
     const navigate = useNavigate();
-    const [saving, setSaving] = useState(false);
-    const [users, setUsers] = useState([]);
-    const [directions, setDirections] = useState([]);
-    const [levels, setLevels] = useState([]);
-    const [formData, setFormData] = useState({
-        userId: '',
-        status: 'editing',
-        title: '',
-        description: '',
-        skills: [],
-        direction: '',
-        level: '',
-        price: ''
-    });
-    const [skillInput, setSkillInput] = useState('');
-    const [errors, setErrors] = useState({});
-
-    // File states
-    const [thumbnailFile, setThumbnailFile] = useState(null);
+    const [saving, setSaving]             = useState(false);
+    const [users, setUsers]               = useState([]);
+    const [directions, setDirections]     = useState([]);
+    const [levels, setLevels]             = useState([]);
+    const [baseLang, setBaseLang]         = useState("en");
+    const [addLangs, setAddLangs]         = useState([]);
+    const [trans, setTrans]               = useState([emptyTrans()]);
+    const [activeLang, setActiveLang]     = useState(0);
+    const [skillInputs, setSkillInputs]   = useState([""]);
+    const [formData, setFormData]         = useState({ userId: "", direction: "", level: "", price: "" });
+    const [errors, setErrors]             = useState({});
+    const [thumbnailFile, setThumbnailFile]       = useState(null);
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
-    const [contentFiles, setContentFiles] = useState([]);
+    const [contentFiles, setContentFiles]         = useState([]);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete  = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
+
+    // Move an item in a list up (-1) or down (+1)
+    const moveItem = (setter, idx, dir) => {
+        setter(prev => {
+            const arr = [...prev];
+            const target = idx + dir;
+            if (target < 0 || target >= arr.length) return arr;
+            [arr[idx], arr[target]] = [arr[target], arr[idx]];
+            return arr;
+        });
+    };
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-
+        const token = localStorage.getItem("token");
+        const ah = token
+            ? { Authorization: `${token.split(" ")[0]} ${token.split(" ")[1]}`, "Content-Type": "application/json" }
+            : { "Content-Type": "application/json" };
         if (token) {
-            const fetchUsers = async () => {
-                try {
-                    const response = await fetch('http://localhost:4040/api/manage/users', {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    if (response.ok) {
-                        const res = await response.json();
-                        setUsers(res.data || res);
-                    }
-                } catch (error) {
-                    console.error('Error fetching users:', error);
-                }
-            };
-
-            fetchUsers();
+            fetch("http://localhost:4040/api/manage/users", { headers: ah })
+                .then(r => r.ok ? r.json() : null).then(d => d && setUsers(d.data || d)).catch(console.error);
         }
-
-        // Fetch directions
-        const fetchDirections = async () => {
-            try {
-                const response = await fetch('http://localhost:4040/api/directions', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                if (response.ok) {
-                    const res = await response.json();
-                    setDirections(res.data || []);
-                }
-            } catch (error) {
-                console.error('Error fetching directions:', error);
-            }
-        };
-
-        // Fetch levels
-        const fetchLevels = async () => {
-            try {
-                const response = await fetch('http://localhost:4040/api/levels', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                if (response.ok) {
-                    const res = await response.json();
-                    setLevels(res.data || []);
-                }
-            } catch (error) {
-                console.error('Error fetching levels:', error);
-            }
-        };
-
-        fetchDirections();
-        fetchLevels();
+        fetch("http://localhost:4040/api/directions", { headers: ah })
+            .then(r => r.ok ? r.json() : null).then(d => d && setDirections(d.data || [])).catch(console.error);
+        fetch("http://localhost:4040/api/levels", { headers: ah })
+            .then(r => r.ok ? r.json() : null).then(d => d && setLevels(d.data || [])).catch(console.error);
     }, []);
+
+    const allLangs = [baseLang, ...addLangs];
+
+    const toggleAddLang = (lang) => {
+        if (addLangs.includes(lang)) {
+            const idx = addLangs.indexOf(lang);
+            setAddLangs(p => p.filter(l => l !== lang));
+            setTrans(p => p.filter((_, i) => i !== idx + 1));
+            setSkillInputs(p => p.filter((_, i) => i !== idx + 1));
+            if (activeLang > allLangs.length - 2) setActiveLang(0);
+        } else {
+            setAddLangs(p => [...p, lang]);
+            setTrans(p => [...p, emptyTrans()]);
+            setSkillInputs(p => [...p, ""]);
+        }
+    };
+
+    const handleTransChange = (idx, field, value) =>
+        setTrans(p => p.map((t, i) => i === idx ? { ...t, [field]: value } : t));
+
+    const handleAddSkill = (idx) => {
+        const trimmed = skillInputs[idx]?.trim();
+        if (!trimmed || trans[idx]?.skills.includes(trimmed)) return;
+        setTrans(p => p.map((t, i) => i === idx ? { ...t, skills: [...t.skills, trimmed] } : t));
+        setSkillInputs(p => p.map((s, i) => i === idx ? "" : s));
+    };
+
+    const handleRemoveSkill = (ti, skill) =>
+        setTrans(p => p.map((t, i) => i === ti ? { ...t, skills: t.skills.filter(s => s !== skill) } : t));
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-        if (errors[name]) {
-            setErrors(prev => ({
-                ...prev,
-                [name]: ''
-            }));
-        }
+        setFormData(p => ({ ...p, [name]: value }));
+        if (errors[name]) setErrors(p => ({ ...p, [name]: "" }));
     };
 
     const handleThumbnailChange = (e) => {
         const file = e.target.files[0];
-        console.log(file)
-        if (file) {
-            if (!file.type.startsWith('image/')) {
-                setErrors(prev => ({ ...prev, thumbnail: 'Please select an image file' }));
-                return;
-            }
-            if (file.size > 5 * 1024 * 1024) {
-                setErrors(prev => ({ ...prev, thumbnail: 'Image must be less than 5MB' }));
-                return;
-            }
-            setThumbnailFile(file);
-            setThumbnailPreview(URL.createObjectURL(file));
-            setErrors(prev => ({ ...prev, thumbnail: '' }));
-        }
-    };
-
-    const handleContentFilesChange = (e) => {
-        const files = Array.from(e.target.files);
-        const validFiles = [];
-
-        for (const file of files) {
-            if (file.size > 50 * 1024 * 1024) {
-                alert(`File ${file.name} is too large. Maximum size is 50MB.`);
-                continue;
-            }
-            validFiles.push(file);
-        }
-
-        setContentFiles(prev => [...prev, ...validFiles]);
-    };
-
-    const removeContentFile = (index) => {
-        setContentFiles(prev => prev.filter((_, i) => i !== index));
-    };
-
-    const renameFile = (file, newName) => {
-        const blob = file.slice(0, file.size, file.type);
-        return new File([blob], newName, { type: file.type });
-    };
-
-    const handleAddSkill = () => {
-        const trimmedSkill = skillInput.trim();
-        if (trimmedSkill && !formData.skills.includes(trimmedSkill)) {
-            setFormData(prev => ({
-                ...prev,
-                skills: [...prev.skills, trimmedSkill]
-            }));
-            setSkillInput('');
-        }
-    };
-
-    const handleRemoveSkill = (skillToRemove) => {
-        setFormData(prev => ({
-            ...prev,
-            skills: prev.skills.filter(skill => skill !== skillToRemove)
-        }));
-    };
-
-    const handleSkillInputKeyPress = (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handleAddSkill();
-        }
+        if (!file) return;
+        if (!file.type.startsWith("image/")) { setErrors(p => ({ ...p, thumbnail: "Please select an image file" })); return; }
+        if (file.size > 5 * 1024 * 1024) { setErrors(p => ({ ...p, thumbnail: "Image must be less than 5MB" })); return; }
+        setThumbnailFile(file);
+        setThumbnailPreview(URL.createObjectURL(file));
+        setErrors(p => ({ ...p, thumbnail: "" }));
     };
 
     const validateForm = () => {
-        const newErrors = {};
-
-        if (!formData.userId) newErrors.userId = 'Owner is required';
-        if (!formData.status) newErrors.status = 'Status is required';
-        if (!formData.title.trim()) newErrors.title = 'Title is required';
-        if (!formData.direction.trim()) newErrors.direction = 'Direction is required';
-        if (!formData.level.trim()) newErrors.level = 'Level is required';
-        if (formData.price && isNaN(parseFloat(formData.price))) {
-            newErrors.price = 'Price must be a valid number';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        const e = {};
+        if (!formData.userId)           e.userId    = "Owner is required";
+        if (!formData.direction.trim()) e.direction = "Direction is required";
+        if (!formData.level.trim())     e.level     = "Level is required";
+        if (!trans[0]?.title?.trim())   e.baseTitle = `Title is required for ${LANG_LABELS[baseLang]}`;
+        if (formData.price && isNaN(parseFloat(formData.price))) e.price = "Price must be a valid number";
+        setErrors(e);
+        return Object.keys(e).length === 0;
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        if (!validateForm()) {
-            return;
-        }
-
+    const handleSubmit = async (ev) => {
+        ev.preventDefault();
+        if (!validateForm()) return;
         setSaving(true);
-
         try {
-            const token = localStorage.getItem('token');
-            const headers = {
-                'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-                'Content-Type': 'application/json'
-            };
+            const token = localStorage.getItem("token");
+            const ah = { Authorization: `${token.split(" ")[0]} ${token.split(" ")[1]}`, "Content-Type": "application/json" };
+            const mh = { Authorization: `${token.split(" ")[0]} ${token.split(" ")[1]}` };
 
-            // Step 1: Create course
-            const response = await fetch('http://localhost:4040/api/manage/courses', {
-                method: 'POST',
-                headers,
+            const res = await fetch("http://localhost:4040/api/manage/courses", {
+                method: "POST", headers: ah,
                 body: JSON.stringify({
-                    userId: formData.userId,
-                    status: formData.status,
-                    title: formData.title,
-                    description: formData.description,
-                    skills: formData.skills,
-                    direction: formData.direction,
-                    level: formData.level,
+                    userId: formData.userId, status: "editing",
+                    base_lang: baseLang, add_langs: addLangs, trans,
+                    direction: formData.direction, level: formData.level,
                     price: formData.price ? parseFloat(formData.price) : 0
                 })
             });
+            if (!res.ok) { const err = await res.json(); showInfo('Error', `Failed: ${err.message || "Unknown error"}`); setSaving(false); return; }
+            const { data: cd } = await res.json();
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                alert(`Failed to create course: ${errorData.message || 'Unknown error'}`);
-                setSaving(false);
-                return;
-            }
-
-            const { data: courseData } = await response.json();
-            const courseId = courseData._id;
-
-            // Step 2: Upload thumbnail if provided
             if (thumbnailFile) {
-                const fileExtension = thumbnailFile.name.split('.').pop();
-                const renamedFile = renameFile(thumbnailFile, `thumbnail.${fileExtension}`);
-                console.log(renamedFile)
-                const thumbnailFormData = new FormData();
-                thumbnailFormData.append('file', renamedFile);
-
-                await fetch(`http://localhost:4040/api/manage/courses/${courseId}/files`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`
-                    },
-                    body: thumbnailFormData
-                });
+                const ext = thumbnailFile.name.split(".").pop();
+                const blob = thumbnailFile.slice(0, thumbnailFile.size, thumbnailFile.type);
+                const renamed = new File([blob], `thumbnail.${ext}`, { type: thumbnailFile.type });
+                const fd = new FormData(); fd.append("file", renamed);
+                await fetch(`http://localhost:4040/api/manage/courses/${cd._id}/files`, { method: "POST", headers: mh, body: fd });
             }
-
-            // Step 3: Upload content files if provided
             if (contentFiles.length > 0) {
-                const contentFormData = new FormData();
-                contentFiles.forEach(file => {
-                    contentFormData.append('files', file);
-                });
-
-                await fetch(`http://localhost:4040/api/manage/courses/${courseId}/files/multiple`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`
-                    },
-                    body: contentFormData
-                });
+                const fd = new FormData(); contentFiles.forEach(f => fd.append("files", f));
+                await fetch(`http://localhost:4040/api/manage/courses/${cd._id}/files/multiple`, { method: "POST", headers: mh, body: fd });
             }
-
-            alert('Course created successfully!');
-            navigate('/manage/courses');
-        } catch (error) {
-            console.error('Error creating course:', error);
-            alert('Error creating course. Please try again.');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const handleCancel = () => {
-        if (window.confirm('Are you sure you want to cancel? All entered data will be lost.')) {
-            navigate('/manage/courses');
-        }
-    };
-
-    const getUserInfo = (userId) => {
-        const found = users.find((u) => u._id === userId);
-        return found ? { nickname: found.nickname, email: found.email } : { nickname: 'Unknown', email: '—' };
+            showInfo('Success', 'Course created successfully!');
+            navigate("/manage/courses");
+        } catch (err) { console.error(err); showInfo('Error', 'Error creating course. Please try again.'); }
+        finally { setSaving(false); }
     };
 
     return (
         <>
             <Navbar data={data} onLogout={onLogout} />
-
             <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
-                {/* Page Header */}
                 <div className="row mb-4">
                     <div className="col-12">
-                        <div className="d-flex align-items-center gap-3 mb-2">
-                            <button
-                                className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
-                                onClick={() => navigate('/manage/courses')}
-                            >
-                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                    <path fillRule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" />
-                                </svg>
-                                Back to Courses
-                            </button>
-                        </div>
+                        <button className="btn btn-outline-secondary btn-sm mb-2" onClick={() => navigate("/manage/courses")}>← Back to Courses</button>
                         <h1 className="h3 fw-bold text-dark mb-1">Create Course</h1>
-                        <p className="text-muted mb-0 small">Add a new course with files and content</p>
+                        <p className="text-muted mb-0 small">Add a new course with multi-language support</p>
                     </div>
                 </div>
-
-                {/* Create Form */}
                 <div className="row">
                     <div className="col-12 col-lg-10 col-xl-8">
                         <div className="card border-0 shadow-sm">
                             <div className="card-body p-4">
                                 <form onSubmit={handleSubmit}>
-                                    {/* Course Icon Preview */}
+
+                                    {/* Thumbnail */}
                                     <div className="text-center mb-4">
-                                        {thumbnailPreview ? (
-                                            <img
-                                                src={thumbnailPreview}
-                                                alt="Thumbnail preview"
-                                                className="rounded mb-2"
-                                                style={{ width: '120px', height: '120px', objectFit: 'cover' }}
-                                            />
-                                        ) : (
-                                            <div className="rounded bg-primary bg-opacity-10 d-flex align-items-center justify-content-center text-primary mx-auto mb-2"
-                                                style={{ width: '120px', height: '120px' }}>
+                                        {thumbnailPreview
+                                            ? <img src={thumbnailPreview} alt="Thumbnail" className="rounded mb-2" style={{ width: 120, height: 120, objectFit: "cover" }} />
+                                            : <div className="rounded bg-primary bg-opacity-10 d-flex align-items-center justify-content-center text-primary mx-auto mb-2" style={{ width: 120, height: 120 }}>
                                                 <svg width="48" height="48" fill="currentColor" viewBox="0 0 16 16">
-                                                    <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 6.464V13.5a.5.5 0 0 0 1 0V6.236a.5.5 0 0 0-.053-.224l-7.5-3.5z" />
-                                                    <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032z" />
+                                                    <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 6.464V13.5a.5.5 0 0 0 1 0V6.236a.5.5 0 0 0-.053-.224l-7.5-3.5z"/>
+                                                    <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032z"/>
                                                 </svg>
-                                            </div>
-                                        )}
-
-                                        {/* Button Logic: Show Upload button when no thumbnail, Show Change/Delete when thumbnail exists */}
-                                        <div className="mb-2 d-flex justify-content-center gap-2">
-                                            <input
-                                                type="file"
-                                                id="thumbnail"
-                                                className="d-none"
-                                                accept="image/*"
-                                                onChange={handleThumbnailChange}
-                                            />
-
-                                            {!thumbnailPreview ? (
-                                                // No thumbnail - show only Upload button
-                                                <label htmlFor="thumbnail" className="btn btn-sm btn-primary">
-                                                    <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
-                                                        <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" />
-                                                    </svg>
-                                                    Upload Thumbnail
-                                                </label>
-                                            ) : (
-                                                // Thumbnail exists - show Change and Delete buttons
-                                                <>
-                                                    <label htmlFor="thumbnail" className="btn btn-sm btn-warning">
-                                                        <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                                            <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.203.134l-6 2a.5.5 0 0 1-.633-.633l2-6a.5.5 0 0 1 .134-.203l10-10z" />
-                                                        </svg>
-                                                        Change Thumbnail
-                                                    </label>
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-sm btn-danger"
-                                                        onClick={() => {
-                                                            setThumbnailFile(null);
-                                                            setThumbnailPreview(null);
-                                                        }}
-                                                    >
-                                                        <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                                            <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z" />
-                                                            <path d="M5 0 4.5.5l-.5 1H2a1 1 0 0 0-1 1v1h12V2.5a1 1 0 0 0-1-1H10.5l-.5-1L9.5 0h-5zM3 14.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4H3v10.5zM4.5 3h7L11 2H5l-.5 1z" />
-                                                        </svg>
-                                                        Delete Thumbnail
-                                                    </button>
-                                                </>
-                                            )}
+                                              </div>
+                                        }
+                                        <div className="d-flex justify-content-center gap-2 mb-1">
+                                            <input type="file" id="thumbnail" className="d-none" accept="image/*" onChange={handleThumbnailChange} />
+                                            {!thumbnailPreview
+                                                ? <label htmlFor="thumbnail" className="btn btn-sm btn-primary">Upload Thumbnail</label>
+                                                : <>
+                                                    <label htmlFor="thumbnail" className="btn btn-sm btn-warning">Change</label>
+                                                    <button type="button" className="btn btn-sm btn-danger" onClick={() => { setThumbnailFile(null); setThumbnailPreview(null); }}>Delete</button>
+                                                  </>
+                                            }
                                         </div>
-                                        {errors.thumbnail && (
-                                            <small className="text-danger d-block">{errors.thumbnail}</small>
-                                        )}
-                                        <small className="text-muted">Recommended: 800x600px, max 5MB</small>
+                                        {errors.thumbnail && <small className="text-danger d-block">{errors.thumbnail}</small>}
+                                        <small className="text-muted">Recommended 800×600 px · max 5 MB</small>
                                     </div>
 
                                     <div className="row g-3">
-                                        {/* Owner Field */}
+                                        {/* Owner */}
                                         <div className="col-12 col-md-6">
-                                            <label htmlFor="userId" className="form-label fw-semibold">
-                                                Course Owner <span className="text-danger">*</span>
-                                            </label>
-                                            <select
-                                                className={`form-select ${errors.userId ? 'is-invalid' : ''}`}
-                                                id="userId"
-                                                name="userId"
-                                                value={formData.userId}
-                                                onChange={handleChange}
-                                            >
+                                            <label className="form-label fw-semibold">Course Owner <span className="text-danger">*</span></label>
+                                            <select className={`form-select ${errors.userId ? "is-invalid" : ""}`} name="userId" value={formData.userId} onChange={handleChange}>
                                                 <option value="">Select an owner</option>
-                                                {users.map((u) => (
-                                                    <option key={u._id} value={u._id}>
-                                                        {u.nickname} ({u.email})
-                                                    </option>
+                                                {users.map(u => <option key={u._id} value={u._id}>{u.nickname} ({u.email})</option>)}
+                                            </select>
+                                            {errors.userId && <div className="invalid-feedback">{errors.userId}</div>}
+                                        </div>
+
+                                        {/* Base language */}
+                                        <div className="col-12 col-md-6">
+                                            <label className="form-label fw-semibold">Base Language <span className="text-danger">*</span></label>
+                                            <select className="form-select" value={baseLang} onChange={e => { setBaseLang(e.target.value); setActiveLang(0); }}>
+                                                {ALL_LANGS.map(l => <option key={l} value={l} disabled={addLangs.includes(l)}>{LANG_LABELS[l]}</option>)}
+                                            </select>
+                                            <small className="text-muted">Primary course language</small>
+                                        </div>
+
+                                        {/* Additional languages */}
+                                        <div className="col-12">
+                                            <label className="form-label fw-semibold">Additional Languages</label>
+                                            <div className="d-flex flex-wrap gap-3">
+                                                {ALL_LANGS.filter(l => l !== baseLang).map(lang => (
+                                                    <div key={lang} className="form-check m-0">
+                                                        <input className="form-check-input" type="checkbox" id={`addlang-${lang}`}
+                                                            checked={addLangs.includes(lang)} onChange={() => toggleAddLang(lang)} />
+                                                        <label className="form-check-label" htmlFor={`addlang-${lang}`}>{LANG_LABELS[lang]}</label>
+                                                    </div>
                                                 ))}
-                                            </select>
-                                            {errors.userId && (
-                                                <div className="invalid-feedback">{errors.userId}</div>
-                                            )}
-                                        </div>
-
-                                        {/* Status Field */}
-                                        {/* <div className="col-12 col-md-6">
-                                            <label htmlFor="status" className="form-label fw-semibold">
-                                                Status <span className="text-danger">*</span>
-                                            </label>
-                                            <select
-                                                className={`form-select ${errors.status ? 'is-invalid' : ''}`}
-                                                id="status"
-                                                name="status"
-                                                value={formData.status}
-                                                onChange={handleChange}
-                                            >
-                                                <option value="editing">Editing</option>
-                                                <option value="on-check">On Check</option>
-                                                <option value="deployed">Deployed</option>
-                                            </select>
-                                            {errors.status && (
-                                                <div className="invalid-feedback">{errors.status}</div>
-                                            )}
-                                        </div> */}
-
-                                        {/* Title Field */}
-                                        <div className="col-12">
-                                            <label htmlFor="title" className="form-label fw-semibold">
-                                                Course Title <span className="text-danger">*</span>
-                                            </label>
-                                            <input
-                                                type="text"
-                                                className={`form-control ${errors.title ? 'is-invalid' : ''}`}
-                                                id="title"
-                                                name="title"
-                                                value={formData.title}
-                                                onChange={handleChange}
-                                                placeholder="Enter course title"
-                                            />
-                                            {errors.title && (
-                                                <div className="invalid-feedback">{errors.title}</div>
-                                            )}
-                                        </div>
-
-                                        {/* Description Field */}
-                                        <div className="col-12">
-                                            <label htmlFor="description" className="form-label fw-semibold">
-                                                Description
-                                            </label>
-                                            <textarea
-                                                className="form-control"
-                                                id="description"
-                                                name="description"
-                                                value={formData.description}
-                                                onChange={handleChange}
-                                                placeholder="Enter course description"
-                                                rows="4"
-                                            />
-                                        </div>
-
-                                        {/* Skills Field */}
-                                        <div className="col-12">
-                                            <label className="form-label fw-semibold">Skills</label>
-                                            <div className="input-group mb-2">
-                                                <input
-                                                    type="text"
-                                                    className="form-control"
-                                                    value={skillInput}
-                                                    onChange={(e) => setSkillInput(e.target.value)}
-                                                    onKeyPress={handleSkillInputKeyPress}
-                                                    placeholder="Type a skill and press Enter"
-                                                />
-                                                <button
-                                                    className="btn btn-outline-primary"
-                                                    type="button"
-                                                    onClick={handleAddSkill}
-                                                >
-                                                    Add
-                                                </button>
+                                                {ALL_LANGS.length <= 1 && <small className="text-muted">No additional languages available</small>}
                                             </div>
-                                            {formData.skills.length > 0 && (
-                                                <div className="d-flex flex-wrap gap-2 mb-2">
-                                                    {formData.skills.map((skill, idx) => (
-                                                        <span
-                                                            key={idx}
-                                                            className="badge bg-primary d-flex align-items-center gap-1"
-                                                            style={{ fontSize: '0.875rem', padding: '0.5rem 0.75rem' }}
-                                                        >
-                                                            {skill}
-                                                            <svg
-                                                                width="14"
-                                                                height="14"
-                                                                fill="currentColor"
-                                                                viewBox="0 0 16 16"
-                                                                style={{ cursor: 'pointer' }}
-                                                                onClick={() => handleRemoveSkill(skill)}
-                                                            >
-                                                                <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854z" />
-                                                            </svg>
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
                                         </div>
 
-                                        {/* Direction Field */}
+                                        {/* Per-language content */}
+                                        <div className="col-12">
+                                            <label className="form-label fw-semibold mb-2">Course Content</label>
+                                            {allLangs.length > 1 && (
+                                                <ul className="nav nav-tabs mb-0">
+                                                    {allLangs.map((lang, idx) => (
+                                                        <li key={lang} className="nav-item">
+                                                            <button type="button" className={`nav-link ${activeLang === idx ? "active" : ""}`} onClick={() => setActiveLang(idx)}>
+                                                                {LANG_LABELS[lang]}
+                                                                {idx === 0 && <span className="badge bg-primary ms-1" style={{ fontSize: "0.6rem" }}>base</span>}
+                                                                {errors.baseTitle && idx === 0 && <span className="text-danger ms-1 fw-bold">!</span>}
+                                                            </button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                            {allLangs.map((lang, idx) => (
+                                                <div key={lang} className="border rounded p-3 bg-light" style={{ display: activeLang === idx ? "block" : "none", borderTopLeftRadius: allLangs.length > 1 && idx === 0 ? 0 : undefined }}>
+                                                    <div className="d-flex gap-2 mb-3">
+                                                        <span className="badge bg-secondary">{LANG_LABELS[lang]}</span>
+                                                        {idx === 0 && <span className="badge bg-primary">Base Language</span>}
+                                                    </div>
+
+                                                    <div className="mb-3">
+                                                        <label className="form-label fw-semibold">Title {idx === 0 && <span className="text-danger">*</span>}</label>
+                                                        <input type="text"
+                                                            className={`form-control ${errors.baseTitle && idx === 0 ? "is-invalid" : ""}`}
+                                                            value={trans[idx]?.title || ""}
+                                                            onChange={e => handleTransChange(idx, "title", e.target.value)}
+                                                            placeholder={`Course title in ${LANG_LABELS[lang]}`} />
+                                                        {errors.baseTitle && idx === 0 && <div className="invalid-feedback">{errors.baseTitle}</div>}
+                                                    </div>
+
+                                                    <div className="mb-3">
+                                                        <label className="form-label fw-semibold">Description</label>
+                                                        <textarea className="form-control" rows="3"
+                                                            value={trans[idx]?.description || ""}
+                                                            onChange={e => handleTransChange(idx, "description", e.target.value)}
+                                                            placeholder={`Course description in ${LANG_LABELS[lang]}`} />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="form-label fw-semibold">Skills</label>
+                                                        <div className="input-group mb-2">
+                                                            <input type="text" className="form-control"
+                                                                value={skillInputs[idx] || ""}
+                                                                onChange={e => setSkillInputs(p => p.map((s, i) => i === idx ? e.target.value : s))}
+                                                                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAddSkill(idx); } }}
+                                                                placeholder="Type a skill and press Enter" />
+                                                            <button type="button" className="btn btn-outline-primary" onClick={() => handleAddSkill(idx)}>Add</button>
+                                                        </div>
+                                                        {trans[idx]?.skills?.length > 0 && (
+                                                            <div className="d-flex flex-wrap gap-2">
+                                                                {trans[idx].skills.map((skill, si) => (
+                                                                    <span key={si} className="badge bg-primary d-flex align-items-center gap-1" style={{ fontSize: "0.875rem", padding: "0.5rem 0.75rem" }}>
+                                                                        {skill}
+                                                                        <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style={{ cursor: "pointer" }} onClick={() => handleRemoveSkill(idx, skill)}>
+                                                                            <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854z"/>
+                                                                        </svg>
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Direction */}
                                         <div className="col-12 col-md-4">
-                                            <label htmlFor="direction" className="form-label fw-semibold">
-                                                Direction <span className="text-danger">*</span>
-                                            </label>
-                                            <select
-                                                className={`form-select ${errors.direction ? 'is-invalid' : ''}`}
-                                                id="direction"
-                                                name="direction"
-                                                value={formData.direction}
-                                                onChange={(e) => {
-                                                    handleChange(e);
-                                                    setFormData(prev => ({ ...prev, level: '' }));
-                                                }}
-                                            >
+                                            <label className="form-label fw-semibold">Direction <span className="text-danger">*</span></label>
+                                            <select className={`form-select ${errors.direction ? "is-invalid" : ""}`} name="direction" value={formData.direction}
+                                                onChange={e => { handleChange(e); setFormData(p => ({ ...p, level: "" })); }}>
                                                 <option value="">Select direction</option>
-                                                {directions.map((dir) => (
-                                                    <option key={dir._id} value={dir.directionName}>
-                                                        {dir.directionName}
-                                                    </option>
+                                                {directions.map(d => <option key={d._id} value={d.directionName}>{d.directionName}</option>)}
+                                            </select>
+                                            {errors.direction && <div className="invalid-feedback">{errors.direction}</div>}
+                                        </div>
+
+                                        {/* Level */}
+                                        <div className="col-12 col-md-4">
+                                            <label className="form-label fw-semibold">Level <span className="text-danger">*</span></label>
+                                            <select className={`form-select ${errors.level ? "is-invalid" : ""}`} name="level" value={formData.level}
+                                                onChange={handleChange} disabled={!formData.direction}>
+                                                <option value="">Select level</option>
+                                                {levels.filter(l => l.directionName === formData.direction).map(l => (
+                                                    <option key={l._id} value={l.levelName}>{l.levelName}</option>
                                                 ))}
                                             </select>
-                                            {errors.direction && (
-                                                <div className="invalid-feedback">{errors.direction}</div>
-                                            )}
+                                            {errors.level && <div className="invalid-feedback">{errors.level}</div>}
+                                            {!formData.direction && <small className="text-muted">Select direction first</small>}
                                         </div>
 
-                                        {/* Level Field */}
+                                        {/* Price */}
                                         <div className="col-12 col-md-4">
-                                            <label htmlFor="level" className="form-label fw-semibold">
-                                                Level <span className="text-danger">*</span>
-                                            </label>
-                                            <select
-                                                className={`form-select ${errors.level ? 'is-invalid' : ''}`}
-                                                id="level"
-                                                name="level"
-                                                value={formData.level}
-                                                onChange={handleChange}
-                                                disabled={!formData.direction}
-                                            >
-                                                <option value="">Select level</option>
-                                                {levels
-                                                    .filter(lvl => lvl.directionName === formData.direction)
-                                                    .map((lvl) => (
-                                                        <option key={lvl._id} value={lvl.levelName}>
-                                                            {lvl.levelName}
-                                                        </option>
-                                                    ))}
-                                            </select>
-                                            {errors.level && (
-                                                <div className="invalid-feedback">{errors.level}</div>
-                                            )}
-                                            {!formData.direction && (
-                                                <small className="text-muted">Select direction first</small>
-                                            )}
-                                        </div>
-
-                                        {/* Price Field */}
-                                        <div className="col-12 col-md-4">
-                                            <label htmlFor="price" className="form-label fw-semibold">
-                                                Price (USD)
-                                            </label>
+                                            <label className="form-label fw-semibold">Price (USD)</label>
                                             <div className="input-group">
                                                 <span className="input-group-text">$</span>
-                                                <input
-                                                    type="number"
-                                                    className={`form-control ${errors.price ? 'is-invalid' : ''}`}
-                                                    id="price"
-                                                    name="price"
-                                                    value={formData.price}
-                                                    onChange={handleChange}
-                                                    placeholder="0.00"
-                                                    step="0.01"
-                                                    min="0"
-                                                />
+                                                <input type="number" className={`form-control ${errors.price ? "is-invalid" : ""}`}
+                                                    name="price" value={formData.price} onChange={handleChange}
+                                                    placeholder="0.00" step="0.01" min="0" />
                                             </div>
+                                            {errors.price && <div className="text-danger small mt-1">{errors.price}</div>}
                                         </div>
 
-                                        {/* Course Content Files - IMPROVED VERSION */}
+                                        {/* Content files */}
                                         <div className="col-12">
-                                            <label className="form-label fw-semibold">
-                                                Course Content Files
-                                                <span className="text-muted ms-2">(Videos, PDFs, Documents, Images)</span>
-                                            </label>
+                                            <label className="form-label fw-semibold">Course Content Files <span className="text-muted">(Videos, PDFs, etc.)</span></label>
                                             <div className="border rounded p-3 bg-light">
-                                                {/* Upload Button */}
-                                                <div className="mb-3">
-                                                    <input
-                                                        type="file"
-                                                        id="contentFiles"
-                                                        className="d-none"
-                                                        multiple
-                                                        onChange={handleContentFilesChange}
-                                                        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip"
-                                                    />
-                                                    <label htmlFor="contentFiles" className="btn btn-outline-primary">
-                                                        <i className="bi bi-upload me-1"></i>
-                                                        Choose Files to Upload
-                                                    </label>
+                                                <div className="mb-2 d-flex align-items-center gap-2 flex-wrap">
+                                                    <input type="file" id="contentFiles" className="d-none" multiple
+                                                        onChange={e => {
+                                                            const files = Array.from(e.target.files).filter(f => {
+                                                                if (f.size > 512 * 1024 * 1024) { showInfo('File Too Large', `${f.name} exceeds 512 MB limit.`); return false; }
+                                                                return true;
+                                                            });
+                                                            setContentFiles(p => [...p, ...files]);
+                                                        }}
+                                                        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip" />
+                                                    <label htmlFor="contentFiles" className="btn btn-outline-primary btn-sm">Choose Files</label>
                                                 </div>
-
-                                                <small className="text-muted d-block mb-3">
-                                                    <i className="bi bi-info-circle me-1"></i>
-                                                    These files will be available to use in your course content (volumes/chapters).
-                                                    Max 512MB per file. Supported: Videos, Audio, Images, PDFs, Documents.
-                                                </small>
-
-                                                {/* Selected Files Display */}
-                                                {contentFiles.length > 0 && (
-                                                    <div className="mt-3">
+                                                <small className="text-muted d-block mb-2">Max 512 MB per file.</small>
+                                                {contentFiles.length > 0 ? (
+                                                    <>
                                                         <div className="d-flex justify-content-between align-items-center mb-2">
-                                                            <strong className="small">
-                                                                <i className="bi bi-files me-1"></i>
-                                                                Files to Upload ({contentFiles.length})
-                                                            </strong>
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-sm btn-outline-danger"
-                                                                onClick={() => setContentFiles([])}
-                                                            >
-                                                                <i className="bi bi-trash me-1"></i>
-                                                                Clear All
-                                                            </button>
+                                                            <strong className="small">Files to Upload ({contentFiles.length})</strong>
+                                                            <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setContentFiles([])}>Clear All</button>
                                                         </div>
-
-                                                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                                                            {contentFiles.map((file, idx) => {
-                                                                const isImage = file.type.startsWith('image/');
-                                                                const isVideo = file.type.startsWith('video/');
-                                                                const isAudio = file.type.startsWith('audio/');
-                                                                const isPDF = file.type === 'application/pdf';
-
-                                                                let icon = 'file-earmark';
-                                                                let iconColor = 'text-secondary';
-
-                                                                if (isImage) {
-                                                                    icon = 'image';
-                                                                    iconColor = 'text-primary';
-                                                                } else if (isVideo) {
-                                                                    icon = 'camera-video';
-                                                                    iconColor = 'text-danger';
-                                                                } else if (isAudio) {
-                                                                    icon = 'music-note';
-                                                                    iconColor = 'text-success';
-                                                                } else if (isPDF) {
-                                                                    icon = 'file-pdf';
-                                                                    iconColor = 'text-danger';
-                                                                }
-
-                                                                return (
-                                                                    <div
-                                                                        key={idx}
-                                                                        className="d-flex justify-content-between align-items-center bg-white p-2 rounded mb-2 border"
-                                                                    >
-                                                                        <div className="d-flex align-items-center flex-grow-1">
-                                                                            <i className={`bi bi-${icon} ${iconColor} me-2`} style={{ fontSize: '1.25rem' }}></i>
-                                                                            <div className="flex-grow-1">
-                                                                                <div className="small fw-semibold text-truncate" style={{ maxWidth: '400px' }}>
-                                                                                    {file.name}
-                                                                                </div>
-                                                                                <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                                                                                    {(file.size / 1024 / 1024).toFixed(2)} MB
-                                                                                    <span className="ms-2">•</span>
-                                                                                    <span className="ms-2">
-                                                                                        {isImage ? 'Image' : isVideo ? 'Video' : isAudio ? 'Audio' : isPDF ? 'PDF' : 'Document'}
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                        <button
-                                                                            type="button"
-                                                                            className="btn btn-sm btn-outline-danger"
-                                                                            onClick={() => removeContentFile(idx)}
-                                                                            title="Remove file"
-                                                                        >
-                                                                            <i className="bi bi-x-lg"></i>
-                                                                        </button>
+                                                        <small className="text-muted d-block mb-1">Use ▲ ▼ to set upload order</small>
+                                                        <div style={{ maxHeight: 250, overflowY: "auto" }}>
+                                                            {contentFiles.map((f, i) => (
+                                                                <div key={i} className="d-flex justify-content-between align-items-center bg-white p-2 rounded mb-2 border">
+                                                                    {/* Sort controls */}
+                                                                    <div className="d-flex flex-column me-2" style={{ gap: 1 }}>
+                                                                        <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
+                                                                            style={{ width: 22, height: 20, fontSize: "0.65rem" }}
+                                                                            disabled={i === 0}
+                                                                            onClick={() => moveItem(setContentFiles, i, -1)}
+                                                                            title="Move up">▲</button>
+                                                                        <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
+                                                                            style={{ width: 22, height: 20, fontSize: "0.65rem" }}
+                                                                            disabled={i === contentFiles.length - 1}
+                                                                            onClick={() => moveItem(setContentFiles, i, 1)}
+                                                                            title="Move down">▼</button>
                                                                     </div>
-                                                                );
-                                                            })}
+                                                                    <div className="flex-grow-1">
+                                                                        <div className="small fw-semibold text-truncate" style={{ maxWidth: 380 }}>{f.name}</div>
+                                                                        <div className="text-muted" style={{ fontSize: "0.75rem" }}>{(f.size / 1024 / 1024).toFixed(2)} MB</div>
+                                                                    </div>
+                                                                    <button type="button" className="btn btn-sm btn-outline-danger ms-2" onClick={() => setContentFiles(p => p.filter((_, j) => j !== i))} title="Remove">×</button>
+                                                                </div>
+                                                            ))}
                                                         </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Empty State */}
-                                                {contentFiles.length === 0 && (
-                                                    <div className="text-center py-4 text-muted">
-                                                        <i className="bi bi-cloud-upload" style={{ fontSize: '3rem', opacity: 0.3 }}></i>
-                                                        <p className="mb-0 mt-2 small">No files selected yet</p>
-                                                        <p className="mb-0 small">Upload course materials that you'll use in your lessons</p>
-                                                    </div>
+                                                    </>
+                                                ) : (
+                                                    <div className="text-center py-3 text-muted small">No files selected yet</div>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Form Actions */}
+                                    {/* Actions */}
                                     <div className="d-flex gap-2 justify-content-end pt-4 mt-3 border-top">
-                                        <button
-                                            type="button"
-                                            className="btn btn-outline-secondary"
-                                            onClick={handleCancel}
-                                            disabled={saving}
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            className="btn btn-primary"
-                                            disabled={saving}
-                                        >
-                                            {saving ? (
-                                                <>
-                                                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                                    Creating...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <svg width="16" height="16" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                                        <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
-                                                    </svg>
-                                                    Create Course
-                                                </>
-                                            )}
+                                        <button type="button" className="btn btn-outline-secondary" onClick={() => showConfirm('Cancel', 'Cancel and discard all data?', () => navigate("/manage/courses"))} disabled={saving}>Cancel</button>
+                                        <button type="submit" className="btn btn-primary" disabled={saving}>
+                                            {saving ? <><span className="spinner-border spinner-border-sm me-2" />Creating...</> : "Create Course"}
                                         </button>
                                     </div>
                                 </form>
@@ -742,6 +401,21 @@ function CreateCourse({ data, onLogout }) {
                     </div>
                 </div>
             </div>
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
         </>
     );
 }

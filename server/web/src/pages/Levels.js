@@ -2,12 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { extendSession } from "../utils/utils";
+import { UtilityModal } from '../components/UtilityModal';
 
 function Levels({ data, onLogout }) {
   const navigate = useNavigate();
   const [levels, setLevels] = useState([]);
   const [directions, setDirections] = useState([]);
   const [loading, setLoading] = useState(true);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete  = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDirection, setFilterDirection] = useState('');
 
@@ -53,41 +60,26 @@ function Levels({ data, onLogout }) {
       console.error('Error fetching data:', err);
       setLevels([]); // Set to empty arrays on error
       setDirections([]);
-      alert('Failed to load data. Please check your connection.');
+      showInfo('Error', 'Failed to load data. Please check your connection.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (level) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete level "${level.levelName}"?\n\nThis action cannot be undone.`
-    );
-
-    if (confirmed) {
-      let i = prompt(`You confirmed to proceed deleting level "${level.levelName}" (${level.directionName}) \n\n This action cannot be undone.
-                \n Please enter level's name to continue.`)
-      if (i === level.levelName) {
-        alert(`Role "${level.levelName}" (${level.directionName}) is DELETING. \n This action cannot be undone.`)
-
+  const handleDelete = (level) => {
+    showDelete('Delete Level',
+      `You are about to permanently delete level "${level.levelName}" (${level.directionName}). This cannot be undone.`,
+      level.levelName, "Type the level's name to confirm",
+      async () => {
         try {
           const token = localStorage.getItem('token');
           const response = await fetch(`http://localhost:4040/api/levels/${level._id}`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-              'Content-Type': 'application/json'
-            }
+            method: 'DELETE', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
           });
-          if (response.ok) {
-            alert(`Level "${level.levelName}" (${level.directionName}) is DELETED.`)
-            fetchData()
-          }
-        } catch (error) {
-          console.error('Error deleting level:', error);
-        }
+          if (response.ok) { showInfo('Deleted', `Level "${level.levelName}" has been deleted.`); fetchData(); }
+        } catch (e) { showInfo('Error', 'Failed to delete level.'); }
       }
-    }
+    );
   };
 
   const filteredLevels = Array.isArray(levels)
@@ -279,7 +271,23 @@ function Levels({ data, onLogout }) {
           </small>
         </div>
       </div>
+        <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
     </>
+
   );
 }
 

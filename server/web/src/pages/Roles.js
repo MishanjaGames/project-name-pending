@@ -2,12 +2,19 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import { extendSession } from "../utils/utils";
+import { UtilityModal } from '../components/UtilityModal';
 
 function Roles({ data, onLogout }) {
     const [loading, setLoading] = useState(false);
     const [roles, setRoles] = useState([]);
     const [selectedRole, setSelectedRole] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal = () => setModal(p => ({ ...p, show: false }));
+    const showInfo = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
     const [searchText, setSearchText] = useState('');
     const [selectedAccessLevel, setSelectedAccessLevel] = useState('');
     const navigate = useNavigate();
@@ -65,43 +72,24 @@ function Roles({ data, onLogout }) {
         setShowModal(true);
     };
 
-    const closeModal = () => {
-        setShowModal(false);
-        setSelectedRole(null);
-    };
-
     const handleEdit = (role) => {
         navigate(`/manage/role/${role._id}`);
     };
 
-    const handleDelete = async (role) => {
-        const confirmed = window.confirm(
-            `Are you sure you want to delete role "${role.roleName}"?\n\nThis action cannot be undone.`
-        );
-
-        if (confirmed) {
-            let i = prompt(`You confirmed to proceed deleting role "${role.roleName}" (${role.accessLevel}) \n\n This action cannot be undone.
-                \n Please enter role's name to continue.`)
-            if (i === role.roleName) {
-                alert(`Role "${role.roleName}" (${role.accessLevel}) is DELETING. \n This action cannot be undone.`)
-
+    const handleDelete = (role) => {
+        showDelete('Delete Role',
+            `You are about to permanently delete role "${role.roleName}" (${role.accessLevel}). This cannot be undone.`,
+            role.roleName, "Type the role's name to confirm",
+            async () => {
                 try {
                     const token = localStorage.getItem('token');
                     const response = await fetch(`http://localhost:4040/api/manage/roles/${role._id}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-                            'Content-Type': 'application/json'
-                        }
+                        method: 'DELETE', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
                     });
-                    if (response.ok) {
-                        alert(`Role "${role.roleName}" (${role.accessLevel}) is DELETED.`)
-                    }
-                } catch (error) {
-                    console.error('Error deleting role:', error);
-                }
+                    if (response.ok) { showInfo('Deleted', `Role "${role.roleName}" has been deleted.`); setRoles(prev => prev.filter(r => r._id !== role._id)); }
+                } catch (e) { showInfo('Error', 'Failed to delete role.'); }
             }
-        }
+        );
     };
 
     const getAccessLevelBadgeColor = (level) => {
@@ -425,6 +413,20 @@ function Roles({ data, onLogout }) {
                     </div>
                 </>
             )}
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
         </>
     );
 }

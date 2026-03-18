@@ -283,16 +283,26 @@
 
 /* ── Welcome screen ───────────────────────────────────────── */
 .vc-welcome {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 80vh;
-  padding: 2rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+  padding: 2rem 1.75rem 2rem;
+  min-height: 60vh;
 }
 
 .vc-welcome-inner {
-  max-width: 520px;
+  width: 100%;
   text-align: center;
+  animation: vcFadeUp 0.35s ease-out;
+  min-width: 0;
+}
+
+.vc-welcome-right {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
   animation: vcFadeUp 0.35s ease-out;
 }
 
@@ -980,6 +990,28 @@
   .vc-pane { padding: 1.25rem 1rem 3rem; }
   .vc-content-title { font-size: 1.4rem; }
   .vc-welcome-title { font-size: 1.5rem; }
+  .vc-welcome {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding: 1.25rem 1rem;
+  }
+  .vc-welcome-inner {
+    max-width: 100%;
+  }
+  .vc-welcome-right {
+    width: 100%;
+  }
+  .vc-comments {
+    width: 100%;
+  }
+  .vc-comment-header {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .vc-comment-date {
+    margin-left: 0;
+    width: 100%;
+  }
 }
 
 /* ── Print ────────────────────────────────────────────────── */
@@ -991,8 +1023,10 @@
 
 /* ── Welcome thumbnail (when course has a cover image) ───── */
 .vc-welcome-thumbnail {
-  width: 880px;
-  height: 600px;
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  aspect-ratio: 16 / 9;
   margin: 0 auto 1.5rem;
   border-radius: 14px;
   overflow: hidden;
@@ -1098,4 +1132,272 @@
   .vc-thumb--landscape { max-width: 100%; }
   .vc-thumb--square    { width: 160px; height: 160px; }
   .vc-thumb--portrait  { width: 120px; height: 170px; }
+}
+/* ── Comments ────────────────────────────────────────────────────────────── */
+.vc-comments {
+  width: 100%;
+  text-align: left;
+}
+.vc-comments-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--vc-text, #1e293b);
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+.vc-comments-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vc-accent, #2563eb);
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+  border-radius: 999px;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 .35rem;
+}
+.vc-comments-loading,
+.vc-comments-empty {
+  color: var(--vc-muted, #64748b);
+  font-size: .9rem;
+  padding: .75rem 0;
+}
+
+/* Compose */
+.vc-comment-compose {
+  background: var(--vc-surface, #f8fafc);
+  border: 1px solid var(--vc-border, #e2e8f0);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+.vc-compose-tabs {
+  display: flex;
+  gap: .5rem;
+  margin-bottom: .75rem;
+}
+.vc-compose-tab {
+  background: none;
+  border: 1px solid var(--vc-border, #e2e8f0);
+  border-radius: 6px;
+  padding: .3rem .8rem;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--vc-muted, #64748b);
+  cursor: pointer;
+  transition: all .15s;
+}
+.vc-compose-tab--active {
+  background: var(--vc-accent, #2563eb);
+  border-color: var(--vc-accent, #2563eb);
+  color: #fff;
+}
+.vc-compose-tab:disabled {
+  opacity: .45;
+  cursor: default;
+}
+.vc-comment-textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--vc-border, #e2e8f0);
+  border-radius: 8px;
+  padding: .6rem .8rem;
+  font-size: .9rem;
+  font-family: inherit;
+  color: var(--vc-text, #1e293b);
+  background: #fff;
+  transition: border-color .15s;
+  box-sizing: border-box;
+}
+.vc-comment-textarea:focus {
+  outline: none;
+  border-color: var(--vc-accent, #2563eb);
+}
+.vc-comment-preview {
+  min-height: 80px;
+  padding: .6rem .8rem;
+  border: 1px solid var(--vc-border, #e2e8f0);
+  border-radius: 8px;
+  background: #fff;
+  font-size: .9rem;
+}
+.vc-compose-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: .6rem;
+}
+.vc-char-count {
+  font-size: .78rem;
+  color: var(--vc-muted, #94a3b8);
+}
+.vc-compose-submit {
+  padding: .4rem 1.1rem;
+  font-size: .875rem;
+}
+.vc-spinner-sm {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: vc-spin .6s linear infinite;
+  vertical-align: middle;
+  margin-right: .3rem;
+}
+
+/* Comment list */
+.vc-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.vc-comment {
+  background: var(--vc-surface, #f8fafc);
+  border: 1px solid var(--vc-border, #e2e8f0);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+.vc-comment-header {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: .6rem;
+  flex-wrap: wrap;
+}
+.vc-comment-author {
+  font-weight: 700;
+  font-size: .88rem;
+  color: var(--vc-text, #1e293b);
+}
+.vc-comment-date {
+  font-size: .78rem;
+  color: var(--vc-muted, #94a3b8);
+  margin-left: auto;
+}
+.vc-comment-delete {
+  background: none;
+  border: none;
+  color: var(--vc-muted, #94a3b8);
+  cursor: pointer;
+  padding: .2rem .35rem;
+  border-radius: 5px;
+  font-size: .85rem;
+  transition: color .15s, background .15s;
+  margin-left: .25rem;
+}
+.vc-comment-delete:hover {
+  color: #dc2626;
+  background: #fee2e2;
+}
+.vc-comment-body {
+  font-size: .9rem;
+  line-height: 1.65;
+  color: var(--vc-text, #1e293b);
+}
+
+/* ── Syntax help panel ─────────────────────────────────────── */
+.vc-compose-tab--help {
+  margin-left: auto;
+}
+.vc-syntax-help {
+  background: var(--vc-surface, #f8fafc);
+  border: 1px solid var(--vc-border, #e2e8f0);
+  border-radius: 8px;
+  padding: .75rem 1rem;
+  margin-bottom: .75rem;
+  animation: vcFadeUp .15s ease-out;
+}
+.vc-syntax-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: .3rem .75rem;
+  align-items: center;
+}
+.vc-syntax-ex code {
+  font-size: .78rem;
+  background: #e2e8f0;
+  color: #1e293b;
+  border-radius: 4px;
+  padding: .1rem .35rem;
+  white-space: nowrap;
+}
+.vc-syntax-desc {
+  font-size: .78rem;
+  color: var(--vc-muted, #64748b);
+}
+
+/* ── Rate this course (ViewCourse) ─────────────────────────── */
+.vc-rate-section {
+  background: var(--vc-surface, #f8fafc);
+  border: 1px solid var(--vc-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+.vc-rate-avg {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.vc-rate-num {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--vc-body-text, #1e293b);
+  line-height: 1;
+}
+.vc-rate-stars-display .vc-star-display,
+.vc-rate-stars-display i {
+  color: #f59e0b;
+  font-size: 1rem;
+}
+.vc-rate-count {
+  font-size: .82rem;
+  color: var(--vc-muted, #64748b);
+}
+.vc-rate-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+.vc-rate-label {
+  font-size: .88rem;
+  color: var(--vc-muted, #64748b);
+  font-weight: 500;
+}
+.vc-stars-interactive {
+  display: flex;
+  gap: .15rem;
+}
+.vc-star-btn {
+  background: none;
+  border: none;
+  padding: .1rem;
+  cursor: pointer;
+  font-size: 1.3rem;
+  color: #d1d5db;
+  transition: color .1s, transform .1s;
+  line-height: 1;
+}
+.vc-star-btn.active,
+.vc-star-btn:hover {
+  color: #f59e0b;
+}
+.vc-star-btn:hover { transform: scale(1.15); }
+.vc-star-btn:disabled { cursor: default; opacity: .7; }
+.vc-rated-badge {
+  font-size: .78rem;
+  font-weight: 600;
+  color: #16a34a;
+  background: #dcfce7;
+  border-radius: 999px;
+  padding: .2rem .65rem;
 }

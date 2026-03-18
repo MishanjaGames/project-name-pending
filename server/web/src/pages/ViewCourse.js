@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { extendSession } from '../utils/utils';
 import './ViewCourse.css';
+import { UtilityModal } from '../components/UtilityModal';
 
 // ─── Helpers (shared with CoursePreview) ──────────────────────────────────────
 const isContainer = (e) => !e?.type || e.type === 'container' || e.type === 'none';
@@ -93,6 +94,13 @@ function parseTextSyntax(text) {
 
   // 4. Standard syntax transforms
   html = html.replace(/~\(([^\|]+)\)\[([^\]]+)\]~/g, '<code type="$1">$2</code>');
+  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  html = html.replace(/`([^`]+)`/g, '<code class="vc-inline-code">$1</code>');
+  html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  html = html.replace(/^---+$/gm, '<hr>');
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^# (.+)$/gm, '<h1>$1</h1>');
   html = html.replace(/`\{([^}]+)\}`/g, '<p>$1</p>');
   html = html.replace(/\{(https?:\/\/[^}]+)\}/g, '<video src="$1" class="vc-video-player" controls></video>');
@@ -198,7 +206,27 @@ function ViewCourse({ data, onLogout }) {
   const [course, setCourse] = useState(null);
   const [volumes, setVolumes] = useState([]);
   const [loading, setLoading] = useState(true);
+  // ── Modal state ──────────────────────────────────────────────────────────
+  const [modal, setModal] = useState({ show: false, type: 'confirm', title: '', message: '', onConfirm: null, onCancel: null });
+  const closeModal  = () => setModal(p => ({ ...p, show: false }));
+  const showConfirm = (title, message, onConfirm) => setModal({ show: true, type: 'confirm', title, message, onConfirm, onCancel: closeModal });
+  const showInfo = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
   const [locked, setLocked] = useState(true);
+
+  // ── Comments state ─────────────────────────────────────────────────────────
+  const [comments, setComments]         = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentText, setCommentText]   = useState('');
+  const [commentPreview, setCommentPreview] = useState(false);
+  const [commentPosting, setCommentPosting] = useState(false);
+  const [syntaxHelpOpen, setSyntaxHelpOpen] = useState(false);
+
+  // ── Rating state ───────────────────────────────────────────────────────────
+  const [myRating, setMyRating] = useState(null);
+  const [avgRating, setAvgRating] = useState(0);
+  const [totalVotes, setTotalVotes] = useState(0);
+  const [ratingHover, setRatingHover] = useState(null);
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
 
   // Sidebar expand state
   const [openVolumes, setOpenVolumes] = useState({});
@@ -209,7 +237,87 @@ function ViewCourse({ data, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
-  useEffect(() => { fetchData(); }, [id]);
+  useEffect(() => { fetchData(); fetchComments(); fetchRating(); }, [id]);
+
+  const fetchComments = async () => {
+    setCommentsLoading(true);
+    try {
+      const res = await fetch(`http://localhost:4040/api/courses/${id}/comments`);
+      if (res.ok) {
+        const json = await res.json();
+        setComments(json.data || []);
+      }
+    } catch (e) { console.error('Comments fetch error:', e); }
+    finally { setCommentsLoading(false); }
+  };
+
+  const handleAddComment = async () => {
+    if (!commentText.trim()) return;
+    setCommentPosting(true);
+    try {
+      const res = await fetch(`http://localhost:4040/api/courses/${id}/comments`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text: commentText.trim() })
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setComments(prev => [...prev, json.data]);
+        setCommentText('');
+        setCommentPreview(false);
+      }
+    } catch (e) { console.error('Comment post error:', e); }
+    finally { setCommentPosting(false); }
+  };
+
+  const fetchRating = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`http://localhost:4040/api/courses/${id}/rating`, {
+        headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` }
+      });
+      if (res.ok) {
+        const j = await res.json();
+        setAvgRating(j.data?.avgRating || 0);
+        setTotalVotes(j.data?.totalVotes || 0);
+        setMyRating(j.data?.myRating || null);
+      }
+    } catch (e) { console.error('fetchRating:', e); }
+  };
+
+  const handleRate = async (value) => {
+    if (locked || ratingSubmitting) return;
+    setRatingSubmitting(true);
+    try {
+      const res = await fetch(`http://localhost:4040/api/courses/${id}/rating`, {
+        method: 'POST',
+        headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value })
+      });
+      if (res.ok) {
+        const j = await res.json();
+        setMyRating(j.data.myRating);
+        setAvgRating(j.data.avgRating);
+        setTotalVotes(j.data.totalVotes);
+      } else showInfo('Error', 'Could not submit rating.');
+    } catch (e) { showInfo('Error', 'Network error.'); }
+    setRatingSubmitting(false);
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    showConfirm('Delete Comment', 'Are you sure you want to delete this comment?', async () => {
+      try {
+        const res = await fetch(`http://localhost:4040/api/courses/${id}/comments/${commentId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` }
+        });
+        if (res.ok) setComments(prev => prev.filter(c => c._id !== commentId));
+      } catch (e) { console.error('Comment delete error:', e); }
+    });
+  };
 
   const checkAccess = async (fetchedCourse) => {
     try {
@@ -473,6 +581,7 @@ function ViewCourse({ data, onLogout }) {
           {selected == null ? (
             /* ── Welcome / no selection ── */
             <div className="vc-welcome">
+              {/* ── Left: course info ── */}
               <div className="vc-welcome-inner">
                 {course.links[0] ? (
                   <CourseThumbnail
@@ -505,6 +614,161 @@ function ViewCourse({ data, onLogout }) {
                   )
                 )}
               </div>
+
+              {/* ── Right: rating + comments ── */}
+              <div className="vc-welcome-right">
+
+              {/* ── Rate this course ── */}
+              {!locked && (
+                <div className="vc-rate-section">
+                  <div className="vc-rate-avg">
+                    <span className="vc-rate-num">{avgRating > 0 ? avgRating.toFixed(1) : '—'}</span>
+                    <div className="vc-rate-stars-display">
+                      {[1,2,3,4,5].map(n => (
+                        <i key={n} className={`bi ${avgRating >= n ? 'bi-star-fill' : avgRating >= n - 0.5 ? 'bi-star-half' : 'bi-star'} vc-star-display`}></i>
+                      ))}
+                    </div>
+                    <span className="vc-rate-count">({totalVotes} {totalVotes === 1 ? 'rating' : 'ratings'})</span>
+                  </div>
+                  <div className="vc-rate-row">
+                    <span className="vc-rate-label">{myRating ? 'Your rating:' : 'Rate this course:'}</span>
+                    <div className="vc-stars-interactive">
+                      {[1,2,3,4,5].map(n => (
+                        <button key={n}
+                          className={`vc-star-btn${(ratingHover || myRating) >= n ? ' active' : ''}`}
+                          onMouseEnter={() => setRatingHover(n)}
+                          onMouseLeave={() => setRatingHover(null)}
+                          onClick={() => handleRate(n)}
+                          disabled={ratingSubmitting}
+                          title={`${n} star${n > 1 ? 's' : ''}`}
+                        >
+                          <i className={`bi ${(ratingHover || myRating) >= n ? 'bi-star-fill' : 'bi-star'}`}></i>
+                        </button>
+                      ))}
+                    </div>
+                    {myRating && <span className="vc-rated-badge"><i className="bi bi-check-circle-fill me-1"></i>Rated</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Comments section ── */}
+              <div className="vc-comments">
+                <h3 className="vc-comments-title">
+                  <i className="bi bi-chat-left-text me-2"></i>
+                  Comments {comments.length > 0 && <span className="vc-comments-count">{comments.length}</span>}
+                </h3>
+
+                {/* Compose box — only for owners */}
+                {!locked && (
+                  <div className="vc-comment-compose">
+                    <div className="vc-compose-tabs">
+                      <button
+                        className={`vc-compose-tab${!commentPreview ? ' vc-compose-tab--active' : ''}`}
+                        onClick={() => setCommentPreview(false)}
+                      >Write</button>
+                      <button
+                        className={`vc-compose-tab${commentPreview ? ' vc-compose-tab--active' : ''}`}
+                        onClick={() => setCommentPreview(true)}
+                        disabled={!commentText.trim()}
+                      >Preview</button>
+                      <button
+                        className={`vc-compose-tab vc-compose-tab--help${syntaxHelpOpen ? ' vc-compose-tab--active' : ''}`}
+                        onClick={() => setSyntaxHelpOpen(p => !p)}
+                        title="Formatting syntax reference"
+                      ><i className="bi bi-question-circle me-1"></i>Syntax</button>
+                    </div>
+                    {syntaxHelpOpen && (
+                      <div className="vc-syntax-help">
+                        <div className="vc-syntax-grid">
+                          <span className="vc-syntax-ex"><code># Heading 1</code></span><span className="vc-syntax-desc">Large heading</span>
+                          <span className="vc-syntax-ex"><code>## Heading 2</code></span><span className="vc-syntax-desc">Medium heading</span>
+                          <span className="vc-syntax-ex"><code>**bold**</code></span><span className="vc-syntax-desc">Bold text</span>
+                          <span className="vc-syntax-ex"><code>*italic*</code></span><span className="vc-syntax-desc">Italic text</span>
+                          <span className="vc-syntax-ex"><code>`inline code`</code></span><span className="vc-syntax-desc">Inline code</span>
+                          <span className="vc-syntax-ex"><code>~(js)[code here]~</code></span><span className="vc-syntax-desc">Code block with language</span>
+                          <span className="vc-syntax-ex"><code>- item</code></span><span className="vc-syntax-desc">Bullet list item</span>
+                          <span className="vc-syntax-ex"><code>1. item</code></span><span className="vc-syntax-desc">Numbered list item</span>
+                          <span className="vc-syntax-ex"><code>---</code></span><span className="vc-syntax-desc">Horizontal rule</span>
+                          <span className="vc-syntax-ex"><code>[text](url)</code></span><span className="vc-syntax-desc">Link</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {commentPreview ? (
+                      <div
+                        className="vc-comment-preview vc-text-body"
+                        dangerouslySetInnerHTML={{ __html: parseTextSyntax(commentText) }}
+                      />
+                    ) : (
+                      <textarea
+                        className="vc-comment-textarea"
+                        rows={4}
+                        placeholder={`Write a comment…\nSupports the same text syntax as course content: # headings, **bold**, \`code\`, ~(lang)[…]~, etc.`}
+                        value={commentText}
+                        onChange={e => setCommentText(e.target.value)}
+                        maxLength={4000}
+                      />
+                    )}
+
+                    <div className="vc-compose-footer">
+                      <span className="vc-char-count">{commentText.length} / 4000</span>
+                      <button
+                        className="vc-btn-primary vc-compose-submit"
+                        onClick={handleAddComment}
+                        disabled={!commentText.trim() || commentPosting}
+                      >
+                        {commentPosting
+                          ? <><span className="vc-spinner-sm"></span> Posting…</>
+                          : <><i className="bi bi-send me-1"></i>Post</>}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Comment list */}
+                {commentsLoading ? (
+                  <div className="vc-comments-loading"><span className="vc-spinner-sm"></span> Loading…</div>
+                ) : comments.length === 0 ? (
+                  <p className="vc-comments-empty">No comments yet{locked ? '.' : ' — be the first!'}</p>
+                ) : (
+                  <div className="vc-comment-list">
+                    {comments.map(comment => (
+                      <div key={comment._id} className="vc-comment">
+                        <div className="vc-comment-header">
+                          <span className="vc-comment-author">
+                            <i className="bi bi-person-circle me-1"></i>
+                            {comment.nickname}
+                          </span>
+                          <span className="vc-comment-date">
+                            {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                          </span>
+                          {/* Delete button: shown to author or manager/admin/root */}
+                          {data?._id && comment.userId && (() => {
+                            const al = data?.role?.accessLevel;
+                            const rn = data?.role?.roleName;
+                            const isElevated = al === 'manage' || al === 'admin' || al === 'root' || rn === 'root';
+                            const isAuthor = String(data._id) === String(comment.userId);
+                            return (isAuthor || isElevated) && (
+                              <button
+                                className="vc-comment-delete"
+                                onClick={() => handleDeleteComment(comment._id)}
+                                title="Delete comment"
+                              >
+                                <i className="bi bi-trash"></i>
+                              </button>
+                            );
+                          })()}
+                        </div>
+                        <div
+                          className="vc-comment-body vc-text-body"
+                          dangerouslySetInnerHTML={{ __html: parseTextSyntax(comment.text) }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              </div>{/* end vc-welcome-right */}
             </div>
           ) : (
             /* ── Item Content ── */
@@ -525,6 +789,15 @@ function ViewCourse({ data, onLogout }) {
           )}
         </main>
       </div>
+      <UtilityModal
+        show={modal.show}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+        onCancel={modal.onCancel || closeModal}
+        onClose={closeModal}
+      />
     </>
   );
 }
@@ -772,6 +1045,9 @@ function FormViewer({ url, token: tok }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const shuffles = useRef({});
+  const [modal, setModal] = useState({ show: false, type: 'confirm', title: '', message: '', onConfirm: null, onCancel: null });
+  const closeModal  = () => setModal(p => ({ ...p, show: false }));
+  const showConfirm = (title, message, onConfirm) => setModal({ show: true, type: 'confirm', title, message, onConfirm, onCancel: closeModal });
 
   const getShuffled = (id, arr) => {
     if (!shuffles.current[id]) shuffles.current[id] = [...arr].sort(() => Math.random() - .5);
@@ -812,8 +1088,11 @@ function FormViewer({ url, token: tok }) {
       if (q.type === 'open' || q.type === 'closed') return !a || !a.trim();
       return a === undefined || a === null;
     });
-    if (ua.length && !window.confirm(`${ua.length} unanswered. Submit anyway?`)) return;
-    setSubmitted(true);
+    if (ua.length) {
+      showConfirm('Submit anyway?', `${ua.length} question(s) unanswered. Submit anyway?`, () => setSubmitted(true));
+    } else {
+      setSubmitted(true);
+    }
   };
 
   const retry = () => {
@@ -915,6 +1194,15 @@ function FormViewer({ url, token: tok }) {
           </button>
         </div>
       )}
+      <UtilityModal
+        show={modal.show}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+        onCancel={modal.onCancel || closeModal}
+        onClose={closeModal}
+      />
     </div>
   );
 }

@@ -146,6 +146,33 @@ export const Navbar = ({ data, onLogout }) => {
                                 <span>Settings</span>
                             </Link>
                         </li>
+                        <li className="nav-item">
+                            <Link 
+                                to='/manage/promos' 
+                                className="nav-link text-white d-flex align-items-center"
+                                onClick={closeSidebar}
+                            >
+                                <span>Promo Codes</span>
+                            </Link>
+                        </li>
+                        <li className="nav-item">
+                            <Link 
+                                to='/manage/keys' 
+                                className="nav-link text-white d-flex align-items-center"
+                                onClick={closeSidebar}
+                            >
+                                <span>Product Keys</span>
+                            </Link>
+                        </li>
+                        <li className="nav-item">
+                            <Link 
+                                to='/redeem' 
+                                className="nav-link text-white d-flex align-items-center"
+                                onClick={closeSidebar}
+                            >
+                                <span>Redeem Key</span>
+                            </Link>
+                        </li>
                     </ul>
                 </nav>
 

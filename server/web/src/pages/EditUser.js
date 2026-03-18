@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import AuthImage from "../components/AuthImage";
 import { jwtDecode } from 'jwt-decode';
+import { UtilityModal } from '../components/UtilityModal';
 
 
 function EditUser({ data, onLogout }) {
@@ -19,6 +20,12 @@ function EditUser({ data, onLogout }) {
     });
     const [isCurrent, setIsCurrent] = useState(false)
     const [errors, setErrors] = useState({});
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete  = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
 
     // Profile picture state
     const [profilePicture, setProfilePicture] = useState(null);
@@ -60,12 +67,12 @@ function EditUser({ data, onLogout }) {
                         const {_} = await jwtDecode('Bearer '+user.password)
                         setCurrentPassword(_ || '');
                     } else {
-                        alert('Failed to fetch user details');
+                        showInfo('Error', 'Failed to fetch user details');
                         navigate('/manage/users');
                     }
                 } catch (error) {
                     console.error('Error fetching user:', error);
-                    alert('Error loading user details');
+                    showInfo('Error', 'Error loading user details');
                     navigate('/manage/users');
                 } finally {
                     setLoading(false);
@@ -167,7 +174,7 @@ function EditUser({ data, onLogout }) {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                alert(`Failed to update user: ${errorData.message || 'Unknown error'}`);
+                showInfo('Error', `Failed to update user: ${errorData.message || 'Unknown error'}`);
                 setSaving(false);
                 return;
             }
@@ -189,23 +196,21 @@ function EditUser({ data, onLogout }) {
                 }
             }
 
-            alert('User updated successfully!');
+            showInfo('Success', 'User updated successfully!');
             setHasChanges(false);
             setProfilePicture(null);
             setProfilePreview(null);
             navigate('/manage/users');
         } catch (error) {
             console.error('Error updating user:', error);
-            alert('Error updating user. Please try again.');
+            showInfo('Error', 'Error updating user. Please try again.');
         } finally {
             setSaving(false);
         }
     };
 
     const handleCancel = () => {
-        if (window.confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
-            navigate('/manage/users');
-        }
+        showConfirm('Cancel', 'Are you sure you want to cancel? Any unsaved changes will be lost.', () => navigate('/manage/users'));
     };
 
     const getRoleName = (roleId) => {
@@ -388,42 +393,31 @@ function EditUser({ data, onLogout }) {
                                                     <button
                                                         type="button"
                                                         className="btn btn-sm btn-danger"
-                                                        onClick={async () => {
-                                                            if (!window.confirm('Are you sure you want to delete this profile picture?')) {
-                                                                return;
-                                                            }
-
+                                                        onClick={() => showConfirm('Delete Profile Picture', 'Are you sure you want to delete this profile picture?', async () => {
                                                             try {
                                                                 const token = localStorage.getItem('token');
                                                                 const headers = {
                                                                     'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`
                                                                 };
-
-                                                                // Call DELETE API endpoint
                                                                 const response = await fetch(`http://localhost:4040/api/manage/users/${id}/profile-picture`, {
                                                                     method: 'DELETE',
                                                                     headers
                                                                 });
-
                                                                 if (response.ok) {
-                                                                    // Clear local state
                                                                     setProfilePicture(null);
                                                                     setProfilePreview(null);
-                                                                    setFormData(prev => ({
-                                                                        ...prev,
-                                                                        links: []
-                                                                    }));
-                                                                    setHasChanges(false); // No changes since we already saved
-                                                                    alert('Profile picture deleted successfully');
+                                                                    setFormData(prev => ({ ...prev, links: [] }));
+                                                                    setHasChanges(false);
+                                                                    showInfo('Success', 'Profile picture deleted successfully');
                                                                 } else {
                                                                     const errorData = await response.json();
-                                                                    alert(`Failed to delete profile picture: ${errorData.message || 'Unknown error'}`);
+                                                                    showInfo('Error', `Failed to delete profile picture: ${errorData.message || 'Unknown error'}`);
                                                                 }
                                                             } catch (error) {
                                                                 console.error('Error deleting profile picture:', error);
-                                                                alert('Error deleting profile picture. Please try again.');
+                                                                showInfo('Error', 'Error deleting profile picture. Please try again.');
                                                             }
-                                                        }}
+                                                        }, true)}
                                                         disabled={!isCurrent}
                                                     >
                                                         <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
@@ -624,7 +618,7 @@ function EditUser({ data, onLogout }) {
                                                             className="btn btn-warning"
                                                             onClick={() => {
                                                                 if (!newPassword) {
-                                                                    alert('Please enter or generate a new password');
+                                                                    showInfo('Validation', 'Please enter or generate a new password');
                                                                     return;
                                                                 }
                                                                 setHasChanges(true);
@@ -698,7 +692,23 @@ function EditUser({ data, onLogout }) {
                     </div>
                 </div>
             </div>
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
         </>
+
     );
 }
 

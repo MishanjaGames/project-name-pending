@@ -3,6 +3,8 @@ const fileHandler = require('../utils/fileHandler')
 const linkFilter = require('../utils/linkFilter')
 const Courses = require('../models/mongo.courses')
 const errorHandler = require('../utils/errorHandler')
+const Users = require('../models/mongo.users');
+const Roles = require('../models/mongo.roles');
 
 module.exports.getAll = async (req, res) => {
     try {
@@ -69,30 +71,54 @@ module.exports.getById = async (req, res) => {
 
 module.exports.create = async (req, res) => {
     try {
-        const skils = [`Master the core concepts of ${req.body.title.toLowerCase()}`, 'Learn and build real-world projects']
-        
+        const base_lang  = req.body.base_lang  || 'en';
+        const add_langs  = Array.isArray(req.body.add_langs) ? req.body.add_langs : [];
+
+        // Build trans array — one entry per language (base first, then additional)
+        let trans = [];
+        if (Array.isArray(req.body.trans) && req.body.trans.length > 0) {
+            trans = req.body.trans.map(t => ({
+                title:       t.title       || '',
+                description: t.description || '',
+                skills:      Array.isArray(t.skills) ? t.skills : []
+            }));
+        } else {
+            // Fallback: build a single entry from flat fields (backwards compat)
+            const baseTitle = req.body.title || '';
+            const defaultSkills = baseTitle
+                ? [`Master the core concepts of ${baseTitle.toLowerCase()}`, 'Learn and build real-world projects']
+                : [];
+            trans = [{
+                title:       baseTitle,
+                description: req.body.description || '',
+                skills:      [...defaultSkills, ...(Array.isArray(req.body.skills) ? req.body.skills : [])]
+            }];
+            // Pad with empty entries for each additional language
+            add_langs.forEach(() => trans.push({ title: '', description: '', skills: [] }));
+        }
+
         const course = await new Courses({
-            userId: req.body.userId,
-            title: req.body.title,
-            description: req.body.description,
-            skills: [...skils, ...req.body.skills],
-            price: req.body.price,
-            ratings: req.body.ratings || 0,
+            userId:    req.body.userId,
+            base_lang,
+            add_langs,
+            trans,
+            price:     req.body.price     || 0,
+            ratings:   req.body.ratings   || 0,
             followers: 0,
-            level: req.body.level,
+            level:     req.body.level,
             direction: req.body.direction,
-            volumes: [],
-            links: [], // Initialize as empty array - thumbnail and files will be added when uploaded
+            volumes:   [],
+            links:     [],
             createdAt: Date.now(),
             updatedAt: Date.now()
-        })
+        });
 
-        await course.save()
+        await course.save();
 
         res.status(201).json({
             message: 'Course created successfully',
             data: course
-        })
+        });
     } catch (e) {
         errorHandler(res, 500, e)
     }
@@ -120,18 +146,24 @@ module.exports.remove = async (req, res) => {
 module.exports.update = async (req, res) => {
     try {
         const updatedCourse = {
-            userId: req.body.userId,
-            status: req.body.status,
-            title: req.body.title,
-            description: req.body.description,
+            userId:    req.body.userId,
+            status:    req.body.status,
             direction: req.body.direction,
-            level: req.body.level,
-            skills: req.body.skills,
-            ratings: req.body.ratings,
+            level:     req.body.level,
+            base_lang: req.body.base_lang,
+            add_langs: Array.isArray(req.body.add_langs) ? req.body.add_langs : [],
+            trans:     Array.isArray(req.body.trans)
+                ? req.body.trans.map(t => ({
+                    title:       t.title       || '',
+                    description: t.description || '',
+                    skills:      Array.isArray(t.skills) ? t.skills : []
+                  }))
+                : [],
+            ratings:   req.body.ratings,
             followers: req.body.followers,
-            price: req.body.price,
-            volumes: req.body.volumes,
-            links: req.body.links,
+            price:     req.body.price,
+            volumes:   req.body.volumes,
+            links:     req.body.links,
             updatedAt: Date.now()
         }
 
@@ -514,6 +546,265 @@ module.exports.deleteAllCourseFiles = async (req, res) => {
             });
         }
 
+    } catch (e) {
+        errorHandler(res, 500, e);
+    }
+};
+// ============================================================================
+// RATING ROUTES
+// ============================================================================
+
+/**
+ * GET  /api/courses/:id/rating
+ * Returns the authenticated user's current rating for this course (or null).
+ * Requires JWT auth.
+ */
+module.exports.getMyRating = async (req, res) => {
+    try {
+        const token = req.headers.authorization
+            ? req.headers.authorization.split(' ')[1]
+            : null;
+
+        if (!token) return errorHandler(res, 401, 'Authentication required');
+
+        const requester = await utils.parseToken(token);
+        if (!requester) return errorHandler(res, 401, 'Invalid token');
+
+        const course = await Courses.findById(req.params.id);
+        if (!course) return errorHandler(res, 404, 'Course not found');
+
+        const entry = (course.ratingsList || []).find(
+            r => r.userId.toString() === requester._id.toString()
+        );
+
+        res.status(200).json({
+            data: {
+                courseId:   course._id,
+                avgRating:  course.ratings || 0,
+                totalVotes: (course.ratingsList || []).length,
+                myRating:   entry ? entry.value : null
+            }
+        });
+    } catch (e) {
+        errorHandler(res, 500, e);
+    }
+};
+
+/**
+ * POST /api/courses/:id/rating
+ * Submit or update the authenticated user's rating for this course.
+ * Only users who own the course (it appears in user.courses[]) may rate it.
+ *
+ * Body: { value: 1|2|3|4|5 }
+ */
+module.exports.rateById = async (req, res) => {
+    try {
+        const token = req.headers.authorization
+            ? req.headers.authorization.split(' ')[1]
+            : null;
+
+        if (!token) return errorHandler(res, 401, 'Authentication required');
+
+        const requester = await utils.parseToken(token);
+        if (!requester) return errorHandler(res, 401, 'Invalid token');
+
+        // Validate rating value
+        const value = parseInt(req.body.value, 10);
+        if (isNaN(value) || value < 1 || value > 5) {
+            return errorHandler(res, 400, 'Rating value must be an integer between 1 and 5');
+        }
+
+        const course = await Courses.findById(req.params.id);
+        if (!course) return errorHandler(res, 404, 'Course not found');
+
+        // Check that the user has purchased / owns this course
+        const UsersModel = require('../models/mongo.users');
+        const user  = await UsersModel.findById(requester._id);
+        if (!user)  return errorHandler(res, 404, 'User not found');
+
+        const hasBought = (user.courses || []).some(
+            c => c._id && c._id.toString() === course._id.toString()
+        );
+        if (!hasBought) {
+            return errorHandler(res, 403, 'You must own this course to rate it');
+        }
+
+        // Upsert: update existing entry or push a new one
+        const ratingsList = course.ratingsList || [];
+        const existingIdx = ratingsList.findIndex(
+            r => r.userId.toString() === requester._id.toString()
+        );
+
+        if (existingIdx >= 0) {
+            ratingsList[existingIdx].value     = value;
+            ratingsList[existingIdx].createdAt = new Date();
+        } else {
+            ratingsList.push({
+                userId:    requester._id,
+                value,
+                createdAt: new Date()
+            });
+        }
+
+        // Recalculate average (round to 2 dp)
+        const avgRating = parseFloat(
+            (ratingsList.reduce((sum, r) => sum + r.value, 0) / ratingsList.length).toFixed(2)
+        );
+
+        await Courses.findByIdAndUpdate(
+            { _id: course._id },
+            { $set: { ratingsList, ratings: avgRating } }
+        );
+
+        res.status(200).json({
+            message: existingIdx >= 0 ? 'Rating updated' : 'Rating submitted',
+            data: {
+                courseId:   course._id,
+                myRating:   value,
+                avgRating,
+                totalVotes: ratingsList.length
+            }
+        });
+    } catch (e) {
+        errorHandler(res, 500, e);
+    }
+};
+
+// ============================================================================
+// COMMENT ROUTES
+// ============================================================================
+
+/**
+ * GET /api/courses/:id/comments
+ * Public. Returns all comments for a course with resolved nicknames.
+ * Response shape per comment: { _id, userId, nickname, date, text }
+ */
+module.exports.getComments = async (req, res) => {
+    try {
+        const course = await Courses.findById(req.params.id);
+        if (!course) return errorHandler(res, 404, 'Course not found');
+
+        const comments = course.comments || [];
+
+        // Resolve nicknames in bulk (one query for all unique authors)
+        const uniqueIds = [...new Set(comments.map(c => c.userId.toString()))];
+        const users = await Users.find({ _id: { $in: uniqueIds } }).select('_id nickname');
+        const nicknameMap = {};
+        users.forEach(u => { nicknameMap[u._id.toString()] = u.nickname; });
+
+        const enriched = comments.map(c => ({
+            _id:      c._id,
+            userId:   c.userId,
+            nickname: nicknameMap[c.userId.toString()] || 'Unknown user',
+            date:     c.date,
+            text:     c.text
+        }));
+
+        res.status(200).json({ data: enriched });
+    } catch (e) {
+        errorHandler(res, 500, e);
+    }
+};
+
+/**
+ * POST /api/courses/:id/comments
+ * JWT required. User must own (have bought) the course or be its creator.
+ * Body: { text: string }
+ */
+module.exports.addComment = async (req, res) => {
+    try {
+        const token = req.headers.authorization
+            ? req.headers.authorization.split(' ')[1]
+            : null;
+        if (!token) return errorHandler(res, 401, 'Authentication required');
+
+        const requester = await utils.parseToken(token);
+        if (!requester) return errorHandler(res, 401, 'Invalid token');
+
+        const text = (req.body.text || '').trim();
+        if (!text) return errorHandler(res, 400, 'Comment text is required');
+        if (text.length > 4000) return errorHandler(res, 400, 'Comment must be 4000 characters or fewer');
+
+        const course = await Courses.findById(req.params.id);
+        if (!course) return errorHandler(res, 404, 'Course not found');
+
+        // Allow: course creator OR anyone who owns the course
+        const isCreator = course.userId.toString() === requester._id.toString();
+        const hasBought = (requester.courses || []).some(
+            c => c._id && c._id.toString() === course._id.toString()
+        );
+        if (!isCreator && !hasBought) {
+            return errorHandler(res, 403, 'You must own this course to post a comment');
+        }
+
+        const comment = {
+            userId: requester._id,
+            date:   new Date(),
+            text
+        };
+
+        const updated = await Courses.findByIdAndUpdate(
+            { _id: course._id },
+            { $push: { comments: comment } },
+            { new: true }
+        );
+
+        // Return the newly created comment with nickname resolved
+        const newComment = updated.comments[updated.comments.length - 1];
+        res.status(201).json({
+            message: 'Comment added',
+            data: {
+                _id:      newComment._id,
+                userId:   newComment.userId,
+                nickname: requester.nickname,
+                date:     newComment.date,
+                text:     newComment.text
+            }
+        });
+    } catch (e) {
+        errorHandler(res, 500, e);
+    }
+};
+
+/**
+ * DELETE /api/courses/:id/comments/:commentId
+ * JWT required. Only the comment author or a user with manage+ role may delete.
+ */
+module.exports.deleteComment = async (req, res) => {
+    try {
+        const token = req.headers.authorization
+            ? req.headers.authorization.split(' ')[1]
+            : null;
+        if (!token) return errorHandler(res, 401, 'Authentication required');
+
+        const requester = await utils.parseToken(token);
+        if (!requester) return errorHandler(res, 401, 'Invalid token');
+
+        const course = await Courses.findById(req.params.id);
+        if (!course) return errorHandler(res, 404, 'Course not found');
+
+        const comment = (course.comments || []).find(
+            c => c._id.toString() === req.params.commentId
+        );
+        if (!comment) return errorHandler(res, 404, 'Comment not found');
+
+        // Check permissions: author or manage+
+        const isAuthor = comment.userId.toString() === requester._id.toString();
+        if (!isAuthor) {
+            const role = await Roles.findById(requester.role);
+            const level = role?.accessLevel || 'default';
+            const canManage = ['manage', 'admin', 'root'].includes(level);
+            if (!canManage) {
+                return errorHandler(res, 403, 'You can only delete your own comments');
+            }
+        }
+
+        await Courses.findByIdAndUpdate(
+            { _id: course._id },
+            { $pull: { comments: { _id: comment._id } } }
+        );
+
+        res.status(200).json({ message: 'Comment deleted', data: { _id: comment._id } });
     } catch (e) {
         errorHandler(res, 500, e);
     }

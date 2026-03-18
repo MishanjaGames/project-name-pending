@@ -1,15 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Navbar } from "../components/Navbar";
+import { UtilityModal } from '../components/UtilityModal';
 
 function Settings({ data, onLogout }) {
     const [logs, setLogs] = useState('');
     const [logFiles, setLogFiles] = useState([]);
     const [selectedDate, setSelectedDate] = useState('today');
     const [loading, setLoading] = useState(false);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete  = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
     const [autoRefresh, setAutoRefresh] = useState(true);
     const [refreshInterval, setRefreshInterval] = useState(30); // seconds
     const [lastUpdate, setLastUpdate] = useState(null);
     const [error, setError] = useState('');
+    // SSE for live log streaming (today only)
+    const [sseState, setSseState] = useState('idle'); // 'idle'|'connecting'|'open'|'closed'
+    const esRef = useRef(null);
 
     const token = localStorage.getItem('token');
 
@@ -50,9 +60,6 @@ function Settings({ data, onLogout }) {
         }
     };
 
-    // const req = new EventSource(`http://localhost:4040/api/utils/logs/stream?token=${encodeURIComponent(token)}`);
-    // req.onmessage = e => {setLogs(e.logs); setLastUpdate(new Date())}
-
     // Fetch available log files
     const fetchLogFiles = async () => {
         try {
@@ -83,15 +90,56 @@ function Settings({ data, onLogout }) {
         fetchLogFiles();
     }, [selectedDate]);
 
-    // Auto-refresh
+    // Live streaming (SSE) for today; polling for historical dates
     useEffect(() => {
+        // Always close any existing SSE connection when dependencies change
+        if (esRef.current) {
+            esRef.current.close();
+            esRef.current = null;
+            setSseState('idle');
+        }
+
         if (!autoRefresh) return;
 
-        const interval = setInterval(() => {
-            fetchLogs(selectedDate);
-        }, refreshInterval * 1000);
+        // Use SSE only for 'today' — historical files don't change
+        if (selectedDate === 'today') {
+            const url = `http://localhost:4040/api/utils/logs/stream?token=${encodeURIComponent(token)}&date=today&lines=100`;
+            const es = new EventSource(url);
+            esRef.current = es;
+            setSseState('connecting');
 
-        return () => clearInterval(interval);
+            es.onopen = () => setSseState('open');
+
+            es.onmessage = (e) => {
+                try {
+                    const d = JSON.parse(e.data);
+                    if (d.success) {
+                        setLogs(d.logs);
+                        setLastUpdate(new Date());
+                        setError('');
+                    }
+                } catch (err) {
+                    console.error('SSE parse error:', err);
+                }
+            };
+
+            es.onerror = () => {
+                setSseState('closed');
+                // EventSource auto-reconnects; mark state until next onopen
+            };
+
+            return () => {
+                es.close();
+                esRef.current = null;
+                setSseState('idle');
+            };
+        } else {
+            // Historical dates: use polling interval
+            const interval = setInterval(() => {
+                fetchLogs(selectedDate);
+            }, refreshInterval * 1000);
+            return () => clearInterval(interval);
+        }
     }, [autoRefresh, refreshInterval, selectedDate]);
 
     return (
@@ -125,11 +173,17 @@ function Settings({ data, onLogout }) {
                                     <small className="text-muted">Last 100 entries {lastUpdate && `(updated ${lastUpdate.toLocaleTimeString()})`}</small>
                                 </div>
                                 <div className="d-flex gap-2 flex-wrap align-items-center">
-                                    {autoRefresh && (
+                                    {autoRefresh && selectedDate === 'today' && sseState === 'open' && (
                                         <span className="badge bg-success d-flex align-items-center gap-1">
                                             <span className="rounded-circle" style={{ width: '6px', height: '6px', backgroundColor: 'rgba(255,255,255,0.7)', animation: 'pulse 1s infinite' }}></span>
-                                            Live
+                                            Live (SSE)
                                         </span>
+                                    )}
+                                    {autoRefresh && selectedDate === 'today' && sseState === 'connecting' && (
+                                        <span className="badge bg-warning text-dark">Connecting…</span>
+                                    )}
+                                    {autoRefresh && selectedDate !== 'today' && (
+                                        <span className="badge bg-secondary">Polling</span>
                                     )}
                                     <button
                                         className="btn btn-sm btn-outline-primary"
@@ -258,7 +312,7 @@ function Settings({ data, onLogout }) {
                                         className="btn btn-sm btn-outline-secondary"
                                         onClick={() => {
                                             navigator.clipboard.writeText(logs);
-                                            alert('Logs copied to clipboard!');
+                                            showInfo('Copied', 'Logs copied to clipboard!');
                                         }}
                                         disabled={!logs}
                                     >
@@ -337,7 +391,23 @@ function Settings({ data, onLogout }) {
                     50% { opacity: 1; }
                 }
             `}</style>
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
         </>
+
     );
 }
 

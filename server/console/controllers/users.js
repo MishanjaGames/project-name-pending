@@ -27,27 +27,44 @@ module.exports.getCurrent = async (req, res) => {
 
 module.exports.getAll = async (req, res) => {
     try {
-        // Get requester's access level
+        // Get requester's access level and identity
         const token = req.headers.authorization ? req.headers.authorization.split(" ")[1] : null;
         let requesterAccessLevel = 'default';
-        
+        let requesterId = null;
+        let requesterIsRoot = false;
+
         if (token) {
             try {
-                const decoded = token.split('.'); // JWT has 3 parts
                 const requester = await utils.parseToken(token);
-                if (requester && requester.role) {
-                    const requesterRole = await require('../models/mongo.roles').findById(requester.role);
-                    if (requesterRole) {
-                        requesterAccessLevel = requesterRole.accessLevel || 'default';
+                if (requester) {
+                    requesterId = requester._id ? requester._id.toString() : null;
+                    if (requester.role) {
+                        const requesterRole = await require('../models/mongo.roles').findById(requester.role);
+                        if (requesterRole) {
+                            requesterAccessLevel = requesterRole.accessLevel || 'default';
+                            requesterIsRoot = requesterRole.accessLevel === 'root' || requesterRole.roleName === 'root';
+                        }
                     }
                 }
             } catch (e) {
                 // Token parsing failed, use default level
             }
         }
-        
-        const users = await Users.find({});
-        const filteredUsers = linkFilter.filterUsersData(users, requesterAccessLevel).filter((d)=>d.nickname!=='root');
+
+        const users = await Users.find({}).populate('role');
+        const filteredUsers = linkFilter.filterUsersData(users, requesterAccessLevel).filter((d) => {
+            const userId = d._id ? d._id.toString() : null;
+            // A root user always sees themselves in the list
+            if (requesterIsRoot && requesterId && userId === requesterId) return true;
+            // Hide users whose role is root (by accessLevel or roleName)
+            const role = d.role;
+            if (role && typeof role === 'object') {
+                if (role.accessLevel === 'root' || role.roleName === 'root') return false;
+            }
+            // Legacy fallback: hide by nickname
+            if (d.nickname === 'root') return false;
+            return true;
+        });
         res.status(200).json({ data: filteredUsers })
     } catch (e) {
         errorHandler(res, 500, e)

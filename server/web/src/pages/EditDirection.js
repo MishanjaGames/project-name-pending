@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
+import { UtilityModal } from '../components/UtilityModal';
 
 function EditDirection({ data, onLogout }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const [directionName, setDirectionName] = useState('');
   const [loading, setLoading] = useState(true);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
   const [saving, setSaving] = useState(false);
 
   const token = localStorage.getItem('token');
@@ -23,12 +29,12 @@ function EditDirection({ data, onLogout }) {
         const data = await response.json();
         setDirectionName(data.directionName);
       } else {
-        alert('Direction not found');
+        showInfo('Error', 'Direction not found');
         navigate('/manage/directions');
       }
     } catch (err) {
       console.error('Error fetching direction:', err);
-      alert('Failed to load direction');
+      showInfo('Error', 'Failed to load direction');
       navigate('/manage/directions');
     } finally {
       setLoading(false);
@@ -39,7 +45,7 @@ function EditDirection({ data, onLogout }) {
     e.preventDefault();
 
     if (!directionName.trim()) {
-      alert('Please enter a direction name');
+      showInfo('Validation', 'Please enter a direction name');
       return;
     }
 
@@ -59,15 +65,15 @@ function EditDirection({ data, onLogout }) {
       });
 
       if (response.ok) {
-        alert('Direction updated successfully');
+        showInfo('Success', 'Direction updated successfully');
         navigate('/manage/directions');
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to update direction');
+        showInfo('Error', error.message || 'Failed to update direction');
       }
     } catch (err) {
       console.error('Error updating direction:', err);
-      alert('Failed to update direction');
+      showInfo('Error', 'Failed to update direction');
     } finally {
       setSaving(false);
     }
@@ -162,7 +168,19 @@ function EditDirection({ data, onLogout }) {
           </div>
         </div>
       </div>
+        <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
     </>
+
   );
 }
 

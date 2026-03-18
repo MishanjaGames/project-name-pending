@@ -4,6 +4,7 @@ import JSZip from 'jszip';
 import { Navbar } from '../components/Navbar';
 import { extendSession } from "../utils/utils";
 import './CoursePreview.css';
+import { UtilityModal } from '../components/UtilityModal';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const isContainer = (entity) =>
@@ -38,10 +39,10 @@ const fu = (url) => (!url || url.startsWith('http') ? url : `${BASE}${url}`);
 const isYouTube = url => url && (/youtu\.be\/|youtube\.com\/(watch|shorts|embed)/.test(url));
 
 const extractYouTubeId = url => {
-  const short  = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
-  const watch  = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  const short = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  const watch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
   const shorts = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
-  const embed  = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+  const embed = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
   return (short || watch || shorts || embed)?.[1] || null;
 };
 
@@ -61,36 +62,36 @@ const YoutubeEmbed = ({ url }) => {
 };
 
 const ENTITY_TYPE_OPTIONS = [
-  { type: 'container', icon: 'bi-folder',      label: 'Container' },
-  { type: 'text',      icon: 'bi-file-text',   label: 'Text'      },
-  { type: 'form',      icon: 'bi-ui-checks',   label: 'Form'      },
-  { type: 'image',     icon: 'bi-image',        label: 'Image'     },
-  { type: 'video',     icon: 'bi-camera-video', label: 'Video'     },
-  { type: 'audio',     icon: 'bi-music-note',   label: 'Audio'     },
-  { type: 'document',  icon: 'bi-file-pdf',     label: 'Document'  },
-  { type: 'archive',   icon: 'bi-file-zip',     label: 'Archive'   },
+  { type: 'container', icon: 'bi-folder', label: 'Container' },
+  { type: 'text', icon: 'bi-file-text', label: 'Text' },
+  { type: 'form', icon: 'bi-ui-checks', label: 'Form' },
+  { type: 'image', icon: 'bi-image', label: 'Image' },
+  { type: 'video', icon: 'bi-camera-video', label: 'Video' },
+  { type: 'audio', icon: 'bi-music-note', label: 'Audio' },
+  { type: 'document', icon: 'bi-file-pdf', label: 'Document' },
+  { type: 'archive', icon: 'bi-file-zip', label: 'Archive' },
 ];
 
 const ITEM_TYPE_OPTIONS = [
-  { type: 'text',     icon: 'bi-file-text',   label: 'Text'     },
-  { type: 'form',     icon: 'bi-ui-checks',   label: 'Form'     },
-  { type: 'image',    icon: 'bi-image',        label: 'Image'    },
-  { type: 'audio',    icon: 'bi-music-note',   label: 'Audio'    },
-  { type: 'video',    icon: 'bi-camera-video', label: 'Video'    },
-  { type: 'document', icon: 'bi-file-pdf',     label: 'Document' },
-  { type: 'archive',  icon: 'bi-file-zip',     label: 'Archive'  },
+  { type: 'text', icon: 'bi-file-text', label: 'Text' },
+  { type: 'form', icon: 'bi-ui-checks', label: 'Form' },
+  { type: 'image', icon: 'bi-image', label: 'Image' },
+  { type: 'audio', icon: 'bi-music-note', label: 'Audio' },
+  { type: 'video', icon: 'bi-camera-video', label: 'Video' },
+  { type: 'document', icon: 'bi-file-pdf', label: 'Document' },
+  { type: 'archive', icon: 'bi-file-zip', label: 'Archive' },
 ];
 
 // ─── parseTextSyntax ──────────────────────────────────────────────────────────
 function parseTextSyntax(text) {
   if (!text) return '';
 
-  const encAttr = s => s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const encHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const encAttr = s => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const encHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   const codeBlocks = [];
   let html = text.replace(/~\(([^)]+)\)\[([\s\S]+?)\]~/g, (_, lang, code) => {
-    const esc = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    const esc = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     const idx = codeBlocks.length;
     codeBlocks.push(
       `<div class="code-block"><div class="code-header"><span class="code-lang">${lang}</span>` +
@@ -111,28 +112,35 @@ function parseTextSyntax(text) {
     return `\x00BTN${idx}\x00`;
   });
 
-  html = html.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+  html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
   html = html.replace(/~\(([^\|]+)\)\[([^\]]+)\]~/g, '<code type="$1">$2</code>');
-  html = html.replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>');
-  html = html.replace(/`\{([^}]+)\}`/g,'<p>$1</p>');
-  html = html.replace(/\{(https?:\/\/[^}]+)\}/g,'<video src="$1" class="video-player" controls></video>');
+  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+  html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  html = html.replace(/^---+$/gm, '<hr>');
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  html = html.replace(/`\{([^}]+)\}`/g, '<p>$1</p>');
+  html = html.replace(/\{(https?:\/\/[^}]+)\}/g, '<video src="$1" class="video-player" controls></video>');
 
   html = html.replace(/\((https?:\/\/[^)]+)\)/g, (_, u) => {
-    const short  = u.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
-    const watch  = u.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    const short = u.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    const watch = u.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
     const shorts = u.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
     const id = (short || watch || shorts)?.[1];
     const e = id ? `https://www.youtube.com/embed/${id}` : u;
     return `\n    <iframe src="${e}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
   });
 
-  html = html.replace(/!\[([^\|]+)\|(https?:\/\/[^\]]+)\]!/g,'<a href="$2" download class="text-download-link"><i class="bi bi-download"></i> $1</a>');
-  html = html.replace(/@(https?:\/\/[^@]+)@/g,'<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-  html = html.replace(/#(https?:\/\/[^#]+)#/g,'<img alt="image" class="content-image" src="$1">');
-  html = html.replace(/^(\d+)\.\s(.+)$/gm,'<li class="numbered-item">$2</li>').replace(/(<li class="numbered-item">.*?<\/li>\n?)+/gs,'<ol>$&</ol>');
-  html = html.replace(/^[•\-\*]\s(.+)$/gm,'<li>$1</li>').replace(/(<li>.*?<\/li>\n?)+/gs,'<ul>$&</ul>');
-  html = html.replace(/\\t/g,'&nbsp;&nbsp;&nbsp;&nbsp;').replace(/\\n/g,'<br>');
+  html = html.replace(/!\[([^\|]+)\|(https?:\/\/[^\]]+)\]!/g, '<a href="$2" download class="text-download-link"><i class="bi bi-download"></i> $1</a>');
+  html = html.replace(/@(https?:\/\/[^@]+)@/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+  html = html.replace(/#(https?:\/\/[^#]+)#/g, '<img alt="image" class="content-image" src="$1">');
+  html = html.replace(/^(\d+)\.\s(.+)$/gm, '<li class="numbered-item">$2</li>').replace(/(<li class="numbered-item">.*?<\/li>\n?)+/gs, '<ol>$&</ol>');
+  html = html.replace(/^[•\-\*]\s(.+)$/gm, '<li>$1</li>').replace(/(<li>.*?<\/li>\n?)+/gs, '<ul>$&</ul>');
+  html = html.replace(/\\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;').replace(/\\n/g, '<br>');
 
   html = html.replace(/\x00CODE(\d+)\x00/g, (_, i) => codeBlocks[+i]);
   html = html.replace(/\x00BTN(\d+)\x00/g, (_, i) => {
@@ -149,6 +157,12 @@ function CoursePreview({ data, onLogout }) {
   const token = localStorage.getItem('token');
 
   const [locked, setLocked] = useState(true);
+
+  // ── Promo state ────────────────────────────────────────────────────────────
+  const [promoCode, setPromoCode] = useState('');
+  const [promoResult, setPromoResult] = useState(null);  // null | { valid, finalPrice, discount, ... }
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [applyingPromo, setApplyingPromo] = useState(false);
   const [course, setCourse] = useState(null);
   const [author, setAuthor] = useState({});
   const [role, setRole] = useState({});
@@ -157,6 +171,11 @@ function CoursePreview({ data, onLogout }) {
   const [expandedChapters, setExpandedChapters] = useState({});
   const [expandedItems, setExpandedItems] = useState({});
   const [editMode, setEditMode] = useState(false);
+
+  const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null, danger: false });
+  const closeModal = () => setModal(p => ({ ...p, show: false }));
+  const showInfo = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+  const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
   const [volumes, setVolumes] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [directions, setDirections] = useState([]);
@@ -182,13 +201,100 @@ function CoursePreview({ data, onLogout }) {
   const [entityEdit, setEntityEdit] = useState(null);
   const [entityFormModal, setEntityFormModal] = useState(null);
 
+  // ── Comments & Rating state ─────────────────────────────────────────────────
+  const [cpComments, setCpComments] = useState([]);
+  const [cpCommentsLoading, setCpCommentsLoading] = useState(false);
+  const [cpCommentText, setCpCommentText] = useState('');
+  const [cpCommentPosting, setCpCommentPosting] = useState(false);
+  const [cpCommentPreview, setCpCommentPreview] = useState(false);
+  const [cpSyntaxHelp, setCpSyntaxHelp] = useState(false);
+  const [cpMyRating, setCpMyRating] = useState(null);   // 1-5 or null
+  const [cpAvgRating, setCpAvgRating] = useState(0);
+  const [cpTotalVotes, setCpTotalVotes] = useState(0);
+  const [cpRatingHover, setCpRatingHover] = useState(null);
+  const [cpRatingSubmitting, setCpRatingSubmitting] = useState(false);
+
   useEffect(() => { fetchData(); setRole(data.role); }, [id]);
-  useEffect(() => { if (course) fetchUserData(); }, [course?.userId]);
+  useEffect(() => { if (course) { fetchUserData(); fetchCpComments(); fetchCpRating(); } }, [course?._id]);
   useEffect(() => {
     const h = e => { if (hasChanges) { e.preventDefault(); e.returnValue = 'Unsaved changes!'; } };
     window.addEventListener('beforeunload', h);
     return () => window.removeEventListener('beforeunload', h);
   }, [hasChanges]);
+
+  const fetchCpComments = async () => {
+    setCpCommentsLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/courses/${id}/comments`);
+      if (res.ok) { const j = await res.json(); setCpComments(j.data || []); }
+    } catch (e) { console.error('fetchCpComments:', e); }
+    setCpCommentsLoading(false);
+  };
+
+  const fetchCpRating = async () => {
+    const tok = localStorage.getItem('token');
+    if (!tok) return;
+    try {
+      const res = await fetch(`${BASE}/api/courses/${id}/rating`, {
+        headers: { Authorization: `${tok.split(' ')[0]} ${tok.split(' ')[1]}` }
+      });
+      if (res.ok) {
+        const j = await res.json();
+        setCpAvgRating(j.data?.avgRating || 0);
+        setCpTotalVotes(j.data?.totalVotes || 0);
+        setCpMyRating(j.data?.myRating || null);
+      }
+    } catch (e) { console.error('fetchCpRating:', e); }
+  };
+
+  const handleCpAddComment = async () => {
+    if (!cpCommentText.trim() || cpCommentPosting) return;
+    setCpCommentPosting(true);
+    const tok = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${BASE}/api/courses/${id}/comments`, {
+        method: 'POST',
+        headers: { Authorization: `${tok.split(' ')[0]} ${tok.split(' ')[1]}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: cpCommentText.trim() })
+      });
+      if (res.ok) { setCpCommentText(''); setCpCommentPreview(false); await fetchCpComments(); }
+      else showInfo('Error', 'Failed to post comment.');
+    } catch (e) { showInfo('Error', 'Network error.'); }
+    setCpCommentPosting(false);
+  };
+
+  const handleCpDeleteComment = async (commentId) => {
+    showConfirm('Delete Comment', 'Are you sure you want to delete this comment?', async () => {
+      const tok = localStorage.getItem('token');
+      try {
+        const res = await fetch(`${BASE}/api/courses/${id}/comments/${commentId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `${tok.split(' ')[0]} ${tok.split(' ')[1]}` }
+        });
+        if (res.ok) setCpComments(prev => prev.filter(c => c._id !== commentId));
+      } catch (e) { console.error('delete comment:', e); }
+    });
+  };
+
+  const handleCpRate = async (value) => {
+    if (locked || cpRatingSubmitting) return;
+    setCpRatingSubmitting(true);
+    const tok = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${BASE}/api/courses/${id}/rating`, {
+        method: 'POST',
+        headers: { Authorization: `${tok.split(' ')[0]} ${tok.split(' ')[1]}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value })
+      });
+      if (res.ok) {
+        const j = await res.json();
+        setCpMyRating(j.data.myRating);
+        setCpAvgRating(j.data.avgRating);
+        setCpTotalVotes(j.data.totalVotes);
+      } else showInfo('Error', 'Could not submit rating.');
+    } catch (e) { showInfo('Error', 'Network error.'); }
+    setCpRatingSubmitting(false);
+  };
 
   const checkCCourse = async (fetchedCourse) => {
     try {
@@ -272,17 +378,17 @@ function CoursePreview({ data, onLogout }) {
   };
 
   const deleteVolume = (vi) => {
-  const v = volumes[vi];
-  const inp = prompt(`Type the volume title to confirm deletion:\n"${v.title}"`);
-  if (inp === v.title) {
-    if (v.url) setFilesToDelete(p => [...p, v.url]);
-    v.chapters?.forEach(ch => {
-      if (ch.url) setFilesToDelete(p => [...p, ch.url]);
-      ch.items?.forEach(item => { if (item.url) setFilesToDelete(p => [...p, item.url]); });
-    });
-    setVolumes(volumes.filter((_, i) => i !== vi)); setHasChanges(true); alert('Volume deleted.');
-  } else if (inp !== null) alert('Title mismatch. Cancelled.');
-};
+    const v = volumes[vi];
+    showConfirm('Delete Volume', `Delete volume "${v.title}"? This cannot be undone.`, () => {
+      if (v.url) setFilesToDelete(p => [...p, v.url]);
+      v.chapters?.forEach(ch => {
+        if (ch.url) setFilesToDelete(p => [...p, ch.url]);
+        ch.items?.forEach(item => { if (item.url) setFilesToDelete(p => [...p, item.url]); });
+      });
+      setVolumes(volumes.filter((_, i) => i !== vi)); setHasChanges(true);
+      showInfo('Deleted', 'Volume deleted.');
+    }, true);
+  };
 
   const updateVolumeTitle = (vi, title) => {
     const nv = [...volumes]; nv[vi].title = title; setVolumes(nv); setHasChanges(true);
@@ -304,15 +410,15 @@ function CoursePreview({ data, onLogout }) {
   };
 
   const deleteChapter = (vi, ci) => {
-  const ch = volumes[vi].chapters[ci];
-  const inp = prompt(`Type the chapter title to confirm deletion:\n"${ch.title}"`);
-  if (inp === ch.title) {
-    if (ch.url) setFilesToDelete(p => [...p, ch.url]);
-    ch.items?.forEach(item => { if (item.url) setFilesToDelete(p => [...p, item.url]); });
-    const nv = [...volumes]; nv[vi].chapters = nv[vi].chapters.filter((_, i) => i !== ci);
-    setVolumes(nv); setHasChanges(true); alert('Chapter deleted.');
-  } else if (inp !== null) alert('Title mismatch. Cancelled.');
-};
+    const ch = volumes[vi].chapters[ci];
+    showConfirm('Delete Chapter', `Delete chapter "${ch.title}"? This cannot be undone.`, () => {
+      if (ch.url) setFilesToDelete(p => [...p, ch.url]);
+      ch.items?.forEach(item => { if (item.url) setFilesToDelete(p => [...p, item.url]); });
+      const nv = [...volumes]; nv[vi].chapters = nv[vi].chapters.filter((_, i) => i !== ci);
+      setVolumes(nv); setHasChanges(true);
+      showInfo('Deleted', 'Chapter deleted.');
+    }, true);
+  };
 
   const updateChapterTitle = (vi, ci, title) => {
     const nv = [...volumes]; nv[vi].chapters[ci].title = title; setVolumes(nv); setHasChanges(true);
@@ -323,7 +429,7 @@ function CoursePreview({ data, onLogout }) {
     const key = `entity-${entityId}`;
     const payload = isForm ? JSON.stringify(content) : content;
     const mime = isForm ? 'application/json' : 'text/plain';
-    const ext  = isForm ? '-form.json' : '.txt';
+    const ext = isForm ? '-form.json' : '.txt';
     const blob = new Blob([payload], { type: mime });
     const file = new File([blob], `${key}${ext}`, { type: mime });
     setTextFilesToUpload(p => ({ ...p, [key]: { file, entityId, kind, vi, ci, isEntity: true } }));
@@ -419,12 +525,13 @@ function CoursePreview({ data, onLogout }) {
   };
 
   const deleteContentItem = (vi, ci, ii) => {
-  if (!window.confirm('Delete this item?')) return;
-  const item = volumes[vi].chapters[ci].items[ii];
-  if (item.url) setFilesToDelete(p => [...p, item.url]);
-  const nv = [...volumes]; nv[vi].chapters[ci].items.splice(ii, 1);
-  setVolumes(nv); setHasChanges(true);
-};
+    showConfirm('Delete Item', 'Delete this item?', async () => {
+      const item = volumes[vi].chapters[ci].items[ii];
+      if (item.url) setFilesToDelete(p => [...p, item.url]);
+      const nv = [...volumes]; nv[vi].chapters[ci].items.splice(ii, 1);
+      setVolumes(nv); setHasChanges(true);
+    })
+  };
 
   const updateItemTitle = (vi, ci, ii, title) => {
     const nv = [...volumes]; nv[vi].chapters[ci].items[ii].title = title; setVolumes(nv); setHasChanges(true);
@@ -432,12 +539,12 @@ function CoursePreview({ data, onLogout }) {
 
   // ── Drag ───────────────────────────────────────────────────────────────────
   const handleDragOver = e => { if (!editMode) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
-  const handleVolumeDragStart   = (e, i)        => { if (!editMode) return; setDraggedVolume(i); e.dataTransfer.effectAllowed = 'move'; };
-  const handleVolumeDrop        = (e, t)        => { if (!editMode || draggedVolume === null) return; e.preventDefault(); const nv = [...volumes]; const [m] = nv.splice(draggedVolume, 1); nv.splice(t, 0, m); setVolumes(nv); setDraggedVolume(null); setHasChanges(true); };
-  const handleChapterDragStart  = (e, vi, ci)   => { if (!editMode) return; setDraggedChapter({ vi, ci }); e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); };
-  const handleChapterDrop       = (e, tvi, tci) => { if (!editMode || !draggedChapter) return; e.preventDefault(); e.stopPropagation(); const nv = [...volumes]; const [m] = nv[draggedChapter.vi].chapters.splice(draggedChapter.ci, 1); nv[tvi].chapters.splice(tci, 0, m); setVolumes(nv); setDraggedChapter(null); setHasChanges(true); };
-  const handleItemDragStart     = (e, vi, ci, ii) => { if (!editMode) return; setDraggedItem({ vi, ci, ii }); e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); };
-  const handleItemDrop          = (e, tvi, tci, tii) => {
+  const handleVolumeDragStart = (e, i) => { if (!editMode) return; setDraggedVolume(i); e.dataTransfer.effectAllowed = 'move'; };
+  const handleVolumeDrop = (e, t) => { if (!editMode || draggedVolume === null) return; e.preventDefault(); const nv = [...volumes]; const [m] = nv.splice(draggedVolume, 1); nv.splice(t, 0, m); setVolumes(nv); setDraggedVolume(null); setHasChanges(true); };
+  const handleChapterDragStart = (e, vi, ci) => { if (!editMode) return; setDraggedChapter({ vi, ci }); e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); };
+  const handleChapterDrop = (e, tvi, tci) => { if (!editMode || !draggedChapter) return; e.preventDefault(); e.stopPropagation(); const nv = [...volumes]; const [m] = nv[draggedChapter.vi].chapters.splice(draggedChapter.ci, 1); nv[tvi].chapters.splice(tci, 0, m); setVolumes(nv); setDraggedChapter(null); setHasChanges(true); };
+  const handleItemDragStart = (e, vi, ci, ii) => { if (!editMode) return; setDraggedItem({ vi, ci, ii }); e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); };
+  const handleItemDrop = (e, tvi, tci, tii) => {
     if (!editMode || !draggedItem) return; e.preventDefault(); e.stopPropagation();
     if (draggedItem.vi !== tvi || draggedItem.ci !== tci) { setDraggedItem(null); return; }
     const nv = [...volumes]; const [m] = nv[draggedItem.vi].chapters[draggedItem.ci].items.splice(draggedItem.ii, 1); nv[tvi].chapters[tci].items.splice(tii, 0, m); setVolumes(nv); setDraggedItem(null); setHasChanges(true);
@@ -445,9 +552,9 @@ function CoursePreview({ data, onLogout }) {
 
   // ── Course field helpers ───────────────────────────────────────────────────
   const handleCourseFieldChange = (f, v) => { setEditableCourse(p => ({ ...p, [f]: v })); setHasChanges(true); };
-  const handleSkillChange = (i, v) => { const s = [...editableCourse.skills]; s[i] = v; setEditableCourse(p => ({ ...p, skills: s })); setHasChanges(true); };
-  const addSkill    = ()    => { setEditableCourse(p => ({ ...p, skills: [...p.skills, ''] })); setHasChanges(true); };
-  const removeSkill = (i)   => { setEditableCourse(p => ({ ...p, skills: p.skills.filter((_, x) => x !== i) })); setHasChanges(true); };
+  const handleSkillChange = (i, v) => { const t = editableCourse.trans ? [...editableCourse.trans] : [{}]; const s = [...(t[0]?.skills || [])]; s[i] = v; t[0] = { ...t[0], skills: s }; setEditableCourse(p => ({ ...p, trans: t })); setHasChanges(true); };
+  const addSkill = () => { setEditableCourse(p => { const t = p.trans ? [...p.trans] : [{}]; t[0] = { ...t[0], skills: [...(t[0]?.skills || []), ''] }; return { ...p, trans: t }; }); setHasChanges(true); };
+  const removeSkill = (i) => { setEditableCourse(p => { const t = p.trans ? [...p.trans] : [{}]; t[0] = { ...t[0], skills: (t[0]?.skills || []).filter((_, x) => x !== i) }; return { ...p, trans: t }; }); setHasChanges(true); };
   const handleThumbnailChange = e => {
     const file = e.target.files[0]; if (!file) return;
     const r = new FileReader(); r.onloadend = () => { setEditableCourse(p => ({ ...p, thumbnail: r.result })); setHasChanges(true); }; r.readAsDataURL(file);
@@ -478,15 +585,15 @@ function CoursePreview({ data, onLogout }) {
           if (res?.ok) {
             const r = await res.json();
             const url = r.data?.link?.url || r.data?.url || r.data?.path
-                      || r.data?.file?.url || r.data?.file?.path
-                      || r.url || r.path || r.link?.url;
+              || r.data?.file?.url || r.data?.file?.path
+              || r.url || r.path || r.link?.url;
             if (url) urlUpdates[key] = { url, ...fd };
           }
           return !!res?.ok;
         }));
 
         if (results.some(ok => !ok)) {
-          alert('Some files failed. Changes discarded.');
+          showInfo('Warning', 'Some files failed. Changes discarded.');
           resetUnsaved(); setLocalTextContent({}); await fetchData(); return;
         }
       }
@@ -529,7 +636,7 @@ function CoursePreview({ data, onLogout }) {
         setEditMode(false);
         await fetchData();
         setLocalTextContent({}); // clear AFTER reload so content stays visible during save
-        alert('Saved!');
+        showInfo('Saved', 'Course saved successfully!');
         if (filesToDelete.length) {
           await Promise.allSettled(filesToDelete.map(url =>
             fetch(`${BASE}/api/manage/courses/${id}/files`, {
@@ -541,11 +648,11 @@ function CoursePreview({ data, onLogout }) {
           setFilesToDelete([]);
         }
       } else {
-        alert(`Server error ${res.status}. Changes discarded.`);
+        showInfo('Error', `Server error ${res.status}. Changes discarded.`);
         resetUnsaved(); setLocalTextContent({}); await fetchData();
       }
     } catch (e) {
-      alert(`Save failed: ${e.message}`);
+      showInfo('Error', `Save failed: ${e.message}`);
       resetUnsaved(); setLocalTextContent({}); await fetchData();
     } finally {
       setIsSaving(false);
@@ -578,7 +685,7 @@ function CoursePreview({ data, onLogout }) {
           const filename = `files/${url.split('/').pop()}`;
           zip.file(filename, blob);
           urlMap[url] = filename;
-        } catch {}
+        } catch { }
       }));
 
       // Save course JSON with url map
@@ -587,68 +694,106 @@ function CoursePreview({ data, onLogout }) {
       const blob = await zip.generateAsync({ type: 'blob' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `${editableCourse.title || 'course'}-backup.zip`;
+      a.download = `${editableCourse.trans?.[0]?.title || 'course'}-backup.zip`;
       a.click();
       URL.revokeObjectURL(a.href);
-    } catch (e) { alert('Export failed: ' + e.message); }
+    } catch (e) { showInfo('Error', 'Export failed: ' + e.message); }
   };
 
   const handleImportZip = async (e) => {
     const file = e.target.files[0]; if (!file) return;
-    if (!window.confirm('This will overwrite current course data. Continue?')) return;
-    try {
-      const zip = await JSZip.loadAsync(file);
+    showConfirm('Overwrite', 'This will overwrite current course data. Continue?', async () => {
+      try {
+        const zip = await JSZip.loadAsync(file);
 
-      const courseJson = await zip.file('course.json')?.async('string');
-      if (!courseJson) { alert('Invalid backup: missing course.json'); return; }
-      const { urlMap, volumes: bkVols, ...bkCourse } = JSON.parse(courseJson);
+        const courseJson = await zip.file('course.json')?.async('string');
+        if (!courseJson) { showInfo('Invalid Backup', 'Invalid backup: missing course.json'); return; }
+        const { urlMap, volumes: bkVols, ...bkCourse } = JSON.parse(courseJson);
 
-      // Re-upload all files and build new URL map
-      const newUrlMap = {};
-      await Promise.allSettled(Object.entries(urlMap).map(async ([origUrl, zipPath]) => {
-        try {
-          const blob = await zip.file(zipPath)?.async('blob');
-          if (!blob) return;
-          const form = new FormData();
-          form.append('file', new File([blob], zipPath.split('/').pop()));
-          const res = await fetch(`${BASE}/api/manage/courses/${id}/files`, {
-            method: 'POST',
-            headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` },
-            body: form
-          });
-          if (res.ok) {
-            const r = await res.json();
-            const newUrl = r.data?.link?.url || r.data?.url || r.data?.path || r.url;
-            if (newUrl) newUrlMap[origUrl] = newUrl;
-          }
-        } catch {}
-      }));
+        // Re-upload all files and build new URL map
+        const newUrlMap = {};
+        await Promise.allSettled(Object.entries(urlMap).map(async ([origUrl, zipPath]) => {
+          try {
+            const blob = await zip.file(zipPath)?.async('blob');
+            if (!blob) return;
+            const form = new FormData();
+            form.append('file', new File([blob], zipPath.split('/').pop()));
+            const res = await fetch(`${BASE}/api/manage/courses/${id}/files`, {
+              method: 'POST',
+              headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` },
+              body: form
+            });
+            if (res.ok) {
+              const r = await res.json();
+              const newUrl = r.data?.link?.url || r.data?.url || r.data?.path || r.url;
+              if (newUrl) newUrlMap[origUrl] = newUrl;
+            }
+          } catch { }
+        }));
 
-      // Remap URLs in volumes
-      const remapUrl = url => newUrlMap[url] || url;
-      const remappedVolumes = bkVols.map(v => ({
-        ...v, url: remapUrl(v.url),
-        chapters: v.chapters?.map(c => ({
-          ...c, url: remapUrl(c.url),
-          items: c.items?.map(i => ({ ...i, url: remapUrl(i.url) }))
-        }))
-      }));
+        // Remap URLs in volumes
+        const remapUrl = url => newUrlMap[url] || url;
+        const remappedVolumes = bkVols.map(v => ({
+          ...v, url: remapUrl(v.url),
+          chapters: v.chapters?.map(c => ({
+            ...c, url: remapUrl(c.url),
+            items: c.items?.map(i => ({ ...i, url: remapUrl(i.url) }))
+          }))
+        }));
 
-      const updatedCourse = { ...bkCourse, volumes: remappedVolumes };
-      const res = await fetch(`${BASE}/api/manage/courses/${id}`, {
-        method: 'PUT',
-        headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedCourse)
-      });
+        const updatedCourse = { ...bkCourse, volumes: remappedVolumes };
+        const res = await fetch(`${BASE}/api/manage/courses/${id}`, {
+          method: 'PUT',
+          headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedCourse)
+        });
 
-      if (res.ok) { alert('Import successful!'); await fetchData(); }
-      else alert('Import failed: server error ' + res.status);
-    } catch (err) { alert('Import failed: ' + err.message); }
-    e.target.value = '';
+        if (res.ok) { showInfo('Success', 'Import successful!'); await fetchData(); }
+        else showInfo('Error', 'Import failed: server error ' + res.status);
+      } catch (err) { showInfo('Error', 'Import failed: ' + err.message); }
+      e.target.value = '';
+    })
   };
 
-  const handleAddToCart = () => alert(`Added "${course.title}" to cart!`);
-  const handleEnroll    = () => alert(`Enrolled in "${course.title}"!`);
+  const handleAddToCart = () => showInfo('Cart', `Added "${course.trans?.[0]?.title}" to cart!`);
+  const handleEnroll = () => showInfo('Enrolled', `Enrolled in "${course.trans?.[0]?.title}"!`);
+
+  const handleValidatePromo = async () => {
+    if (!promoCode.trim()) return;
+    setPromoLoading(true); setPromoResult(null);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:4040/api/promos/validate', {
+        method: 'POST',
+        headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoCode.trim().toUpperCase(), courseId: id })
+      });
+      const json = await res.json();
+      setPromoResult(json);
+    } catch (e) { setPromoResult({ valid: false, reason: 'Network error' }); }
+    setPromoLoading(false);
+  };
+
+  const handleApplyPromo = async () => {
+    if (!promoResult?.valid) return;
+    setApplyingPromo(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:4040/api/promos/apply', {
+        method: 'POST',
+        headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoCode.trim().toUpperCase(), courseId: id })
+      });
+      const json = await res.json();
+      if (res.ok) {
+        showInfo('Success', json.message);
+        setPromoCode(''); setPromoResult(null);
+        // Re-fetch page to update locked state
+        setTimeout(() => window.location.reload(), 1200);
+      } else { showInfo('Error', json.message || 'Failed to apply promo'); }
+    } catch (e) { showInfo('Error', 'Network error'); }
+    setApplyingPromo(false);
+  };
   const formatDate = ds => new Date(ds).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const renderStars = r => {
     const s = []; const f = Math.floor(r);
@@ -667,27 +812,27 @@ function CoursePreview({ data, onLogout }) {
       </div>
     </>
   );
-  
+
   const hasContent = volumes.length > 0;
 
   const sharedItemProps = {
     editMode, locked, expandedItems, setExpandedItems, editingTitle, setEditingTitle,
     textRefreshKey, localTextContent, volumes, setExpandedChapters, setExpandedVolumes,
     onUpdateTitle: updateItemTitle,
-    onEditItem:  (vi, ci, ii) => setEditingItem({ vi, ci, ii, item: volumes[vi].chapters[ci].items[ii] }),
-    onEditForm:  (vi, ci, ii) => setEditingForm({ vi, ci, ii, item: volumes[vi].chapters[ci].items[ii] }),
+    onEditItem: (vi, ci, ii) => setEditingItem({ vi, ci, ii, item: volumes[vi].chapters[ci].items[ii] }),
+    onEditForm: (vi, ci, ii) => setEditingForm({ vi, ci, ii, item: volumes[vi].chapters[ci].items[ii] }),
     onDeleteItem: deleteContentItem,
-    onDragStart:  handleItemDragStart,
-    onDragOver:   handleDragOver,
-    onDrop:       handleItemDrop,
+    onDragStart: handleItemDragStart,
+    onDragOver: handleDragOver,
+    onDrop: handleItemDrop,
     onScrollToItem: (vi, ci, ii) => {
-      const vol  = volumes[vi];
-      const ch   = vol?.chapters[ci];
+      const vol = volumes[vi];
+      const ch = vol?.chapters[ci];
       const item = ch?.items[ii];
       if (!vol || !ch || !item) return;
-      setExpandedVolumes(p  => ({ ...p, [vol.vid]:  true }));
-      setExpandedChapters(p => ({ ...p, [ch.cid]:   true }));
-      setExpandedItems(p    => ({ ...p, [item.iid]: true }));
+      setExpandedVolumes(p => ({ ...p, [vol.vid]: true }));
+      setExpandedChapters(p => ({ ...p, [ch.cid]: true }));
+      setExpandedItems(p => ({ ...p, [item.iid]: true }));
       setTimeout(() => {
         const el = document.getElementById(`item-${item.iid}`);
         if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -718,8 +863,8 @@ function CoursePreview({ data, onLogout }) {
 
               <div className="title-price-row">
                 {editMode
-                  ? <input type="text" className="form-control course-title-input" value={editableCourse.title} onChange={e => handleCourseFieldChange('title', e.target.value)} />
-                  : <h1 className="course-title">{course.title}</h1>}
+                  ? <input type="text" className="form-control course-title-input" value={editableCourse.trans?.[0]?.title || ''} onChange={e => { const t = editableCourse.trans ? [...editableCourse.trans] : [{}]; t[0] = { ...t[0], title: e.target.value }; handleCourseFieldChange('trans', t); }} />
+                  : <h1 className="course-title">{course.trans?.[0]?.title}</h1>}
                 <div className="mobile-price">
                   {editMode
                     ? <input type="number" className="form-control price-input" value={editableCourse.price} onChange={e => handleCourseFieldChange('price', parseFloat(e.target.value))} step="0.01" min="0" />
@@ -735,23 +880,48 @@ function CoursePreview({ data, onLogout }) {
               </div>
 
               <div className="description-box">
-                {editMode ? <textarea className="form-control" value={editableCourse.description} onChange={e => handleCourseFieldChange('description', e.target.value)} rows="3" /> : <p>{course.description}</p>}
+                {editMode ? <textarea className="form-control" value={editableCourse.trans?.[0]?.description || ''} onChange={e => { const t = editableCourse.trans ? [...editableCourse.trans] : [{}]; t[0] = { ...t[0], description: e.target.value }; handleCourseFieldChange('trans', t); }} rows="3" /> : <p>{course.trans?.[0]?.description}</p>}
               </div>
 
               <div className="mobile-skills">
                 <h4 className="section-title">What you'll learn</h4>
                 <div className="skills-grid">
                   {editMode
-                    ? <>{editableCourse.skills.map((s, i) => <div className="skill-item-edit" key={i}><input type="text" className="form-control skill-input" value={s} onChange={e => handleSkillChange(i, e.target.value)} /><button className="btn btn-sm btn-danger" onClick={() => removeSkill(i)}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-primary" onClick={addSkill}><i className="bi bi-plus"></i> Add Skill</button></>
-                    : course.skills.map((s, i) => <div className="skill-item" key={i}><i className="bi bi-check-circle-fill text-success"></i><span>{s}</span></div>)}
+                    ? <>{(editableCourse.trans?.[0]?.skills || []).map((s, i) => <div className="skill-item-edit" key={i}><input type="text" className="form-control skill-input" value={s} onChange={e => handleSkillChange(i, e.target.value)} /><button className="btn btn-sm btn-danger" onClick={() => removeSkill(i)}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-primary" onClick={addSkill}><i className="bi bi-plus"></i> Add Skill</button></>
+                    : (course.trans?.[0]?.skills || []).map((s, i) => <div className="skill-item" key={i}><i className="bi bi-check-circle-fill text-success"></i><span>{s}</span></div>)}
                 </div>
               </div>
 
               <div className="ratings-section">
-                <span className="rating-number">{course.ratings}</span>
-                <div className="stars">{renderStars(course.ratings)}</div>
-                <span className="students-count">({course.followers} students)</span>
+                <span className="rating-number">{cpAvgRating > 0 ? cpAvgRating.toFixed(1) : (course.ratings || 0)}</span>
+                <div className="stars">
+                  {[1,2,3,4,5].map(n => (
+                    <i key={n} className={`bi ${(cpAvgRating || course.ratings) >= n ? 'bi-star-fill' : (cpAvgRating || course.ratings) >= n - 0.5 ? 'bi-star-half' : 'bi-star'} text-warning`}></i>
+                  ))}
+                </div>
+                <span className="students-count">({cpTotalVotes} {cpTotalVotes === 1 ? 'rating' : 'ratings'})</span>
+                {course.followers > 0 && <span className="students-count ms-2"><i className="bi bi-people me-1"></i>{course.followers} {course.followers === 1 ? 'student' : 'students'}</span>}
               </div>
+              {!locked && (
+                <div className="cp-inline-rate">
+                  <span className="cp-rate-label">{cpMyRating ? 'Your rating:' : 'Rate:'}</span>
+                  <div className="cp-stars-interactive">
+                    {[1,2,3,4,5].map(n => (
+                      <button key={n} className={`cp-star-btn${(cpRatingHover || cpMyRating) >= n ? ' active' : ''}`}
+                        onMouseEnter={() => setCpRatingHover(n)} onMouseLeave={() => setCpRatingHover(null)}
+                        onClick={() => handleCpRate(n)} disabled={cpRatingSubmitting} title={`${n} star${n > 1 ? 's' : ''}`}>
+                        <i className={`bi ${(cpRatingHover || cpMyRating) >= n ? 'bi-star-fill' : 'bi-star'}`}></i>
+                      </button>
+                    ))}
+                  </div>
+                  {cpMyRating && <span className="cp-rated-badge"><i className="bi bi-check-circle-fill me-1"></i>Rated</span>}
+                  <button className="btn btn-outline-secondary btn-sm ms-2"
+                    onClick={() => document.getElementById('cp-comments-anchor')?.scrollIntoView({ behavior: 'smooth' })}>
+                    <i className="bi bi-chat-left-text me-1"></i>Comments
+                    {cpComments.length > 0 && <span className="badge bg-primary ms-1">{cpComments.length}</span>}
+                  </button>
+                </div>
+              )}
 
               <div className="course-meta">
                 <span className="meta-item">Created by <strong>{author.nickname}</strong></span>
@@ -761,22 +931,22 @@ function CoursePreview({ data, onLogout }) {
 
               {locked
                 ? <div className="mobile-buttons">
-                    <button className="btn btn-primary btn-lg w-100 mb-2 " onClick={handleAddToCart}>Add to Cart</button>
-                    <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>Enroll Now</button>
-                    <p className="guarantee-text">30-Day Money-Back Guarantee</p>
-                  </div>
+                  <button className="btn btn-primary btn-lg w-100 mb-2 " onClick={handleAddToCart}>Add to Cart</button>
+                  <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>Enroll Now</button>
+                  <p className="guarantee-text">30-Day Money-Back Guarantee</p>
+                </div>
                 : <div className="mobile-buttons">
-                    <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>Add to Cart</button>
-                    <button className="btn btn-outline-secondary btn-lg w-100" onClick={() => navigate(`/course/view/${id}`)}>View Course</button>
-                  </div>
+                  <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>Add to Cart</button>
+                  <button className="btn btn-outline-secondary btn-lg w-100" onClick={() => navigate(`/course/view/${id}`)}>View Course</button>
+                </div>
               }
 
               <div className="desktop-skills section-card">
                 <h4 className="section-title">What you'll learn</h4>
                 <div className="skills-grid">
                   {editMode
-                    ? <>{editableCourse.skills.map((s, i) => <div className="skill-item-edit" key={i}><input type="text" className="form-control skill-input" value={s} onChange={e => handleSkillChange(i, e.target.value)} /><button className="btn btn-sm btn-danger" onClick={() => removeSkill(i)}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-primary mt-2" onClick={addSkill}><i className="bi bi-plus"></i> Add Skill</button></>
-                    : course.skills.map((s, i) => <div className="skill-item" key={i}><i className="bi bi-check-circle-fill text-success"></i><span>{s}</span></div>)}
+                    ? <>{(editableCourse.trans?.[0]?.skills || []).map((s, i) => <div className="skill-item-edit" key={i}><input type="text" className="form-control skill-input" value={s} onChange={e => handleSkillChange(i, e.target.value)} /><button className="btn btn-sm btn-danger" onClick={() => removeSkill(i)}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-primary mt-2" onClick={addSkill}><i className="bi bi-plus"></i> Add Skill</button></>
+                    : (course.trans?.[0]?.skills || []).map((s, i) => <div className="skill-item" key={i}><i className="bi bi-check-circle-fill text-success"></i><span>{s}</span></div>)}
                 </div>
               </div>
             </div>
@@ -795,15 +965,52 @@ function CoursePreview({ data, onLogout }) {
                   </div>
                   {locked
                     ? <div className="purchase-buttons">
-                        <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>Add to Cart</button>
-                        <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>Enroll Now</button>
-                      </div>
+                      <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>Add to Cart</button>
+                      <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>Enroll Now</button>
+                    </div>
                     : <div className="purchase-buttons">
-                        <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>Add to Cart</button>
-                        <button className="btn btn-outline-secondary btn-lg w-100" onClick={() => navigate(`/course/view/${id}`)}>View Course</button>
-                      </div>
+                      <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>Add to Cart</button>
+                      <button className="btn btn-outline-secondary btn-lg w-100" onClick={() => navigate(`/course/view/${id}`)}>View Course</button>
+                    </div>
                   }
-                  {locked ? <p className="guarantee-text">30-Day Money-Back Guarantee</p> : null}
+                  {locked && (
+                    <>
+                      <p className="guarantee-text">30-Day Money-Back Guarantee</p>
+                      {/* ── Promo Code ── */}
+                      <div className="mt-3">
+                        <label className="form-label small fw-semibold text-muted">Have a promo code?</label>
+                        <div className="input-group input-group-sm">
+                          <input type="text" className="form-control text-uppercase"
+                            placeholder="PROMO CODE" value={promoCode}
+                            onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoResult(null); }}
+                            onKeyDown={e => e.key === 'Enter' && handleValidatePromo()} />
+                          <button className="btn btn-outline-secondary" onClick={handleValidatePromo} disabled={promoLoading || !promoCode.trim()}>
+                            {promoLoading ? <span className="spinner-border spinner-border-sm" /> : 'Apply'}
+                          </button>
+                        </div>
+                        {promoResult && !promoResult.valid && (
+                          <div className="text-danger small mt-1"><i className="bi bi-x-circle me-1"></i>{promoResult.reason}</div>
+                        )}
+                        {promoResult?.valid && (
+                          <div className="mt-2 p-2 bg-success bg-opacity-10 border border-success rounded small">
+                            <div className="text-success fw-semibold"><i className="bi bi-check-circle me-1"></i>Code valid!</div>
+                            <div className="text-muted mt-1">
+                              {promoResult.discountType === 'percent'
+                                ? `${promoResult.discountValue}% off`
+                                : `$${promoResult.discountValue} off`}
+                              {' — '}
+                              <span className="text-decoration-line-through">${promoResult.originalPrice}</span>
+                              {' → '}
+                              <strong>${promoResult.finalPrice}</strong>
+                            </div>
+                            <button className="btn btn-success btn-sm w-100 mt-2" onClick={handleApplyPromo} disabled={applyingPromo}>
+                              {applyingPromo ? <><span className="spinner-border spinner-border-sm me-1" />Applying…</> : 'Enroll with Promo'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -882,7 +1089,7 @@ function CoursePreview({ data, onLogout }) {
                                     : setShowAddEntityModal({ kind: 'chapter', vi, afterIndex: volume.chapters.length - 1, preType: type })}
                                 />
                                 <button className="btn btn-sm btn-outline-primary" onClick={() => setEntityEdit({ kind: 'volume', vi, entity: volume })}><i className="bi bi-pencil"></i></button>
-                                <button className="btn btn-sm btn-outline-danger"  onClick={() => deleteVolume(vi)}><i className="bi bi-trash"></i></button>
+                                <button className="btn btn-sm btn-outline-danger" onClick={() => deleteVolume(vi)}><i className="bi bi-trash"></i></button>
                               </div>
                             )}
                           </div>
@@ -911,7 +1118,7 @@ function CoursePreview({ data, onLogout }) {
                                                 <div className="header-actions" onClick={e => e.stopPropagation()}>
                                                   <ItemAddDropdown onAdd={type => openAddItem(vi, ci, type)} />
                                                   <button className="btn btn-sm btn-outline-primary" onClick={() => setEntityEdit({ kind: 'chapter', vi, ci, entity: chapter })}><i className="bi bi-pencil"></i></button>
-                                                  <button className="btn btn-sm btn-outline-danger"  onClick={() => deleteChapter(vi, ci)}><i className="bi bi-trash"></i></button>
+                                                  <button className="btn btn-sm btn-outline-danger" onClick={() => deleteChapter(vi, ci)}><i className="bi bi-trash"></i></button>
                                                 </div>
                                               )}
                                             </div>
@@ -969,6 +1176,78 @@ function CoursePreview({ data, onLogout }) {
         </div>
       </div>
 
+      {/* ── Comments (under course content) ── */}
+      <div className="cp-comments-section" id="cp-comments-anchor">
+        <div className="cp-comments">
+          <h3 className="cp-comments-title">
+            <i className="bi bi-chat-left-text me-2"></i>
+            Comments {cpComments.length > 0 && <span className="cp-comments-count">{cpComments.length}</span>}
+          </h3>
+
+          {!locked && (
+            <div className="cp-comment-compose">
+              <div className="cp-compose-tabs">
+                <button className={`cp-compose-tab${!cpCommentPreview ? ' cp-compose-tab--active' : ''}`} onClick={() => setCpCommentPreview(false)}>Write</button>
+                <button className={`cp-compose-tab${cpCommentPreview ? ' cp-compose-tab--active' : ''}`} onClick={() => setCpCommentPreview(true)} disabled={!cpCommentText.trim()}>Preview</button>
+                <button className={`cp-compose-tab cp-compose-tab--help${cpSyntaxHelp ? ' cp-compose-tab--active' : ''}`} onClick={() => setCpSyntaxHelp(p => !p)} title="Formatting syntax reference"><i className="bi bi-question-circle me-1"></i>Syntax</button>
+              </div>
+              {cpSyntaxHelp && (
+                <div className="cp-syntax-help">
+                  <div className="cp-syntax-grid">
+                    <span><code># Heading 1</code></span><span>Large heading</span>
+                    <span><code>**bold**</code></span><span>Bold text</span>
+                    <span><code>*italic*</code></span><span>Italic text</span>
+                    <span><code>`inline code`</code></span><span>Inline code</span>
+                    <span><code>~(js)[code]~</code></span><span>Code block</span>
+                    <span><code>- item</code></span><span>Bullet list</span>
+                    <span><code>[text](url)</code></span><span>Link</span>
+                  </div>
+                </div>
+              )}
+              {cpCommentPreview
+                ? <div className="cp-comment-preview" dangerouslySetInnerHTML={{ __html: parseTextSyntax(cpCommentText) }} />
+                : <textarea className="cp-comment-textarea" rows={4}
+                    placeholder={"Write a comment…\nSupports: # headings, **bold**, *italic*, `code`, ~(lang)[…]~, etc."}
+                    value={cpCommentText} onChange={e => setCpCommentText(e.target.value)} maxLength={4000} />
+              }
+              <div className="cp-compose-footer">
+                <span className="cp-char-count">{cpCommentText.length} / 4000</span>
+                <button className="btn btn-primary btn-sm cp-compose-submit" onClick={handleCpAddComment} disabled={!cpCommentText.trim() || cpCommentPosting}>
+                  {cpCommentPosting ? <><span className="spinner-border spinner-border-sm me-1"></span>Posting…</> : <><i className="bi bi-send me-1"></i>Post</>}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {cpCommentsLoading ? (
+            <div className="cp-comments-loading"><span className="spinner-border spinner-border-sm me-2"></span>Loading…</div>
+          ) : cpComments.length === 0 ? (
+            <p className="cp-comments-empty">No comments yet{locked ? '.' : ' — be the first!'}</p>
+          ) : (
+            <div className="cp-comment-list">
+              {cpComments.map(comment => {
+                const al = data?.role?.accessLevel;
+                const rn = data?.role?.roleName;
+                const isElevated = al === 'manage' || al === 'admin' || al === 'root' || rn === 'root';
+                const isAuthor = data?._id && String(data._id) === String(comment.userId);
+                return (
+                  <div key={comment._id} className="cp-comment">
+                    <div className="cp-comment-header">
+                      <span className="cp-comment-author"><i className="bi bi-person-circle me-1"></i>{comment.nickname}</span>
+                      <span className="cp-comment-date">{new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                      {(isAuthor || isElevated) && (
+                        <button className="cp-comment-delete" onClick={() => handleCpDeleteComment(comment._id)} title="Delete comment"><i className="bi bi-trash"></i></button>
+                      )}
+                    </div>
+                    <div className="cp-comment-body" dangerouslySetInnerHTML={{ __html: parseTextSyntax(comment.text) }} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* ── Modals ── */}
       {(showAddEntityModal || entityEdit) && (
         <AddEntityModal
@@ -1001,6 +1280,8 @@ function CoursePreview({ data, onLogout }) {
           onSave={d => updateContentItem(editingForm.vi, editingForm.ci, editingForm.ii, d)}
           onClose={() => setEditingForm(null)} />
       )}
+      <UtilityModal show={modal.show} type={modal.type} title={modal.title} message={modal.message}
+        onConfirm={() => { modal.onConfirm?.(); closeModal(); }} onCancel={modal.onCancel || closeModal} onClose={closeModal} />
     </>
   );
 }
@@ -1063,20 +1344,24 @@ function EntityAddDropdown({ onAdd, label = 'Add' }) {
 
 // ─── Add Entity Modal ─────────────────────────────────────────────────────────
 function AddEntityModal({ kind, initial, preType, uploadedFiles, initialTextContent, onSave, onClose }) {
-  const [title,    setTitle]    = useState(initial?.title || '');
-  const [type,     setType]     = useState(initial?.type  || preType || 'container');
-  const [url,      setUrl]      = useState(initial?.url   || '');
-  const [preview,  setPreview]  = useState(initial?.url   || '');
-  const [content,  setContent]  = useState(initialTextContent || '');
+  const [title, setTitle] = useState(initial?.title || '');
+  const [type, setType] = useState(initial?.type || preType || 'container');
+  const [url, setUrl] = useState(initial?.url || '');
+  const [preview, setPreview] = useState(initial?.url || '');
+  const [content, setContent] = useState(initialTextContent || '');
   const [showHelp, setShowHelp] = useState(false);
-  const [helpGroup,setHelpGroup]= useState(0);
+  const [helpGroup, setHelpGroup] = useState(0);
   const [loadingText, setLoadingText] = useState(false);
   const token = localStorage.getItem('token');
+  const [_modal, _setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null, onClose: null });
+  const _closeModal = () => _setModal(p => ({ ...p, show: false }));
+  const _showInfo = (t, message) => _setModal({ show: true, type: 'info', title: t, message, onClose: _closeModal });
+  const _showConfirm = (t, message, onConfirm, danger = false) => _setModal({ show: true, type: 'confirm', danger, title: t, message, onConfirm, onCancel: _closeModal });
 
   const isContent = type && type !== 'container';
-  const isText    = type === 'text';
-  const isForm    = type === 'form';
-  const isMedia   = isContent && !isText && !isForm;
+  const isText = type === 'text';
+  const isForm = type === 'form';
+  const isMedia = isContent && !isText && !isForm;
   const kindLabel = kind === 'volume' ? 'Volume' : 'Chapter';
   const acceptMap = { image: 'image/*', video: 'video/*', audio: 'audio/*', document: '.pdf,.doc,.docx', archive: '.zip,.rar,.7z' };
 
@@ -1090,7 +1375,7 @@ function AddEntityModal({ kind, initial, preType, uploadedFiles, initialTextCont
       })
         .then(r => r.ok ? r.text() : Promise.reject())
         .then(t => setContent(t))
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => setLoadingText(false));
     }
   }, []);
@@ -1099,11 +1384,11 @@ function AddEntityModal({ kind, initial, preType, uploadedFiles, initialTextCont
     if (!isMedia || !uploadedFiles?.length) return [];
     return uploadedFiles.filter(f => {
       const n = (f.originalName || f.filename || '').toLowerCase();
-      if (type === 'image')    return /\.(jpg|jpeg|png|gif|webp)$/i.test(n);
-      if (type === 'video')    return /\.(mp4|webm|ogg|mov|avi)$/i.test(n);
-      if (type === 'audio')    return /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(n);
+      if (type === 'image') return /\.(jpg|jpeg|png|gif|webp)$/i.test(n);
+      if (type === 'video') return /\.(mp4|webm|ogg|mov|avi)$/i.test(n);
+      if (type === 'audio') return /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(n);
       if (type === 'document') return /\.(pdf|doc|docx)$/i.test(n);
-      if (type === 'archive')  return /\.(zip|rar|7z)$/i.test(n);
+      if (type === 'archive') return /\.(zip|rar|7z)$/i.test(n);
       return false;
     });
   };
@@ -1116,8 +1401,8 @@ function AddEntityModal({ kind, initial, preType, uploadedFiles, initialTextCont
   };
 
   const handleSave = () => {
-    if (!title.trim()) { alert('Please enter a title.'); return; }
-    if (isMedia && !url && !preview) { alert('Please provide a file or URL.'); return; }
+    if (!title.trim()) { _showInfo('Validation', 'Please enter a title.'); return; }
+    if (isMedia && !url && !preview) { _showInfo('Validation', 'Please provide a file or URL.'); return; }
     onSave({ title, type, url: url || preview || '', content: isText ? content : undefined });
   };
 
@@ -1226,9 +1511,9 @@ function AddEntityModal({ kind, initial, preType, uploadedFiles, initialTextCont
               {preview && (
                 <div className="mb-3">
                   <label className="form-label">Preview</label>
-                  {type === 'image'    && <img src={preview} alt="" className="img-preview" />}
-                  {type === 'video'    && <video src={preview} controls className="video-preview" />}
-                  {type === 'audio'    && <audio src={preview} controls className="audio-preview" />}
+                  {type === 'image' && <img src={preview} alt="" className="img-preview" />}
+                  {type === 'video' && <video src={preview} controls className="video-preview" />}
+                  {type === 'audio' && <audio src={preview} controls className="audio-preview" />}
                   {(type === 'document' || type === 'archive') && <div className="alert alert-info"><i className={`bi ${typeIcon(type)} me-2`}></i>{(url || preview).split('/').pop()}</div>}
                 </div>
               )}
@@ -1240,6 +1525,8 @@ function AddEntityModal({ kind, initial, preType, uploadedFiles, initialTextCont
           <button className="btn btn-primary" onClick={handleSave}><i className="bi bi-check2 me-1"></i>{initial ? 'Update' : 'Add'} {kindLabel}</button>
         </div>
       </div>
+      {_modal.show && <UtilityModal show={_modal.show} type={_modal.type} title={_modal.title} message={_modal.message}
+        onConfirm={() => { _modal.onConfirm?.(); _closeModal(); }} onCancel={_modal.onCancel || _closeModal} onClose={_modal.onClose || _closeModal} />}
     </div>
   );
 }
@@ -1259,7 +1546,7 @@ function ContentEntityView({ entity, entityId, editMode, locked, expanded, onTog
         {editMode && (
           <div className="header-actions" onClick={e => e.stopPropagation()}>
             <button className="btn btn-sm btn-outline-primary" onClick={onEdit}><i className="bi bi-pencil"></i></button>
-            <button className="btn btn-sm btn-outline-danger"  onClick={onDelete}><i className="bi bi-trash"></i></button>
+            <button className="btn btn-sm btn-outline-danger" onClick={onDelete}><i className="bi bi-trash"></i></button>
           </div>
         )}
       </div>
@@ -1285,16 +1572,16 @@ function EntityMedia({ type, url, entityId, textRefreshKey, localTextContent }) 
   if (type === 'form') return <FormItemDisplay key={`${entityId}-${textRefreshKey}`} url={url} refreshKey={textRefreshKey} />;
   if (!url) return <p className="text-muted fst-italic p-2 mb-0">No content URL set.</p>;
   if (type === 'video') return <div className="video-item"><YoutubeEmbed url={url} /></div>;
-  if (type === 'image')    return <div className="image-item"><img src={fu(url)} alt="" className="content-image" /></div>;
-  if (type === 'audio')    return <div className="audio-item"><audio src={fu(url)} controls className="audio-player" /></div>;
+  if (type === 'image') return <div className="image-item"><img src={fu(url)} alt="" className="content-image" /></div>;
+  if (type === 'audio') return <div className="audio-item"><audio src={fu(url)} controls className="audio-player" /></div>;
   if (type === 'document') return <div className="document-item"><a href={fu(url)} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-info"><i className="bi bi-file-pdf me-1"></i>Open Document</a></div>;
-  if (type === 'archive')  return <div className="archive-item"><a href={fu(url)} download className="btn btn-sm btn-outline-info"><i className="bi bi-file-zip me-1"></i>Download Archive</a></div>;
+  if (type === 'archive') return <div className="archive-item"><a href={fu(url)} download className="btn btn-sm btn-outline-info"><i className="bi bi-file-zip me-1"></i>Download Archive</a></div>;
   return <a href={fu(url)} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-secondary m-2"><i className="bi bi-file-earmark me-1"></i>Open File</a>;
 }
 
 // ─── Content Item View ────────────────────────────────────────────────────────
 function ContentItemView({ item, ii, vi, ci, editMode, locked, expandedItems, setExpandedItems, editingTitle, setEditingTitle, textRefreshKey, localTextContent, volumes, setExpandedChapters, setExpandedVolumes, onUpdateTitle, onEditItem, onEditForm, onDeleteItem, onDragStart, onDragOver, onDrop, onScrollToItem }) {
-  const volume  = volumes[vi];
+  const volume = volumes[vi];
   const chapter = volume?.chapters[ci];
   return (
     <div id={`item-${item.iid}`} className={`content-item ${editMode ? 'draggable' : ''}`}
@@ -1308,7 +1595,7 @@ function ContentItemView({ item, ii, vi, ci, editMode, locked, expandedItems, se
             ? <input className="form-control title-edit-input flex-1" value={item.title} onChange={e => onUpdateTitle(vi, ci, ii, e.target.value)} onBlur={() => setEditingTitle(null)} onKeyDown={e => { if (e.key === 'Enter') setEditingTitle(null); }} autoFocus />
             : <span className="item-title flex-1">{item.title}</span>}
           {item.type === 'form'
-            ? <button className="btn btn-sm btn-outline-info"    onClick={() => onEditForm(vi, ci, ii)}><i className="bi bi-pencil-fill"></i></button>
+            ? <button className="btn btn-sm btn-outline-info" onClick={() => onEditForm(vi, ci, ii)}><i className="bi bi-pencil-fill"></i></button>
             : <button className="btn btn-sm btn-outline-primary" onClick={() => onEditItem(vi, ci, ii)}><i className="bi bi-pencil-fill"></i></button>}
           <button className="btn btn-sm btn-danger" onClick={() => onDeleteItem(vi, ci, ii)}><i className="bi bi-trash"></i></button>
         </div>
@@ -1323,15 +1610,15 @@ function ContentItemView({ item, ii, vi, ci, editMode, locked, expandedItems, se
       {(editMode || expandedItems[item.iid]) && (
         <div className={`item-body${editMode ? '' : ' item-body--expanded'}`}>
           {item.type === 'video' && <div className="video-item"><YoutubeEmbed url={item.url} /></div>}
-          {item.type === 'image'    && <div className="image-item"><img src={fu(item.url)} alt={item.title} className="content-image" /></div>}
-          {item.type === 'audio'    && <div className="audio-item"><audio src={fu(item.url)} controls className="audio-player" /></div>}
+          {item.type === 'image' && <div className="image-item"><img src={fu(item.url)} alt={item.title} className="content-image" /></div>}
+          {item.type === 'audio' && <div className="audio-item"><audio src={fu(item.url)} controls className="audio-player" /></div>}
           {item.type === 'document' && <div className="document-item"><a href={fu(item.url)} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-info"><i className="bi bi-file-pdf me-1"></i>Open Document</a></div>}
-          {item.type === 'archive'  && <div className="archive-item"><a href={fu(item.url)} download className="btn btn-sm btn-outline-info"><i className="bi bi-file-zip me-1"></i>Download Archive</a></div>}
+          {item.type === 'archive' && <div className="archive-item"><a href={fu(item.url)} download className="btn btn-sm btn-outline-info"><i className="bi bi-file-zip me-1"></i>Download Archive</a></div>}
           {item.type === 'text' && (
             <TextItemDisplay key={`${item.iid}-${textRefreshKey}`} url={item.url} refreshKey={textRefreshKey} localContent={localTextContent[item.iid]}
               onCloseItem={() => setExpandedItems(p => ({ ...p, [item.iid]: false }))}
               onCloseChapter={chapter ? () => setExpandedChapters(p => ({ ...p, [chapter.cid]: false })) : undefined}
-              onCloseVolume={volume  ? () => setExpandedVolumes(p  => ({ ...p, [volume.vid]:  false })) : undefined}
+              onCloseVolume={volume ? () => setExpandedVolumes(p => ({ ...p, [volume.vid]: false })) : undefined}
               onScrollToVolume={idx => { const el = document.getElementById(`volume-${volumes[idx]?.vid}`); if (el) el.scrollIntoView({ behavior: 'smooth' }); }}
               onScrollToChapter={(idx, cidx) => { const ch = volumes[idx]?.chapters[cidx]; if (ch) { setExpandedChapters(p => ({ ...p, [ch.cid]: true })); setTimeout(() => { const el = document.getElementById(`chapter-${ch.cid}`); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 100); } }}
               onScrollToItem={onScrollToItem}
@@ -1346,12 +1633,12 @@ function ContentItemView({ item, ii, vi, ci, editMode, locked, expandedItems, se
 
 // ─── ITEM_ACTIONS ─────────────────────────────────────────────────────────────
 const ITEM_ACTIONS = {
-  'close-item':      (p, pr) => pr.onCloseItem?.(),
-  'close-chapter':   (p, pr) => pr.onCloseChapter?.(),
-  'close-volume':    (p, pr) => pr.onCloseVolume?.(),
-  'move-to-volume':  (p, pr) => pr.onScrollToVolume?.(parseInt(p, 10) - 1),
+  'close-item': (p, pr) => pr.onCloseItem?.(),
+  'close-chapter': (p, pr) => pr.onCloseChapter?.(),
+  'close-volume': (p, pr) => pr.onCloseVolume?.(),
+  'move-to-volume': (p, pr) => pr.onScrollToVolume?.(parseInt(p, 10) - 1),
   'move-to-chapter': (p, pr) => { const [vi, ci] = p.split(',').map(s => parseInt(s.trim(), 10) - 1); pr.onScrollToChapter?.(vi, ci); },
-  'move-to-item':    (p, pr) => { const [vi, ci, ii] = p.split(',').map(s => parseInt(s.trim(), 10) - 1); pr.onScrollToItem?.(vi, ci, ii); },
+  'move-to-item': (p, pr) => { const [vi, ci, ii] = p.split(',').map(s => parseInt(s.trim(), 10) - 1); pr.onScrollToItem?.(vi, ci, ii); },
 };
 
 function executeJsAction(action, params) {
@@ -1380,7 +1667,7 @@ function executeJsAction(action, params) {
 function TextItemDisplay({ url, refreshKey, localContent, onCloseItem, onCloseChapter, onCloseVolume, onScrollToVolume, onScrollToChapter, onScrollToItem }) {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(null);
+  const [error, setError] = useState(null);
   const token = localStorage.getItem('token');
 
   useEffect(() => {
@@ -1411,7 +1698,7 @@ function TextItemDisplay({ url, refreshKey, localContent, onCloseItem, onCloseCh
   };
 
   if (loading) return <div className="text-item"><p><em>Loading...</em></p></div>;
-  if (error)   return <div className="text-item"><p style={{ color: 'red' }}>{error}</p></div>;
+  if (error) return <div className="text-item"><p style={{ color: 'red' }}>{error}</p></div>;
   if (!content) return <div className="text-item"><p className="text-muted fst-italic">No content yet.</p></div>;
   return <div className="text-item" onClick={handleClick}><div dangerouslySetInnerHTML={{ __html: parseTextSyntax(content) }} /></div>;
 }
@@ -1420,68 +1707,76 @@ function TextItemDisplay({ url, refreshKey, localContent, onCloseItem, onCloseCh
 const SYNTAX_GROUPS = [
   {
     label: 'Text & Structure', icon: 'bi-text-left', rows: [
-      { format: 'Line break',    syntax: '\\n' },
-      { format: 'Indentation',   syntax: '\\t' },
-      { format: 'Heading 1',     syntax: '# Text' },
-      { format: 'Heading 2',     syntax: '## Text' },
-      { format: 'Heading 3',     syntax: '### Text' },
-      { format: 'Paragraph',     syntax: '`{text}`' },
+      { format: 'Line break', syntax: '\\n' },
+      { format: 'Indentation', syntax: '\\t' },
+      { format: 'Heading 1', syntax: '# Text' },
+      { format: 'Heading 2', syntax: '## Text' },
+      { format: 'Heading 3', syntax: '### Text' },
+      { format: 'Paragraph', syntax: '`{text}`' },
       { format: 'Numbered list', syntax: '1. Item' },
-      { format: 'Bullet list',   syntax: '- Item  or  • Item' },
-      { format: 'Code Snippet',  syntax: '~(language)[code]~', note: 'JS, TS, Python, Java, C, C++, C#, Go, Rust, SQL, Bash, PHP, Swift, CSS, HTML…' },
+      { format: 'Bullet list', syntax: '- Item  or  • Item' },
+      { format: 'Code Snippet', syntax: '~(language)[code]~', note: 'JS, TS, Python, Java, C, C++, C#, Go, Rust, SQL, Bash, PHP, Swift, CSS, HTML…' },
     ]
   },
   {
     label: 'Media', icon: 'bi-play-circle', rows: [
-      { format: 'Image',   syntax: '#https://url#',        note: 'Inline image' },
-      { format: 'Video',   syntax: '{https://url.mp4}',    note: 'HTML5 player' },
+      { format: 'Image', syntax: '#https://url#', note: 'Inline image' },
+      { format: 'Video', syntax: '{https://url.mp4}', note: 'HTML5 player' },
       { format: 'YouTube', syntax: '(https://youtube.com/watch?v=ID)', note: 'Also youtu.be/ and /shorts/' },
     ]
   },
   {
     label: 'Links & Downloads', icon: 'bi-link-45deg', rows: [
-      { format: 'Link',     syntax: '@https://url@',          note: 'New tab' },
-      { format: 'Download', syntax: '![Label|https://url]!',  note: 'Download button' },
+      { format: 'Link', syntax: '@https://url@', note: 'New tab' },
+      { format: 'Download', syntax: '![Label|https://url]!', note: 'Download button' },
     ]
   },
   {
     label: 'Buttons', icon: 'bi-ui-radios', rows: [
-      { format: 'Arrow function',    syntax: '[btn:Label|() => expr]',                note: 'full JS, no args passed in' },
-      { format: 'Arrow (multi-stmt)',syntax: '[btn:Label|() => { stmt1; stmt2; }]',   note: 'wrap body in { }' },
-      { format: 'Dot-path call',     syntax: '[btn:Label|fn.path:arg1,arg2]',         note: 'e.g. alert:Hi  or  console.log:a,b' },
-      { format: 'Dot-path (no args)',syntax: '[btn:Label|functionName]',              note: 'e.g. myGlobalFn' },
-      { format: 'Close item',        syntax: '[btn:Collapse|close-item]' },
-      { format: 'Close chapter',     syntax: '[btn:Close|close-chapter]' },
-      { format: 'Close volume',      syntax: '[btn:Close|close-volume]' },
-      { format: 'Go to volume',      syntax: '[btn:Go|move-to-volume:1]',             note: '1-based' },
-      { format: 'Go to chapter',     syntax: '[btn:Go|move-to-chapter:1,2]',          note: 'vol,ch (1-based)' },
-      { format: 'Go to item',        syntax: '[btn:Go|move-to-item:1,2,3]',           note: 'vol,ch,item (1-based)' },
+      { format: 'Arrow function', syntax: '[btn:Label|() => expr]', note: 'full JS, no args passed in' },
+      { format: 'Arrow (multi-stmt)', syntax: '[btn:Label|() => { stmt1; stmt2; }]', note: 'wrap body in { }' },
+      { format: 'Dot-path call', syntax: '[btn:Label|fn.path:arg1,arg2]', note: 'e.g. alert:Hi  or  console.log:a,b' },
+      { format: 'Dot-path (no args)', syntax: '[btn:Label|functionName]', note: 'e.g. myGlobalFn' },
+      { format: 'Close item', syntax: '[btn:Collapse|close-item]' },
+      { format: 'Close chapter', syntax: '[btn:Close|close-chapter]' },
+      { format: 'Close volume', syntax: '[btn:Close|close-volume]' },
+      { format: 'Go to volume', syntax: '[btn:Go|move-to-volume:1]', note: '1-based' },
+      { format: 'Go to chapter', syntax: '[btn:Go|move-to-chapter:1,2]', note: 'vol,ch (1-based)' },
+      { format: 'Go to item', syntax: '[btn:Go|move-to-item:1,2,3]', note: 'vol,ch,item (1-based)' },
     ]
   },
 ];
 
 // ─── Add Item Modal ───────────────────────────────────────────────────────────
 function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedFiles = [] }) {
-  const [title,    setTitle]    = useState(initialData?.title   || '');
-  const [content,  setContent]  = useState(initialData?.content || '');
-  const [url,      setUrl]      = useState(initialData?.url     || '');
-  const [preview,  setPreview]  = useState(initialData?.url     || '');
-  const [selFile,  setSelFile]  = useState('');
+  const [_modal, _setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null });
+  const _closeModal = () => _setModal(p => ({ ...p, show: false }));
+  const _showInfo = (title, message) => _setModal({ show: true, type: 'info', title, message, onClose: _closeModal });
+  const _showConfirm = (title, message, onConfirm, danger = false) => _setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: _closeModal });
+  const _ModalEl = () => <UtilityModal show={_modal.show} type={_modal.type} title={_modal.title} message={_modal.message}
+    danger={_modal.danger}
+    onConfirm={() => { _modal.onConfirm?.(); _closeModal(); }}
+    onCancel={_modal.onCancel || _closeModal} onClose={_closeModal} />;
+  const [title, setTitle] = useState(initialData?.title || '');
+  const [content, setContent] = useState(initialData?.content || '');
+  const [url, setUrl] = useState(initialData?.url || '');
+  const [preview, setPreview] = useState(initialData?.url || '');
+  const [selFile, setSelFile] = useState('');
   const [showHelp, setShowHelp] = useState(false);
-  const [helpGroup,setHelpGroup]= useState(0);
+  const [helpGroup, setHelpGroup] = useState(0);
   const [loadingTxt, setLoadingTxt] = useState(false);
-  const [txtErr,     setTxtErr]     = useState(null);
+  const [txtErr, setTxtErr] = useState(null);
   const token = localStorage.getItem('token');
 
   const ff = () => {
     if (type === 'text' || !uploadedFiles?.length) return [];
     return uploadedFiles.filter(f => {
       const n = (f.originalName || f.filename || '').toLowerCase();
-      if (type === 'image')    return /\.(jpg|jpeg|png|gif|webp)$/i.test(n);
-      if (type === 'video')    return /\.(mp4|webm|ogg|mov|avi)$/i.test(n);
-      if (type === 'audio')    return /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(n);
+      if (type === 'image') return /\.(jpg|jpeg|png|gif|webp)$/i.test(n);
+      if (type === 'video') return /\.(mp4|webm|ogg|mov|avi)$/i.test(n);
+      if (type === 'audio') return /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(n);
       if (type === 'document') return /\.(pdf|doc|docx)$/i.test(n);
-      if (type === 'archive')  return /\.(zip|rar|7z)$/i.test(n);
+      if (type === 'archive') return /\.(zip|rar|7z)$/i.test(n);
       return false;
     });
   };
@@ -1508,9 +1803,9 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedF
     else { setUrl(''); setPreview(''); }
   };
   const handleSave = () => {
-    if (!title.trim()) { alert('Please enter a title'); return; }
+    if (!title.trim()) { _showInfo('Validation', 'Please enter a title'); return; }
     if (type === 'text') { onSave({ type, title, content }); return; }
-    if (!url && !preview) { alert('Please provide a file or URL'); return; }
+    if (!url && !preview) { _showInfo('Validation', 'Please provide a file or URL'); return; }
     onSave({ type, title, url: url || preview || '' });
   };
   const fi = ff();
@@ -1528,7 +1823,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedF
           {type === 'text' ? (
             <>
               {loadingTxt && <div className="alert alert-info mb-3"><span className="spinner-border spinner-border-sm me-2"></span>Loading…</div>}
-              {txtErr     && <div className="alert alert-danger mb-3">{txtErr}</div>}
+              {txtErr && <div className="alert alert-danger mb-3">{txtErr}</div>}
               <div className="mb-2"><button className="btn btn-sm btn-link px-0" onClick={() => setShowHelp(!showHelp)}><i className={`bi bi-${showHelp ? 'chevron-up' : 'question-circle'} me-1`}></i>{showHelp ? 'Hide syntax help' : 'Syntax help'}</button></div>
               {showHelp && (
                 <div className="syntax-help-panel mb-3">
@@ -1552,9 +1847,9 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedF
               <div className="text-center my-2"><small className="text-muted">— OR —</small></div>
               <div className="mb-3"><label className="form-label">Enter URL</label><input type="url" className="form-control" value={url} onChange={e => { setUrl(e.target.value); setPreview(e.target.value); setSelFile(''); }} placeholder="https://example.com/file" /></div>
               {preview && <div className="mb-3"><label className="form-label">Preview</label>
-                {type === 'image'    && <img src={preview} alt="" className="img-preview" />}
-                {type === 'video'    && <video src={preview} controls className="video-preview" />}
-                {type === 'audio'    && <audio src={preview} controls className="audio-preview" />}
+                {type === 'image' && <img src={preview} alt="" className="img-preview" />}
+                {type === 'video' && <video src={preview} controls className="video-preview" />}
+                {type === 'audio' && <audio src={preview} controls className="audio-preview" />}
                 {(type === 'document' || type === 'archive') && <div className="alert alert-info"><i className={`bi ${tIcon} me-2`}></i>{preview.split('/').pop()}</div>}
               </div>}
             </>
@@ -1572,18 +1867,26 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedF
 // ─── Form Editor Modal ────────────────────────────────────────────────────────
 function FormEditorModal({ isEditing, initialItem, uploadedFiles = [], onSave, onClose }) {
   const token = localStorage.getItem('token');
-  const genId  = () => `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const genId = () => `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const emptyQ = (type = 'single') => {
     const b = { id: genId(), type, question: '', media: null };
-    if (type === 'single')      return { ...b, options: ['', ''], correctIndex: 0 };
-    if (type === 'multiple')    return { ...b, options: ['', ''], correctIndices: [] };
+    if (type === 'single') return { ...b, options: ['', ''], correctIndex: 0 };
+    if (type === 'multiple') return { ...b, options: ['', ''], correctIndices: [] };
     if (type === 'correlation') return { ...b, pairs: [{ left: '', right: '' }, { left: '', right: '' }] };
-    if (type === 'closed')      return { ...b, correctAnswer: '' };
+    if (type === 'closed') return { ...b, correctAnswer: '' };
     return b;
   };
-  const [title,     setTitle]     = useState(initialItem?.title || '');
+  const [_modal, _setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null });
+  const _closeModal = () => _setModal(p => ({ ...p, show: false }));
+  const _showInfo = (title, message) => _setModal({ show: true, type: 'info', title, message, onClose: _closeModal });
+  const _showConfirm = (title, message, onConfirm, danger = false) => _setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: _closeModal });
+  const _ModalEl = () => <UtilityModal show={_modal.show} type={_modal.type} title={_modal.title} message={_modal.message}
+    danger={_modal.danger}
+    onConfirm={() => { _modal.onConfirm?.(); _closeModal(); }}
+    onCancel={_modal.onCancel || _closeModal} onClose={_closeModal} />;
+  const [title, setTitle] = useState(initialItem?.title || '');
   const [questions, setQuestions] = useState([]);
-  const [loading,   setLoading]   = useState(isEditing && !!initialItem?.url);
+  const [loading, setLoading] = useState(isEditing && !!initialItem?.url);
 
   useEffect(() => {
     if (isEditing && initialItem?.url) {
@@ -1597,16 +1900,16 @@ function FormEditorModal({ isEditing, initialItem, uploadedFiles = [], onSave, o
     } else { setQuestions([emptyQ()]); }
   }, []);
 
-  const setQ        = (i, fn) => setQuestions(p => { const a = [...p]; a[i] = fn(a[i]); return a; });
-  const changeType  = (i, t)  => setQ(i, q => ({ ...emptyQ(t), id: q.id, question: q.question, media: q.media }));
-  const setOpt      = (qi, oi, v) => setQ(qi, q => { const o = [...q.options]; o[oi] = v; return { ...q, options: o }; });
-  const addOpt      = (qi)    => setQ(qi, q => ({ ...q, options: [...q.options, ''] }));
-  const removeOpt   = (qi, oi)=> setQ(qi, q => { const o = q.options.filter((_, i) => i !== oi); return { ...q, options: o, correctIndex: q.correctIndex >= o.length ? Math.max(0, o.length - 1) : q.correctIndex, correctIndices: (q.correctIndices || []).filter(i => i !== oi).map(i => i > oi ? i - 1 : i) }; });
-  const setPair     = (qi, pi, s, v) => setQ(qi, q => ({ ...q, pairs: q.pairs.map((p, i) => i === pi ? { ...p, [s]: v } : p) }));
-  const addPair     = (qi)    => setQ(qi, q => ({ ...q, pairs: [...q.pairs, { left: '', right: '' }] }));
-  const removePair  = (qi, pi)=> setQ(qi, q => ({ ...q, pairs: q.pairs.filter((_, i) => i !== pi) }));
+  const setQ = (i, fn) => setQuestions(p => { const a = [...p]; a[i] = fn(a[i]); return a; });
+  const changeType = (i, t) => setQ(i, q => ({ ...emptyQ(t), id: q.id, question: q.question, media: q.media }));
+  const setOpt = (qi, oi, v) => setQ(qi, q => { const o = [...q.options]; o[oi] = v; return { ...q, options: o }; });
+  const addOpt = (qi) => setQ(qi, q => ({ ...q, options: [...q.options, ''] }));
+  const removeOpt = (qi, oi) => setQ(qi, q => { const o = q.options.filter((_, i) => i !== oi); return { ...q, options: o, correctIndex: q.correctIndex >= o.length ? Math.max(0, o.length - 1) : q.correctIndex, correctIndices: (q.correctIndices || []).filter(i => i !== oi).map(i => i > oi ? i - 1 : i) }; });
+  const setPair = (qi, pi, s, v) => setQ(qi, q => ({ ...q, pairs: q.pairs.map((p, i) => i === pi ? { ...p, [s]: v } : p) }));
+  const addPair = (qi) => setQ(qi, q => ({ ...q, pairs: [...q.pairs, { left: '', right: '' }] }));
+  const removePair = (qi, pi) => setQ(qi, q => ({ ...q, pairs: q.pairs.filter((_, i) => i !== pi) }));
   const getFF = (mt) => (uploadedFiles || []).filter(f => { const n = (f.originalName || f.filename || '').toLowerCase(); return mt === 'image' ? /\.(jpg|jpeg|png|gif|webp)$/i.test(n) : mt === 'video' ? /\.(mp4|webm|ogg|mov)$/i.test(n) : /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(n); });
-  const handleSave  = () => { if (!title.trim()) { alert('Enter form title'); return; } if (questions.find(q => !q.question.trim())) { alert('All questions need text'); return; } onSave({ type: 'form', title, formData: { questions } }); };
+  const handleSave = () => { if (!title.trim()) { _showInfo('Validation', 'Enter form title'); return; } if (questions.find(q => !q.question.trim())) { _showInfo('Validation', 'All questions need text'); return; } onSave({ type: 'form', title, formData: { questions } }); };
   const QL = { single: 'Single Answer (Radio)', multiple: 'Multiple Answers (Checkboxes)', correlation: 'Correlation (Match)', closed: 'Closed Answer (Text)', open: 'Open Answer (Teacher reviews)' };
 
   return (
@@ -1626,11 +1929,11 @@ function FormEditorModal({ isEditing, initialItem, uploadedFiles = [], onSave, o
                   </div>
                   <textarea className="form-control form-question-text" rows={2} placeholder="Question text…" value={q.question} onChange={e => setQ(qi, q2 => ({ ...q2, question: e.target.value }))} />
                   <FormMediaPicker media={q.media} uploadedFiles={uploadedFiles} getFilteredFiles={getFF} onSet={m => setQ(qi, q2 => ({ ...q2, media: m }))} onClear={() => setQ(qi, q2 => ({ ...q2, media: null }))} />
-                  {q.type === 'single'      && <div className="form-options-list mt-2"><p className="form-options-hint">Mark correct:</p>{q.options.map((opt, oi) => <div key={oi} className="form-option-row"><input type="radio" className="form-check-input" name={`c-${q.id}`} checked={q.correctIndex === oi} onChange={() => setQ(qi, q2 => ({ ...q2, correctIndex: oi }))} /><input type="text" className="form-control form-control-sm" value={opt} onChange={e => setOpt(qi, oi, e.target.value)} placeholder={`Option ${oi + 1}`} /><button className="btn btn-sm btn-outline-secondary" onClick={() => removeOpt(qi, oi)} disabled={q.options.length <= 2}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-outline-primary mt-1" onClick={() => addOpt(qi)}><i className="bi bi-plus me-1"></i>Add Option</button></div>}
-                  {q.type === 'multiple'    && <div className="form-options-list mt-2"><p className="form-options-hint">Check all correct:</p>{q.options.map((opt, oi) => <div key={oi} className="form-option-row"><input type="checkbox" className="form-check-input" checked={(q.correctIndices || []).includes(oi)} onChange={e => setQ(qi, q2 => { const c = e.target.checked ? [...(q2.correctIndices || []), oi] : (q2.correctIndices || []).filter(i => i !== oi); return { ...q2, correctIndices: c }; })} /><input type="text" className="form-control form-control-sm" value={opt} onChange={e => setOpt(qi, oi, e.target.value)} placeholder={`Option ${oi + 1}`} /><button className="btn btn-sm btn-outline-secondary" onClick={() => removeOpt(qi, oi)} disabled={q.options.length <= 2}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-outline-primary mt-1" onClick={() => addOpt(qi)}><i className="bi bi-plus me-1"></i>Add Option</button></div>}
+                  {q.type === 'single' && <div className="form-options-list mt-2"><p className="form-options-hint">Mark correct:</p>{q.options.map((opt, oi) => <div key={oi} className="form-option-row"><input type="radio" className="form-check-input" name={`c-${q.id}`} checked={q.correctIndex === oi} onChange={() => setQ(qi, q2 => ({ ...q2, correctIndex: oi }))} /><input type="text" className="form-control form-control-sm" value={opt} onChange={e => setOpt(qi, oi, e.target.value)} placeholder={`Option ${oi + 1}`} /><button className="btn btn-sm btn-outline-secondary" onClick={() => removeOpt(qi, oi)} disabled={q.options.length <= 2}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-outline-primary mt-1" onClick={() => addOpt(qi)}><i className="bi bi-plus me-1"></i>Add Option</button></div>}
+                  {q.type === 'multiple' && <div className="form-options-list mt-2"><p className="form-options-hint">Check all correct:</p>{q.options.map((opt, oi) => <div key={oi} className="form-option-row"><input type="checkbox" className="form-check-input" checked={(q.correctIndices || []).includes(oi)} onChange={e => setQ(qi, q2 => { const c = e.target.checked ? [...(q2.correctIndices || []), oi] : (q2.correctIndices || []).filter(i => i !== oi); return { ...q2, correctIndices: c }; })} /><input type="text" className="form-control form-control-sm" value={opt} onChange={e => setOpt(qi, oi, e.target.value)} placeholder={`Option ${oi + 1}`} /><button className="btn btn-sm btn-outline-secondary" onClick={() => removeOpt(qi, oi)} disabled={q.options.length <= 2}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-outline-primary mt-1" onClick={() => addOpt(qi)}><i className="bi bi-plus me-1"></i>Add Option</button></div>}
                   {q.type === 'correlation' && <div className="form-corr-list mt-2"><p className="form-options-hint">Left → Right (shuffled for student):</p>{q.pairs.map((pair, pi) => <div key={pi} className="form-corr-row"><span className="form-corr-num">{pi + 1}.</span><input type="text" className="form-control form-control-sm" value={pair.left} onChange={e => setPair(qi, pi, 'left', e.target.value)} placeholder={`Left ${pi + 1}`} /><i className="bi bi-arrow-right text-muted"></i><input type="text" className="form-control form-control-sm" value={pair.right} onChange={e => setPair(qi, pi, 'right', e.target.value)} placeholder={`Match (${String.fromCharCode(65 + pi)})`} /><button className="btn btn-sm btn-outline-secondary" onClick={() => removePair(qi, pi)} disabled={q.pairs.length <= 2}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-outline-primary mt-1" onClick={() => addPair(qi)}><i className="bi bi-plus me-1"></i>Add Pair</button></div>}
-                  {q.type === 'closed'      && <div className="mt-2"><label className="form-label form-options-hint">Expected answer:</label><input type="text" className="form-control form-control-sm" value={q.correctAnswer || ''} onChange={e => setQ(qi, q2 => ({ ...q2, correctAnswer: e.target.value }))} placeholder="Correct answer…" /></div>}
-                  {q.type === 'open'        && <div className="form-open-hint mt-2"><small className="text-muted"><i className="bi bi-pencil-square me-1"></i>Student writes freely — teacher reviews manually.</small></div>}
+                  {q.type === 'closed' && <div className="mt-2"><label className="form-label form-options-hint">Expected answer:</label><input type="text" className="form-control form-control-sm" value={q.correctAnswer || ''} onChange={e => setQ(qi, q2 => ({ ...q2, correctAnswer: e.target.value }))} placeholder="Correct answer…" /></div>}
+                  {q.type === 'open' && <div className="form-open-hint mt-2"><small className="text-muted"><i className="bi bi-pencil-square me-1"></i>Student writes freely — teacher reviews manually.</small></div>}
                 </div>
               ))}
             </div>
@@ -1645,10 +1948,18 @@ function FormEditorModal({ isEditing, initialItem, uploadedFiles = [], onSave, o
 
 // ─── Form Media Picker ────────────────────────────────────────────────────────
 function FormMediaPicker({ media, uploadedFiles, getFilteredFiles, onSet, onClear }) {
+  const [_modal, _setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null });
+  const _closeModal = () => _setModal(p => ({ ...p, show: false }));
+  const _showInfo = (title, message) => _setModal({ show: true, type: 'info', title, message, onClose: _closeModal });
+  const _showConfirm = (title, message, onConfirm, danger = false) => _setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: _closeModal });
+  const _ModalEl = () => <UtilityModal show={_modal.show} type={_modal.type} title={_modal.title} message={_modal.message}
+    danger={_modal.danger}
+    onConfirm={() => { _modal.onConfirm?.(); _closeModal(); }}
+    onCancel={_modal.onCancel || _closeModal} onClose={_closeModal} />;
   const [open, setOpen] = useState(false);
-  const [mt,   setMt]   = useState('image');
+  const [mt, setMt] = useState('image');
   const [urlI, setUrlI] = useState('');
-  const [fc,   setFc]   = useState('');
+  const [fc, setFc] = useState('');
 
   if (!open && !media) return <button className="btn btn-sm btn-outline-secondary mt-2" onClick={() => setOpen(true)}><i className="bi bi-image me-1"></i>Attach Media</button>;
   if (media) return (
@@ -1662,13 +1973,13 @@ function FormMediaPicker({ media, uploadedFiles, getFilteredFiles, onSet, onClea
 
   const ff = getFilteredFiles(mt);
   const toEmbed = u => {
-    const s = u.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);   if (s) return `https://www.youtube.com/embed/${s[1]}`;
-    const w = u.match(/[?&]v=([a-zA-Z0-9_-]{11})/);         if (w) return `https://www.youtube.com/embed/${w[1]}`;
+    const s = u.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/); if (s) return `https://www.youtube.com/embed/${s[1]}`;
+    const w = u.match(/[?&]v=([a-zA-Z0-9_-]{11})/); if (w) return `https://www.youtube.com/embed/${w[1]}`;
     return u;
   };
   const attach = () => {
     const u = fc ? ((uploadedFiles.find(f => f.url === fc || f.path === fc)?.url) || fc) : urlI.trim();
-    if (!u) { alert('Select or enter URL'); return; }
+    if (!u) { _showInfo('Validation', 'Select or enter URL'); return; }
     const resolved = mt === 'video' ? toEmbed(u) : u;
     onSet({ type: mt, url: fu(resolved) });
     setOpen(false); setUrlI(''); setFc('');
@@ -1691,13 +2002,16 @@ function FormMediaPicker({ media, uploadedFiles, getFilteredFiles, onSet, onClea
 
 // ─── Form Item Display ────────────────────────────────────────────────────────
 function FormItemDisplay({ url, refreshKey }) {
-  const [formDef,   setFormDef]   = useState(null);
-  const [answers,   setAnswers]   = useState({});
+  const [formDef, setFormDef] = useState(null);
+  const [answers, setAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const token = localStorage.getItem('token');
   const [shuffles] = useState({});
+  const [_modal, _setModal] = useState({ show: false, type: 'confirm', title: '', message: '', onConfirm: null, onCancel: null });
+  const _closeModal  = () => _setModal(p => ({ ...p, show: false }));
+  const _showConfirm = (title, message, onConfirm) => _setModal({ show: true, type: 'confirm', title, message, onConfirm, onCancel: _closeModal });
   const getShuffled = (id, arr) => { if (!shuffles[id]) shuffles[id] = [...arr].sort(() => Math.random() - .5); return shuffles[id]; };
 
   useEffect(() => {
@@ -1711,14 +2025,14 @@ function FormItemDisplay({ url, refreshKey }) {
       .finally(() => setLoading(false));
   }, [url, refreshKey]);
 
-  const setAns     = (id, v)  => setAnswers(p => ({ ...p, [id]: v }));
+  const setAns = (id, v) => setAnswers(p => ({ ...p, [id]: v }));
   const toggleMult = (id, oi) => { const c = answers[id] || []; setAns(id, c.includes(oi) ? c.filter(i => i !== oi) : [...c, oi]); };
-  const isCorrect  = q => {
+  const isCorrect = q => {
     const a = answers[q.id];
-    if (q.type === 'single')      return a === q.correctIndex;
-    if (q.type === 'multiple')    return [...(a || [])].sort().join(',') === [...(q.correctIndices || [])].sort().join(',');
+    if (q.type === 'single') return a === q.correctIndex;
+    if (q.type === 'multiple') return [...(a || [])].sort().join(',') === [...(q.correctIndices || [])].sort().join(',');
     if (q.type === 'correlation') return q.pairs.every((p, i) => a && a[i] === p.right);
-    if (q.type === 'closed')      return (a || '').trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase();
+    if (q.type === 'closed') return (a || '').trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase();
     return null;
   };
   const handleSubmit = () => {
@@ -1728,15 +2042,14 @@ function FormItemDisplay({ url, refreshKey }) {
       if (q.type === 'open' || q.type === 'closed') return !a || !a.trim();
       return a === undefined || a === null;
     });
-    if (ua.length && !window.confirm(`${ua.length} unanswered. Submit anyway?`)) return;
-    setSubmitted(true);
+    if (ua.length) { _showConfirm('Submit', `${ua.length} question(s) unanswered. Submit anyway?`, () => setSubmitted(true)); } else { setSubmitted(true); }
   };
 
-  const scoreable = (formDef?.questions || []).filter(q => ['single','multiple','correlation','closed'].includes(q.type));
-  const correct   = scoreable.filter(q => isCorrect(q) === true).length;
+  const scoreable = (formDef?.questions || []).filter(q => ['single', 'multiple', 'correlation', 'closed'].includes(q.type));
+  const correct = scoreable.filter(q => isCorrect(q) === true).length;
 
   if (loading) return <div className="form-item-display"><p><em>Loading form…</em></p></div>;
-  if (error)   return <div className="form-item-display"><p style={{ color: 'red' }}>{error}</p></div>;
+  if (error) return <div className="form-item-display"><p style={{ color: 'red' }}>{error}</p></div>;
   if (!formDef) return null;
 
   return (
@@ -1752,11 +2065,11 @@ function FormItemDisplay({ url, refreshKey }) {
                 <div key={q.id} className="form-review-item">
                   {q.media && <FormMediaDisplay media={q.media} />}
                   <div className="form-review-q"><strong>Q{i + 1}:</strong> {q.question}</div>
-                  {q.type === 'single'      && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>{q.options[a] ?? <em>none</em>}{!ok && <span className="ms-2 text-success">✓ {q.options[q.correctIndex]}</span>}</div>}
-                  {q.type === 'multiple'    && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>{(a || []).map(i => q.options[i]).join(', ') || <em>none</em>}{!ok && <span className="ms-2 text-success">✓ {(q.correctIndices || []).map(i => q.options[i]).join(', ')}</span>}</div>}
+                  {q.type === 'single' && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>{q.options[a] ?? <em>none</em>}{!ok && <span className="ms-2 text-success">✓ {q.options[q.correctIndex]}</span>}</div>}
+                  {q.type === 'multiple' && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>{(a || []).map(i => q.options[i]).join(', ') || <em>none</em>}{!ok && <span className="ms-2 text-success">✓ {(q.correctIndices || []).map(i => q.options[i]).join(', ')}</span>}</div>}
                   {q.type === 'correlation' && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>{q.pairs.map((p, pi) => { const g = a ? a[pi] : undefined; return <span key={pi} className={`form-corr-result ${g === p.right ? 'text-success' : 'text-danger'}`}>{p.left}→{g ?? '?'} {g === p.right ? '✓' : `(✓${p.right})`}</span>; })}</div>}
-                  {q.type === 'closed'      && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>"{a || ''}" {!ok && <span className="ms-2 text-success">✓ "{q.correctAnswer}"</span>}</div>}
-                  {q.type === 'open'        && <div className="form-review-a form-review-a--open"><i className="bi bi-pencil-square text-muted me-1"></i>{a?.trim() || <em>no answer</em>}<span className="badge bg-secondary ms-2">Teacher reviews</span></div>}
+                  {q.type === 'closed' && <div className={`form-review-a ${ok ? 'form-review-a--correct' : 'form-review-a--wrong'}`}><i className={`bi ${ok ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger'} me-1`}></i>"{a || ''}" {!ok && <span className="ms-2 text-success">✓ "{q.correctAnswer}"</span>}</div>}
+                  {q.type === 'open' && <div className="form-review-a form-review-a--open"><i className="bi bi-pencil-square text-muted me-1"></i>{a?.trim() || <em>no answer</em>}<span className="badge bg-secondary ms-2">Teacher reviews</span></div>}
                 </div>
               );
             })}
@@ -1769,16 +2082,18 @@ function FormItemDisplay({ url, refreshKey }) {
             <div key={q.id} className="form-q-block">
               {q.media && <FormMediaDisplay media={q.media} />}
               <div className="form-q-label"><strong>Q{i + 1}.</strong> {q.question}</div>
-              {q.type === 'single'   && <div className="form-q-options">{q.options.map((opt, oi) => <label key={oi} className={`form-q-option ${answers[q.id] === oi ? 'form-q-option--selected' : ''}`}><input type="radio" name={`a-${q.id}`} className="form-check-input me-2" checked={answers[q.id] === oi} onChange={() => setAns(q.id, oi)} />{opt || <em className="text-muted">(empty)</em>}</label>)}</div>}
+              {q.type === 'single' && <div className="form-q-options">{q.options.map((opt, oi) => <label key={oi} className={`form-q-option ${answers[q.id] === oi ? 'form-q-option--selected' : ''}`}><input type="radio" name={`a-${q.id}`} className="form-check-input me-2" checked={answers[q.id] === oi} onChange={() => setAns(q.id, oi)} />{opt || <em className="text-muted">(empty)</em>}</label>)}</div>}
               {q.type === 'multiple' && <div className="form-q-options">{q.options.map((opt, oi) => <label key={oi} className={`form-q-option ${(answers[q.id] || []).includes(oi) ? 'form-q-option--selected' : ''}`}><input type="checkbox" className="form-check-input me-2" checked={(answers[q.id] || []).includes(oi)} onChange={() => toggleMult(q.id, oi)} />{opt || <em className="text-muted">(empty)</em>}</label>)}</div>}
               {q.type === 'correlation' && (() => { const ro = getShuffled(q.id, q.pairs.map(p => p.right)); const ca = answers[q.id] || {}; return <div className="form-corr-answer">{q.pairs.map((pair, pi) => <div key={pi} className="form-corr-answer-row"><span className="form-corr-left">{pair.left}</span><select className="form-select form-select-sm form-corr-select" value={ca[pi] || ''} onChange={e => setAns(q.id, { ...ca, [pi]: e.target.value })}><option value="">— Choose —</option>{ro.map((r, ri) => <option key={ri} value={r}>{r}</option>)}</select></div>)}</div>; })()}
-              {q.type === 'closed'   && <input type="text" className="form-control form-q-closed" placeholder="Type your answer…" value={answers[q.id] || ''} onChange={e => setAns(q.id, e.target.value)} />}
-              {q.type === 'open'     && <textarea className="form-control form-q-open" rows={3} placeholder="Write your answer…" value={answers[q.id] || ''} onChange={e => setAns(q.id, e.target.value)} />}
+              {q.type === 'closed' && <input type="text" className="form-control form-q-closed" placeholder="Type your answer…" value={answers[q.id] || ''} onChange={e => setAns(q.id, e.target.value)} />}
+              {q.type === 'open' && <textarea className="form-control form-q-open" rows={3} placeholder="Write your answer…" value={answers[q.id] || ''} onChange={e => setAns(q.id, e.target.value)} />}
             </div>
           ))}
           <button className="btn btn-primary mt-2" onClick={handleSubmit}><i className="bi bi-send me-1"></i>Submit</button>
         </div>
       )}
+      {_modal.show && <UtilityModal show={_modal.show} type={_modal.type} title={_modal.title} message={_modal.message}
+        onConfirm={() => { _modal.onConfirm?.(); _closeModal(); }} onCancel={_modal.onCancel || _closeModal} onClose={_closeModal} />}
     </div>
   );
 }

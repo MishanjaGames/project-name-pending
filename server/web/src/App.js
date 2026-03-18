@@ -24,6 +24,9 @@ import CoursePreview from './pages/CoursePreview';
 import ViewCourse from './pages/ViewCourse';
 import CreatorForm from './pages/CreatorForm';
 import Forms from './pages/Forms';
+import Keys from './pages/Keys';
+import Promos from './pages/Promos';
+import RedeemKey from './pages/RedeemKey';
 import ViewForm from './pages/ViewForm';
 
 function App() {
@@ -228,6 +231,25 @@ function App() {
         <Route path="/manage/role/:id" element={
           isLoggedIn ?
             <EditRole data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+
+        {/* Promos Route */}
+        <Route path="/manage/promos" element={
+          isLoggedIn ?
+            <Promos data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+
+        {/* Keys Routes */}
+        <Route path="/manage/keys" element={
+          isLoggedIn ?
+            <Keys data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/redeem" element={
+          isLoggedIn ?
+            <RedeemKey data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
         } />
 

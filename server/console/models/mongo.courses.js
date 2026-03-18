@@ -22,8 +22,27 @@ const courseSchema = new Schema({
     },
     ratings: {
         type: Number,
-        required: false
+        required: false,
+        default: 0,
+        description: 'Computed average rating (0-5), auto-recalculated on each vote'
     },
+    ratingsList: [{
+        userId: {
+            ref: 'users',
+            type: require('mongoose').Schema.Types.ObjectId,
+            required: true
+        },
+        value: {
+            type: Number,
+            required: true,
+            min: 1,
+            max: 5
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
     followers: {
         type: Number,
         required: false
@@ -42,6 +61,10 @@ const courseSchema = new Schema({
         required: true
     }],
     trans: [{
+        _id:{
+            type: Schema.Types.ObjectId,
+            required: false
+        },
         title: {
             type: String,
             required: true
@@ -141,6 +164,23 @@ const courseSchema = new Schema({
         description: {
             type: String,
             required: false
+        }
+    }],
+    comments: [{
+        userId: {
+            ref: 'users',
+            type: require('mongoose').Schema.Types.ObjectId,
+            required: true
+        },
+        date: {
+            type: Date,
+            default: Date.now,
+            required: true
+        },
+        text: {
+            type: String,
+            required: true,
+            maxlength: 4000
         }
     }],
     createdAt: {

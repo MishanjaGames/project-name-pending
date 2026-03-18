@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
+import { UtilityModal } from '../components/UtilityModal';
 
 function CreateRole({ data, onLogout }) {
     const navigate = useNavigate();
@@ -10,6 +11,13 @@ function CreateRole({ data, onLogout }) {
         accessLevel: ''
     });
     const [errors, setErrors] = useState({});
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete  = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
+    const isRoot = data?.role?.accessLevel === 'root' || data?.role?.roleName === 'root';
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -33,7 +41,7 @@ function CreateRole({ data, onLogout }) {
 
         if (!formData.accessLevel) {
             newErrors.accessLevel = 'Access level is required';
-        } else if (!['user', 'create', 'quality', 'manage', 'admin'].includes(formData.accessLevel)) {
+        } else if (!['user', 'create', 'quality', 'manage', 'admin', ...(isRoot ? ['root'] : [])].includes(formData.accessLevel)) {
             newErrors.accessLevel = 'Please select a valid access level';
         }
 
@@ -67,24 +75,22 @@ function CreateRole({ data, onLogout }) {
             });
 
             if (response.ok) {
-                alert('Role created successfully!');
+                showInfo('Success', 'Role created successfully!');
                 navigate('/manage/roles');
             } else {
                 const errorData = await response.json();
-                alert(`Failed to create role: ${errorData.message || 'Unknown error'}`);
+                showInfo('Error', `Failed to create role: ${errorData.message || 'Unknown error'}`);
             }
         } catch (error) {
             console.error('Error creating role:', error);
-            alert('Error creating role. Please try again.');
+            showInfo('Error', 'Error creating role. Please try again.');
         } finally {
             setSaving(false);
         }
     };
 
     const handleCancel = () => {
-        if (window.confirm('Are you sure you want to cancel? All entered data will be lost.')) {
-            navigate('/manage/roles');
-        }
+        showConfirm('Cancel', 'Are you sure you want to cancel? All entered data will be lost.', () => navigate('/manage/roles'));
     };
 
     const getAccessLevelBadgeColor = (level) => {
@@ -193,6 +199,7 @@ function CreateRole({ data, onLogout }) {
                                             <option value="quality">Quality Control - Content creation and control access</option>
                                             <option value="manage">Manage - High-level permissions</option>
                                             <option value="admin">Admin - Full system access</option>
+                                            {isRoot && <option value="root">Root - Full access</option>}
                                         </select>
                                         {errors.accessLevel && (
                                             <div className="invalid-feedback">{errors.accessLevel}</div>
@@ -264,6 +271,35 @@ function CreateRole({ data, onLogout }) {
                     </div>
                 </div>
             </div>
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
         </>
     );
 }

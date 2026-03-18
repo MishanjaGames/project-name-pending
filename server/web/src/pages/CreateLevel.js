@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
+import { UtilityModal } from '../components/UtilityModal';
 
 function CreateLevel({ data, onLogout }) {
   const navigate = useNavigate();
@@ -8,6 +9,11 @@ function CreateLevel({ data, onLogout }) {
   const [directionName, setDirectionName] = useState('');
   const [directions, setDirections] = useState([]);
   const [loading, setLoading] = useState(true);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
   const [saving, setSaving] = useState(false);
 
   const token = localStorage.getItem('token');
@@ -37,7 +43,7 @@ function CreateLevel({ data, onLogout }) {
     } catch (err) {
       console.error('Error fetching directions:', err);
       setDirections([]);
-      alert('Failed to load directions. Please check your connection.');
+      showInfo('Error', 'Failed to load directions. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -47,12 +53,12 @@ function CreateLevel({ data, onLogout }) {
     e.preventDefault();
 
     if (!levelName.trim()) {
-      alert('Please enter a level name');
+      showInfo('Validation', 'Please enter a level name');
       return;
     }
 
     if (!directionName) {
-      alert('Please select a direction');
+      showInfo('Validation', 'Please select a direction');
       return;
     }
 
@@ -72,15 +78,15 @@ function CreateLevel({ data, onLogout }) {
       });
 
       if (response.ok) {
-        alert('Level created successfully');
+        showInfo('Success', 'Level created successfully');
         navigate('/manage/levels');
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to create level');
+        showInfo('Error', error.message || 'Failed to create level');
       }
     } catch (err) {
       console.error('Error creating level:', err);
-      alert('Failed to create level');
+      showInfo('Error', 'Failed to create level');
     } finally {
       setSaving(false);
     }
@@ -216,7 +222,19 @@ function CreateLevel({ data, onLogout }) {
           </div>
         </div>
       </div>
+        <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
     </>
+
   );
 }
 

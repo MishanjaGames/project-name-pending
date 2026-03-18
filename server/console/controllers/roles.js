@@ -10,8 +10,22 @@ const errorHandler = require('../utils/errorHandler')
 
 module.exports.getAll = async (req, res) => {
     try {
-        const role = await Roles.find({})
-        res.status(200).json({ data: role.filter((d)=>d.roleName!=='root') })
+        const role = await Roles.find({});
+        const token = req.headers.authorization ? req.headers.authorization.split(' ')[1] : null;
+        let requesterIsRoot = false;
+        if (token) {
+            try {
+                const requester = await utils.parseToken(token);
+                if (requester && requester.role) {
+                    const requesterRole = await Roles.findById(requester.role);
+                    if (requesterRole) {
+                        requesterIsRoot = requesterRole.accessLevel === 'root' || requesterRole.roleName === 'root';
+                    }
+                }
+            } catch (_) {}
+        }
+        const filtered = requesterIsRoot ? role : role.filter(d => d.roleName !== 'root');
+        res.status(200).json({ data: filtered })
     } catch (e) {
         errorHandler(res, 500, e)
     }

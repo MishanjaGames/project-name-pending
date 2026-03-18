@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import './CoursePreview.css';
+import { UtilityModal } from '../components/UtilityModal';
 
 // Mock user data - replace with your actual auth
 const MOCK_USER = {
@@ -16,6 +17,11 @@ function CoursePreview() {
   const [loading, setLoading] = useState(true);
   const [expandedChapters, setExpandedChapters] = useState({});
   const [editMode, setEditMode] = useState(false);
+
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
   const [chapters, setChapters] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [draggedChapter, setDraggedChapter] = useState(null);
@@ -228,7 +234,7 @@ function CoursePreview() {
   };
 
   const deleteContentItem = (chapterIndex, itemIndex) => {
-    if (!window.confirm('Delete this item?')) return;
+    showConfirm('Delete Item', 'Are you sure you want to delete this item?', () => {
     const newChapters = [...chapters];
     newChapters[chapterIndex].items.splice(itemIndex, 1);
     setChapters(newChapters);
@@ -262,23 +268,23 @@ function CoursePreview() {
       
       setCourse({...editableCourse});
       setHasChanges(false);
-      alert('Changes saved successfully!');
+      showInfo('Saved', 'Changes saved successfully!');
     } catch (err) {
       console.error('Error saving:', err);
-      alert('Failed to save changes');
+      showInfo('Error', 'Failed to save changes');
     }
   };
 
   const handleAddToCart = () => {
-    alert(`Added "${course.title}" to cart!`);
+    showInfo('Cart', `Added "${course.title}" to cart!`);
   };
 
   const handleEnroll = () => {
-    alert(`Enrolled in "${course.title}"!`);
+    showInfo('Enrolled', `Enrolled in "${course.title}"!`);
   };
 
   const handleLogout = () => {
-    alert('Logout clicked');
+    showInfo('Info', 'Logout clicked');
   };
 
   const formatDate = (dateString) => {
@@ -759,7 +765,7 @@ function AddItemModal({ type, onSave, onClose, parseTextSyntax }) {
                        type === 'video' ? ['video/mp4', 'video/webm', 'video/ogg'] : [];
     
     if (!validTypes.includes(selectedFile.type)) {
-      alert(`Invalid file type. Please select a ${type} file.`);
+      showInfo('Invalid File', `Please select a ${type} file.`);
       return;
     }
 
@@ -789,7 +795,7 @@ function AddItemModal({ type, onSave, onClose, parseTextSyntax }) {
 
   const handleSave = () => {
     if (!title) {
-      alert('Please enter a title');
+      showInfo('Validation', 'Please enter a title');
       return;
     }
 

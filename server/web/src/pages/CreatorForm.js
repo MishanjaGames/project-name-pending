@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import { FORM_CONFIGS } from "../config/config.forms";
+import { UtilityModal } from '../components/UtilityModal';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -286,6 +287,12 @@ function CreatorForm({ formType, data, onLogout }) {
         Object.fromEntries(((config?.fields) ?? []).map(f => [f.name, f.type === "checkbox" ? false : ""]));
 
     const [fieldValues, setFieldValues] = useState(initialFields);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete  = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
     const [skills, setSkills]           = useState([]);
     const [agreed, setAgreed]           = useState(false);
     const [errors, setErrors]           = useState({});
@@ -322,8 +329,9 @@ function CreatorForm({ formType, data, onLogout }) {
         setModalOpen(false);
     };
     const deleteSkill = (i) => {
-        if (!window.confirm("Remove this skill?")) return;
-        setSkills(prev => prev.filter((_, j) => j !== i));
+        showConfirm('Remove Skill', 'Are you sure you want to remove this skill?', () => {
+            setSkills(prev => prev.filter((_, j) => j !== i));
+        });
     };
 
     // ── Validation ────────────────────────────────────────────────────────────
@@ -381,11 +389,11 @@ function CreatorForm({ formType, data, onLogout }) {
                 setSubmitted(true);
             } else {
                 const json = await res.json().catch(() => ({}));
-                alert(json.message ?? "Submission failed. Please try again.");
+                showInfo('Error', json.message ?? "Submission failed. Please try again.");
             }
         } catch (err) {
             console.error("[CreatorForm] submit:", err);
-            alert("Network error. Please try again.");
+            showInfo('Error', 'Network error. Please try again.');
         } finally {
             setSubmitting(false);
         }
@@ -514,7 +522,23 @@ function CreatorForm({ formType, data, onLogout }) {
                     onSave={handleModalSave}
                 />
             )}
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
         </>
+
     );
 }
 

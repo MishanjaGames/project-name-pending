@@ -1,80 +1,62 @@
 import { Navbar } from "../components/Navbar";
-import { useState, useEffect } from "react";
-import { formatLaunchTime, formatUptime, getTimeAgo, useTimeout } from "../utils/utils";
-import { extendSession } from "../utils/utils";
+import { useState, useEffect, useRef } from "react";
+import { formatLaunchTime, formatUptime, getTimeAgo } from "../utils/utils";
 
 function Main({ data, onLogout }) {
   const [serverStatus, setServerStatus] = useState({
     status: 'ok',
     db_status: 'ok',
-    uptime: '45d 12h 30m',
+    uptime: 0,
     launchTime: undefined,
-    cpuUsage: 35,
-    memoryUsage: 62,
-    diskUsage: 48
   });
 
   const [adminStats, setAdminStats] = useState({
     totalUsers: '???',
-    activeUsers: '???',
     totalCourses: '???',
-    enrollments: '???',
   });
 
+  // 'connecting' | 'open' | 'closed'
+  const [sseState, setSseState] = useState('connecting');
+  const esRef = useRef(null);
+
   useEffect(() => {
-    updateInfo()
-  }, []);
+    const token = localStorage.getItem('token');
+    if (!token) return;
 
-  const { reset } = useTimeout(async () => {
-    await updateInfo()
-    reset()
-  }, 10000)
+    const url = `http://localhost:4040/api/utils/status/stream?token=${encodeURIComponent(token)}`;
+    const es = new EventSource(url);
+    esRef.current = es;
 
-  const updateInfo = async () => {
-    try {
-      const loginData = localStorage.getItem('token')
-      const response = await fetch('http://localhost:4040/api/utils/status', {
-        method: 'GET',
-        headers: {
-          'Authorization': `${loginData.split(' ')[0]} ${loginData.split(' ')[1]}`,
-          'Content-Type': 'application/json'
-        }
-      });
+    es.onopen = () => setSseState('open');
 
-      if (response.status === 401) {
-        extendSession(data)
-      }
-
-      if (response.ok) {
-        const res = await response.json();
-        setServerStatus((p) => {
-          return {
-            ...p,
-            uptime: res.uptime,
-            status: res.status,
-            db_status: res.db_status,
-            launchTime: res.launchTime
-          }
-        });
-        setAdminStats((p) => {
-          return {
-            ...p,
-            totalUsers: res.users.length,
-            totalCourses: res.courses.length,
-            db_status: res.db_status
-          }
-        });
-      }
-    } catch (error) {
-      console.error('SERVER NOT RESPONDING', error);
-      setServerStatus((p) => {
-        return {
+    es.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        setServerStatus(p => ({
           ...p,
-          status: 'fixing'
-        }
-      });
-    }
-  }
+          status:     d.status    ?? p.status,
+          db_status:  d.db_status ?? p.db_status,
+          uptime:     d.uptime    ?? p.uptime,
+          launchTime: d.launchTime ?? p.launchTime,
+        }));
+        setAdminStats(p => ({
+          ...p,
+          totalUsers:   d.userCount   !== undefined ? d.userCount   : p.totalUsers,
+          totalCourses: d.courseCount !== undefined ? d.courseCount : p.totalCourses,
+        }));
+      } catch (err) {
+        console.error('SSE parse error:', err);
+      }
+    };
+
+    es.onerror = () => {
+      setSseState('closed');
+      setServerStatus(p => ({ ...p, status: 'fixing' }));
+      // EventSource reconnects automatically; update state on next onopen
+    };
+
+    return () => { es.close(); setSseState('closed'); };
+  }, []);
 
   return (
     <>
@@ -87,6 +69,17 @@ function Main({ data, onLogout }) {
               <div>
                 <h1 className="h3 h2-md fw-bold text-dark mb-1">Server Admin Dashboard</h1>
                 <p className="text-muted mb-0 small">Server status and system information</p>
+              </div>
+              <div className="d-flex align-items-center gap-2">
+                {sseState === 'open' && (
+                  <span className="badge bg-success">● Live</span>
+                )}
+                {sseState === 'connecting' && (
+                  <span className="badge bg-warning text-dark">Connecting…</span>
+                )}
+                {sseState === 'closed' && (
+                  <span className="badge bg-danger">Reconnecting…</span>
+                )}
               </div>
               {/*
                 <div className="d-none d-lg-block">
@@ -193,10 +186,10 @@ function Main({ data, onLogout }) {
               <div className="card-body p-3">
                 <h6 className="text-muted mb-2 small text-uppercase">Total Users</h6>
                 {
-                  (adminStats.totalUsers > 0 && serverStatus.status === 'ok') ? <h2 className="fw-bold text-primary mb-1 h3">{adminStats.totalUsers}</h2> : <h2 className="fw-bold text-secondary mb-1 h3">???</h2>
+                  (adminStats.totalUsers !== '???' && serverStatus.status === 'ok') ? <h2 className="fw-bold text-primary mb-1 h3">{adminStats.totalUsers}</h2> : <h2 className="fw-bold text-secondary mb-1 h3">???</h2>
                 }
                 {
-                  (adminStats.totalUsers > 0 && serverStatus.status === 'ok') ? <small className="text-muted">{adminStats.activeUsers} in process of learning</small> : <small className="text-warning">??? in process of learning</small>
+                  (adminStats.totalUsers !== '???' && serverStatus.status === 'ok') ? <small className="text-muted">Students enrolled</small> : <small className="text-warning">Waiting for data…</small>
                 }
               </div>
             </div>
@@ -207,10 +200,10 @@ function Main({ data, onLogout }) {
               <div className="card-body p-3">
                 <h6 className="text-muted mb-2 small text-uppercase">Total Courses</h6>
                 {
-                  (adminStats.totalCourses > 0 || serverStatus.status === 'ok') ? <h2 className="fw-bold text-primary mb-1 h3">{adminStats.totalCourses}</h2> : <h2 className="fw-bold text-secondary mb-1 h3">???</h2>
+                  (adminStats.totalCourses !== '???' && serverStatus.status === 'ok') ? <h2 className="fw-bold text-primary mb-1 h3">{adminStats.totalCourses}</h2> : <h2 className="fw-bold text-secondary mb-1 h3">???</h2>
                 }
                 {
-                  (adminStats.totalCourses > 0 || serverStatus.status === 'ok') ? <small className="text-muted">{adminStats.enrollments} being checked</small> : <small className="text-warning">??? being checked</small>
+                  (adminStats.totalCourses !== '???' && serverStatus.status === 'ok') ? <small className="text-muted">Published courses</small> : <small className="text-warning">Waiting for data…</small>
                 }
               </div>
             </div>

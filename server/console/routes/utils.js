@@ -33,31 +33,98 @@ router.get('/logs', passport.authenticate('jwt', { session: false }), utils.vali
     }
 });
 
-router.get('/logs/stream', (req, res) => {
-    const token = req.query['token'] || '';
-    console.log('>'+ token)
-    const tokenValue = token ? token.split(' ')[1] : token;
-    if (!token || !tokenValue) return res.status(401).end();
-
-    // verify however you normally do it
-    try {
-        const decoded = jwt.verify(tokenValue, config.JWT_SECRET);
-        console.log(decoded.role)
-    } catch (e) {
-        return res.status(401).json(e.message).end();
-    }
-
+// ── SSE helpers ──────────────────────────────────────────────────────────────
+function sseHeaders(res) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // disable Nginx buffering if present
+    res.flushHeaders();
+}
 
-    const { date = 'today', lines = null } = req.query;
-    const parsedLines = lines ? parseInt(lines) : null;
+function sseWrite(res, data) {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
 
-    const logs = readLogs(date, parsedLines);
+function sseVerifyToken(token) {
+    if (!token) return null;
+    const tokenValue = token.includes(' ') ? token.split(' ')[1] : token;
+    try {
+        return jwt.verify(tokenValue, config.JWT_SECRET);
+    } catch (e) {
+        return null;
+    }
+}
 
-    const send = data => res.write(`${JSON.stringify(data)}`);
-    const interval = setInterval(() => send({success: true, date, logs}), 1000);
+/**
+ * GET /api/utils/status/stream
+ * SSE — pushes server + DB status every 5 seconds.
+ * Auth: ?token=Bearer%20<jwt>  (query param, same as logs/stream)
+ */
+router.get('/status/stream', async (req, res) => {
+    const decoded = sseVerifyToken(req.query.token || '');
+    if (!decoded) return res.status(401).end();
+
+    sseHeaders(res);
+
+    const os = require('os');
+    const Course = require('../models/mongo.courses');
+    const User   = require('../models/mongo.users');
+
+    const sendStatus = async () => {
+        try {
+            let userCount = 0, courseCount = 0;
+            if (global.db.status === 'connected') {
+                [userCount, courseCount] = await Promise.all([
+                    User.countDocuments({}),
+                    Course.countDocuments({})
+                ]);
+            }
+            sseWrite(res, {
+                status:      global.server.status,
+                db_status:   global.db.status,
+                uptime:      os.uptime(),
+                launchTime:  global.launchTime,
+                userCount,
+                courseCount
+            });
+        } catch (e) {
+            sseWrite(res, { error: e.message });
+        }
+    };
+
+    // Send immediately, then every 5 s
+    sendStatus();
+    const interval = setInterval(sendStatus, 5000);
+    req.on('close', () => clearInterval(interval));
+});
+
+/**
+ * GET /api/utils/logs/stream
+ * SSE — pushes latest log lines every 2 seconds.
+ * Auth: ?token=Bearer%20<jwt>
+ * Query params: date (default 'today'), lines (default 100)
+ */
+router.get('/logs/stream', (req, res) => {
+    const decoded = sseVerifyToken(req.query.token || '');
+    if (!decoded) return res.status(401).end();
+
+    sseHeaders(res);
+
+    const { date = 'today', lines = 100 } = req.query;
+    const parsedLines = lines ? parseInt(lines) : 100;
+
+    const sendLogs = () => {
+        try {
+            const logs = readLogs(date, parsedLines);
+            sseWrite(res, { success: true, date, logs });
+        } catch (e) {
+            sseWrite(res, { success: false, error: e.message });
+        }
+    };
+
+    sendLogs();
+    const interval = setInterval(sendLogs, 2000);
     req.on('close', () => clearInterval(interval));
 });
 

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import AuthImage from "../components/AuthImage";
 import { extendSession } from "../utils/utils";
+import { UtilityModal } from '../components/UtilityModal';
 
 function Users({ data, onLogout }) {
     const [loading, setLoading] = useState(false);
@@ -10,11 +11,18 @@ function Users({ data, onLogout }) {
     const [roles, setRoles] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal = () => setModal(p => ({ ...p, show: false }));
+    const showInfo = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
     const [searchText, setSearchText] = useState('');
     const [selectedRole, setSelectedRole] = useState('');
     const navigate = useNavigate();
 
     const token = localStorage.getItem('token');
+    const isRoot = data?.role?.accessLevel === 'root' || data?.role?.roleName === 'root';
 
     useEffect(() => {
 
@@ -46,7 +54,24 @@ function Users({ data, onLogout }) {
             }
             if (response.ok) {
                 const res = await response.json();
-                setUsers(res.data);
+                let userList = res.data || [];
+                // If the current user is root and not already in the list, fetch and prepend self
+                if (isRoot && data?._id && !userList.find(u => u._id === data._id)) {
+                    try {
+                        const selfRes = await fetch('http://localhost:4040/api/users/c', {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        if (selfRes.ok) {
+                            const selfData = await selfRes.json();
+                            if (selfData.user) userList = [selfData.user, ...userList];
+                        }
+                    } catch (_) {}
+                }
+                setUsers(userList);
             }
         } catch (error) {
             console.error('Error fetching users:', error);
@@ -64,7 +89,7 @@ function Users({ data, onLogout }) {
             });
             if (response.ok) {
                 const res = await response.json();
-                setRoles(res.data.filter((d)=>d.roleName!=='root') || res.filter((d)=>d.roleName!=='root'));
+                setRoles(isRoot ? (res.data || res) : (res.data || res).filter((d) => d.roleName !== 'root'));
             }
         } catch (error) {
             console.error('Error fetching roles:', error);
@@ -84,8 +109,12 @@ function Users({ data, onLogout }) {
     };
 
     const getRoleName = (roleId) => {
+        if (!roleId) return '—';
+        // If role is already a populated object, return its name directly
+        if (typeof roleId === 'object' && roleId.roleName) return roleId.roleName;
+        // Otherwise look it up by ID
         const found = roles.find((r) => r._id === roleId);
-        return found ? found.roleName : roleId;
+        return found ? found.roleName : (typeof roleId === 'string' ? roleId : '—');
     };
 
     // Helper to get the first profile picture URL from links array
@@ -123,43 +152,24 @@ function Users({ data, onLogout }) {
         setShowModal(true);
     };
 
-    const closeModal = () => {
-        setShowModal(false);
-        setSelectedUser(null);
-    };
-
     const handleEdit = (user) => {
         navigate(`/manage/user/${user._id}`);
     };
 
-    const handleDelete = async (user) => {
-        const confirmed = window.confirm(
-            `Are you sure you want to delete user "${user.nickname}" (${user.email})?\n\nThis action cannot be undone.`
-        );
-
-        if (confirmed) {
-            let i = prompt(`You confirmed to proceed deleting user "${user.nickname}" (${user.email})\n\n This action cannot be undone.
-                \n Please enter his email to continue.`)
-            if (i === user.email) {
-                alert(`User "${user.nickname}" (${user.email}) is DELETING. \n This action cannot be undone.`)
-
+    const handleDelete = (user) => {
+        showDelete('Delete User',
+            `You are about to permanently delete user "${user.nickname}" (${user.email}). This cannot be undone.`,
+            user.email, "Type the user's email to confirm",
+            async () => {
                 try {
                     const token = localStorage.getItem('token');
                     const response = await fetch(`http://localhost:4040/api/manage/users/${user._id}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-                            'Content-Type': 'application/json'
-                        }
+                        method: 'DELETE', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
                     });
-                    if (response.ok) {
-                        alert(`User "${user.nickname}" (${user.email}) is DELETED.`)
-                    }
-                } catch (error) {
-                    console.error('Error deleting user:', error);
-                }
+                    if (response.ok) { showInfo('Deleted', `User "${user.nickname}" has been deleted.`); setUsers(prev => prev.filter(u => u._id !== user._id)); }
+                } catch (e) { showInfo('Error', 'Failed to delete user.'); }
             }
-        }
+        );
     };
 
     const formatDate = (dateString) => {
@@ -307,71 +317,72 @@ function Users({ data, onLogout }) {
                                     filteredUsers.map((u, index) => {
                                         const roleName = getRoleName(u.role);
                                         {
-                                        // (u.role.roleName === 'dev') ? return(
-                                        //     <tr key={index} className="align-middle">
-                                        //         <td className="text-muted">{index + 1}</td>
-                                        //         <td rowSpan={4}></td>
-                                        //     </tr>
-                                        // ) : 
-                                        return(
-                                            <tr key={index} className="align-middle">
-                                                <td className="text-muted">{index + 1}</td>
-                                                <td>
-                                                    <div className="d-flex align-items-center gap-2">
-                                                        {(() => {
-                                                            const avatarUrl = getProfilePictureUrl(u);
-                                                            return avatarUrl ? (
-                                                                <AuthImage
-                                                                    src={avatarUrl}
-                                                                    alt={u.nickname}
-                                                                    className="rounded-circle flex-shrink-0"
-                                                                    style={{ width: '34px', height: '34px', objectFit: 'cover' }}
-                                                                    fallback={
-                                                                        <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white flex-shrink-0"
-                                                                            style={{ width: '34px', height: '34px', fontSize: '0.8rem' }}>
-                                                                            {u.nickname ? u.nickname.charAt(0).toUpperCase() : '?'}
-                                                                        </div>
-                                                                    }
-                                                                />
-                                                            ) : (
-                                                                <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white flex-shrink-0"
-                                                                    style={{ width: '34px', height: '34px', fontSize: '0.8rem' }}>
-                                                                    {u.nickname ? u.nickname.charAt(0).toUpperCase() : '?'}
-                                                                </div>
-                                                            );
-                                                        })()}
-                                                        <span className="fw-semibold">{u.nickname || 'Unknown'}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="text-muted">{u.email || '—'}</td>
-                                                <td>
-                                                    <span className={`badge rounded-pill ${getAccessLevelBadgeColor(roleName)}`}>
-                                                        {roleName.toUpperCase()}
-                                                    </span>
-                                                </td>
-                                                <td className="text-end">
-                                                    <div className="btn-group btn-group-sm" role="group">
-                                                        <button type="button" className="btn btn-outline-primary" onClick={() => openModal(u)} title="View details">
-                                                            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                                                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
-                                                                <path d="M7.002 11a1 1 0 1 0 2 0 1 1 0 0 0-2 0zM7.1 4.995a.905.905 0 1 0 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z" />
-                                                            </svg>
-                                                        </button>
-                                                        <button type="button" className="btn btn-outline-warning" onClick={() => handleEdit(u)} title="Edit user">
-                                                            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                                                                <path d="M12.146.146a.5.5 0 0 1 .707 0l3 3a.5.5 0 0 1 0 .707l-10 10a.5.5 0 0 1-.203.134l-6 2a.5.5 0 0 1-.633-.633l2-6a.5.5 0 0 1 .134-.203l10-10zM11.207 1.5 13.5 3.793 14.793 2.5 12.5.207l-1.293 1.293zm1.386 1.386L9.3 0.207 10.5 1.407l2.293 2.293-0.207.207z" />
-                                                            </svg>
-                                                        </button>
-                                                        <button type="button" className="btn btn-outline-danger" onClick={() => handleDelete(u)} title="Delete user">
-                                                            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                                                                <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z" />
-                                                                <path d="M5 0 4.5.5l-.5 1H2a1 1 0 0 0-1 1v1h12V2.5a1 1 0 0 0-1-1H10.5l-.5-1L9.5 0h-5zM3 14.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4H3v10.5zM4.5 3h7L11 2H5l-.5 1z" />
-                                                            </svg>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );}
+                                            // (u.role.roleName === 'dev') ? return(
+                                            //     <tr key={index} className="align-middle">
+                                            //         <td className="text-muted">{index + 1}</td>
+                                            //         <td rowSpan={4}></td>
+                                            //     </tr>
+                                            // ) : 
+                                            return (
+                                                <tr key={index} className="align-middle">
+                                                    <td className="text-muted">{index + 1}</td>
+                                                    <td>
+                                                        <div className="d-flex align-items-center gap-2">
+                                                            {(() => {
+                                                                const avatarUrl = getProfilePictureUrl(u);
+                                                                return avatarUrl ? (
+                                                                    <AuthImage
+                                                                        src={avatarUrl}
+                                                                        alt={u.nickname}
+                                                                        className="rounded-circle flex-shrink-0"
+                                                                        style={{ width: '34px', height: '34px', objectFit: 'cover' }}
+                                                                        fallback={
+                                                                            <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white flex-shrink-0"
+                                                                                style={{ width: '34px', height: '34px', fontSize: '0.8rem' }}>
+                                                                                {u.nickname ? u.nickname.charAt(0).toUpperCase() : '?'}
+                                                                            </div>
+                                                                        }
+                                                                    />
+                                                                ) : (
+                                                                    <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white flex-shrink-0"
+                                                                        style={{ width: '34px', height: '34px', fontSize: '0.8rem' }}>
+                                                                        {u.nickname ? u.nickname.charAt(0).toUpperCase() : '?'}
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                            <span className="fw-semibold">{u.nickname || 'Unknown'}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="text-muted">{u.email || '—'}</td>
+                                                    <td>
+                                                        <span className={`badge rounded-pill ${getAccessLevelBadgeColor(roleName)}`}>
+                                                            {roleName.toUpperCase()}
+                                                        </span>
+                                                    </td>
+                                                    <td className="text-end">
+                                                        <div className="btn-group btn-group-sm" role="group">
+                                                            <button type="button" className="btn btn-outline-primary" onClick={() => openModal(u)} title="View details">
+                                                                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                                                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
+                                                                    <path d="M7.002 11a1 1 0 1 0 2 0 1 1 0 0 0-2 0zM7.1 4.995a.905.905 0 1 0 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z" />
+                                                                </svg>
+                                                            </button>
+                                                            <button type="button" className="btn btn-outline-warning" onClick={() => handleEdit(u)} title="Edit user">
+                                                                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                                                    <path d="M12.146.146a.5.5 0 0 1 .707 0l3 3a.5.5 0 0 1 0 .707l-10 10a.5.5 0 0 1-.203.134l-6 2a.5.5 0 0 1-.633-.633l2-6a.5.5 0 0 1 .134-.203l10-10zM11.207 1.5 13.5 3.793 14.793 2.5 12.5.207l-1.293 1.293zm1.386 1.386L9.3 0.207 10.5 1.407l2.293 2.293-0.207.207z" />
+                                                                </svg>
+                                                            </button>
+                                                            <button type="button" className="btn btn-outline-danger" onClick={() => handleDelete(u)} title="Delete user">
+                                                                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                                                    <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z" />
+                                                                    <path d="M5 0 4.5.5l-.5 1H2a1 1 0 0 0-1 1v1h12V2.5a1 1 0 0 0-1-1H10.5l-.5-1L9.5 0h-5zM3 14.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4H3v10.5zM4.5 3h7L11 2H5l-.5 1z" />
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
                                     })
                                 ) : (
                                     <tr>
@@ -523,6 +534,20 @@ function Users({ data, onLogout }) {
                     </div>
                 </>
             )}
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
         </>
     );
 }

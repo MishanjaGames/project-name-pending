@@ -10,6 +10,8 @@ const manageRouter = require('./manage');
 const utilsRouter = require('./utils')
 const levelsRouter = require('./levels');
 const directionsRouter = require('./directions');
+const keysRouter = require('./keys');
+const promosRouter = require('./promos');
 
 const utils = require('../utils/utils');
 
@@ -22,6 +24,8 @@ router.use('/users', passport.authenticate('jwt', { session: false }), usersRout
 router.use('/courses', coursesRouter)
 router.use('/levels', levelsRouter)
 router.use('/directions', directionsRouter)
+router.use('/keys', keysRouter)
+router.use('/promos', promosRouter)
 
 router.get('/db/connect', utils.validate('admin'), (req, res) => {
     DB.open(config.DB_URL, { dbName: "P_01" })

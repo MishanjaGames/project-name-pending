@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import './CoursePreview.css';
+import { UtilityModal } from '../components/UtilityModal';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 /** A volume/chapter is a "folder" when its type is container, falsy, or 'none'. */
@@ -108,6 +109,11 @@ function CoursePreview({ data, onLogout }) {
   const [expandedChapters, setExpandedChapters] = useState({});
   const [expandedItems, setExpandedItems] = useState({});
   const [editMode, setEditMode] = useState(false);
+
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
   const [volumes, setVolumes] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [directions, setDirections] = useState([]);
@@ -218,8 +224,8 @@ function CoursePreview({ data, onLogout }) {
   const deleteVolume = (vi) => {
     const v = volumes[vi];
     const inp = prompt(`Type the volume title to confirm deletion:\n"${v.title}"`);
-    if (inp === v.title) { setVolumes(volumes.filter((_, i) => i !== vi)); setHasChanges(true); alert('Volume deleted.'); }
-    else if (inp !== null) alert('Title mismatch. Cancelled.');
+    if (inp === v.title) { setVolumes(volumes.filter((_, i) => i !== vi)); setHasChanges(true); showInfo('Deleted', 'Volume deleted.'); }
+    else if (inp !== null) showInfo('Mismatch', 'Title mismatch. Deletion cancelled.');
   };
 
   const updateVolumeTitle = (vi, title) => {
@@ -242,8 +248,8 @@ function CoursePreview({ data, onLogout }) {
   const deleteChapter = (vi, ci) => {
     const ch = volumes[vi].chapters[ci];
     const inp = prompt(`Type the chapter title to confirm deletion:\n"${ch.title}"`);
-    if (inp === ch.title) { const nv = [...volumes]; nv[vi].chapters = nv[vi].chapters.filter((_, i) => i !== ci); setVolumes(nv); setHasChanges(true); alert('Chapter deleted.'); }
-    else if (inp !== null) alert('Title mismatch. Cancelled.');
+    if (inp === ch.title) { const nv = [...volumes]; nv[vi].chapters = nv[vi].chapters.filter((_, i) => i !== ci); setVolumes(nv); setHasChanges(true); showInfo('Deleted', 'Chapter deleted.'); }
+    else if (inp !== null) showInfo('Mismatch', 'Title mismatch. Deletion cancelled.');
   };
 
   const updateChapterTitle = (vi, ci, title) => {
@@ -312,8 +318,7 @@ function CoursePreview({ data, onLogout }) {
   };
 
   const deleteContentItem = (vi, ci, ii) => {
-    if (!window.confirm('Delete this item?')) return;
-    const nv = [...volumes]; nv[vi].chapters[ci].items.splice(ii, 1);
+    showConfirm('Delete Item', 'Delete this item?', async () => { const nv = [...volumes]; nv[vi].chapters[ci].items.splice(ii, 1);
     setVolumes(nv); setHasChanges(true);
   };
 
@@ -364,7 +369,8 @@ function CoursePreview({ data, onLogout }) {
           if (res?.ok) { const r = await res.json(); const url = r.data?.link?.url || r.data?.url || r.url; if (url) urlUpdates[key] = { url, ...fd }; }
           return !!res?.ok;
         }));
-        if (results.some(ok => !ok)) { alert('Some files failed. Changes discarded.'); resetUnsaved(); await fetchData(); return; }
+        if (results.some(ok => !ok)) { showInfo('Warning', 'Some files failed. Changes discarded.');
+      resetUnsaved(); await fetchData(); return; }
       }
       const applyUrls = items => items.map(item => { const m = Object.values(urlUpdates).find(u => u.itemId === item.iid); return m ? { ...item, url: m.url } : item; });
       const newVolumes = volumes.map(v => ({ ...v, chapters: v.chapters.map(c => ({ ...c, items: applyUrls(c.items) })) }));
@@ -372,15 +378,15 @@ function CoursePreview({ data, onLogout }) {
         method: 'PUT', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...editableCourse, volumes: newVolumes })
       });
-      if (res.ok) { setCourse({ ...editableCourse, volumes: newVolumes }); setEditableCourse({ ...editableCourse, volumes: newVolumes }); setVolumes(newVolumes); resetUnsaved(); setEditMode(false); await fetchData(); alert('Saved!'); }
-      else { alert(`Server error ${res.status}. Changes discarded.`); resetUnsaved(); await fetchData(); }
-    } catch (e) { alert(`Save failed: ${e.message}`); resetUnsaved(); await fetchData(); }
+      if (res.ok) { setCourse({ ...editableCourse, volumes: newVolumes }); setEditableCourse({ ...editableCourse, volumes: newVolumes }); setVolumes(newVolumes); resetUnsaved(); setEditMode(false); await fetchData(); showInfo('Saved', 'Course saved successfully!'); }
+      else { showInfo('Error', `Server error ${res.status}. Changes discarded.`); resetUnsaved(); await fetchData(); }
+    } catch (e) { showInfo('Error', `Save failed: ${e.message}`); resetUnsaved(); await fetchData(); }
     finally { setIsSaving(false); }
   };
 
   // ── Misc ───────────────────────────────────────────────────────────────────
-  const handleAddToCart = () => alert(`Added "${course.title}" to cart!`);
-  const handleEnroll = () => alert(`Enrolled in "${course.title}"!`);
+  const handleAddToCart = () => showInfo('Cart', `Added "${course.title}" to cart!`);
+  const handleEnroll = () => showInfo('Enrolled', `Enrolled in "${course.title}"!`);
   const formatDate = ds => new Date(ds).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const renderStars = r => {
     const s = []; const f = Math.floor(r);
@@ -801,8 +807,8 @@ function AddEntityModal({ kind, initial, preType, uploadedFiles, onSave, onClose
   };
 
   const handleSave = () => {
-    if (!title.trim()) { alert('Please enter a title.'); return; }
-    if (isMedia && !url && !preview) { alert('Please provide a file or URL.'); return; }
+    if (!title.trim()) { _showInfo('Validation', 'Please enter a title.'); return; }
+    if (isMedia && !url && !preview) { _showInfo('Validation', 'Please provide a file or URL.'); return; }
     onSave({ title, type, url: url || preview || '', content: isText ? content : undefined });
   };
 
@@ -1098,6 +1104,14 @@ const SYNTAX_GROUPS = [
 
 // ─── Add Item Modal ────────────────────────────────────────────────────────────
 function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedFiles = [] }) {
+  const [_modal, _setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null });
+  const _closeModal  = () => _setModal(p => ({ ...p, show: false }));
+  const _showInfo    = (title, message) => _setModal({ show: true, type: 'info', title, message, onClose: _closeModal });
+  const _showConfirm = (title, message, onConfirm, danger = false) => _setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: _closeModal });
+  const _ModalEl = () => <UtilityModal show={_modal.show} type={_modal.type} title={_modal.title} message={_modal.message}
+    danger={_modal.danger}
+    onConfirm={() => { _modal.onConfirm?.(); _closeModal(); }}
+    onCancel={_modal.onCancel || _closeModal} onClose={_closeModal} />;
   const [title, setTitle] = useState(initialData?.title || '');
   const [content, setContent] = useState(initialData?.content || '');
   const [url, setUrl] = useState(initialData?.url || '');
@@ -1140,9 +1154,9 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedF
     else { setUrl(''); setPreview(''); }
   };
   const handleSave = () => {
-    if (!title.trim()) { alert('Please enter a title'); return; }
+    if (!title.trim()) { _showInfo('Validation', 'Please enter a title'); return; }
     if (type === 'text') { onSave({ type, title, content }); return; }
-    if (!url && !preview) { alert('Please provide a file or URL'); return; }
+    if (!url && !preview) { _showInfo('Validation', 'Please provide a file or URL'); return; }
     onSave({ type, title, url: url || preview || '' });
   };
   const fi = ff();
@@ -1213,6 +1227,14 @@ function FormEditorModal({ isEditing, initialItem, uploadedFiles = [], onSave, o
     if (type === 'closed') return { ...b, correctAnswer: '' };
     return b;
   };
+  const [_modal, _setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null });
+  const _closeModal  = () => _setModal(p => ({ ...p, show: false }));
+  const _showInfo    = (title, message) => _setModal({ show: true, type: 'info', title, message, onClose: _closeModal });
+  const _showConfirm = (title, message, onConfirm, danger = false) => _setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: _closeModal });
+  const _ModalEl = () => <UtilityModal show={_modal.show} type={_modal.type} title={_modal.title} message={_modal.message}
+    danger={_modal.danger}
+    onConfirm={() => { _modal.onConfirm?.(); _closeModal(); }}
+    onCancel={_modal.onCancel || _closeModal} onClose={_closeModal} />;
   const [title, setTitle] = useState(initialItem?.title || '');
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(isEditing && !!initialItem?.url);
@@ -1234,7 +1256,7 @@ function FormEditorModal({ isEditing, initialItem, uploadedFiles = [], onSave, o
   const addPair = (qi) => setQ(qi, q => ({ ...q, pairs: [...q.pairs, { left: '', right: '' }] }));
   const removePair = (qi, pi) => setQ(qi, q => ({ ...q, pairs: q.pairs.filter((_, i) => i !== pi) }));
   const getFF = (mt) => (uploadedFiles || []).filter(f => { const n = (f.originalName || f.filename || '').toLowerCase(); return mt === 'image' ? /\.(jpg|jpeg|png|gif|webp)$/i.test(n) : mt === 'video' ? /\.(mp4|webm|ogg|mov)$/i.test(n) : /\.(mp3|wav|ogg|aac|flac|m4a)$/i.test(n); });
-  const handleSave = () => { if (!title.trim()) { alert('Enter form title'); return; } if (questions.find(q => !q.question.trim())) { alert('All questions need text'); return; } onSave({ type: 'form', title, formData: { questions } }); };
+  const handleSave = () => { if (!title.trim()) { _showInfo('Validation', 'Enter form title'); return; } if (questions.find(q => !q.question.trim())) { _showInfo('Validation', 'All questions need text'); return; } onSave({ type: 'form', title, formData: { questions } }); };
   const QL = { single: 'Single Answer (Radio)', multiple: 'Multiple Answers (Checkboxes)', correlation: 'Correlation (Match)', closed: 'Closed Answer (Text)', open: 'Open Answer (Teacher reviews)' };
 
   return (
@@ -1274,12 +1296,20 @@ function FormEditorModal({ isEditing, initialItem, uploadedFiles = [], onSave, o
 
 // ─── Form Media Picker ────────────────────────────────────────────────────────
 function FormMediaPicker({ media, uploadedFiles, getFilteredFiles, onSet, onClear }) {
+  const [_modal, _setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null });
+  const _closeModal  = () => _setModal(p => ({ ...p, show: false }));
+  const _showInfo    = (title, message) => _setModal({ show: true, type: 'info', title, message, onClose: _closeModal });
+  const _showConfirm = (title, message, onConfirm, danger = false) => _setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: _closeModal });
+  const _ModalEl = () => <UtilityModal show={_modal.show} type={_modal.type} title={_modal.title} message={_modal.message}
+    danger={_modal.danger}
+    onConfirm={() => { _modal.onConfirm?.(); _closeModal(); }}
+    onCancel={_modal.onCancel || _closeModal} onClose={_closeModal} />;
   const [open, setOpen] = useState(false); const [mt, setMt] = useState('image'); const [urlI, setUrlI] = useState(''); const [fc, setFc] = useState('');
   if (!open && !media) return <button className="btn btn-sm btn-outline-secondary mt-2" onClick={() => setOpen(true)}><i className="bi bi-image me-1"></i>Attach Media</button>;
   if (media) return <div className="form-media-preview mt-2">{media.type === 'image' && <img src={media.url} alt="" className="form-media-img" />}{media.type === 'video' && <video src={media.url} controls className="form-media-vid" />}{media.type === 'audio' && <audio src={media.url} controls className="form-media-aud" />}<button className="btn btn-sm btn-outline-danger ms-2" onClick={onClear}><i className="bi bi-x me-1"></i>Remove</button></div>;
   const ff = getFilteredFiles(mt);
   const toEmbed = u => { const s = u.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/); if (s) return `https://www.youtube.com/embed/${s[1]}`; const w = u.match(/[?&]v=([a-zA-Z0-9_-]{11})/); if (w) return `https://www.youtube.com/embed/${w[1]}`; return u; };
-  const attach = () => { const u = fc ? ((uploadedFiles.find(f => f.url === fc || f.path === fc)?.url) || fc) : urlI.trim(); if (!u) { alert('Select or enter URL'); return; } const fu = mt === 'video' ? toEmbed(u) : u; onSet({ type: mt, url: fu.startsWith('http') ? fu : `http://localhost:4040${fu}` }); setOpen(false); setUrlI(''); setFc(''); };
+  const attach = () => { const u = fc ? ((uploadedFiles.find(f => f.url === fc || f.path === fc)?.url) || fc) : urlI.trim(); if (!u) { _showInfo('Validation', 'Select or enter URL'); return; } const fu = mt === 'video' ? toEmbed(u) : u; onSet({ type: mt, url: fu.startsWith('http') ? fu : `http://localhost:4040${fu}` }); setOpen(false); setUrlI(''); setFc(''); };
   return (
     <div className="form-media-picker mt-2">
       <div className="d-flex align-items-center gap-2 mb-2">
@@ -1304,7 +1334,7 @@ function FormItemDisplay({ url, refreshKey }) {
   const setAns = (id, v) => setAnswers(p => ({ ...p, [id]: v }));
   const toggleMult = (id, oi) => { const c = answers[id] || []; setAns(id, c.includes(oi) ? c.filter(i => i !== oi) : [...c, oi]); };
   const isCorrect = q => { const a = answers[q.id]; if (q.type === 'single') return a === q.correctIndex; if (q.type === 'multiple') return [...(a || [])].sort().join(',') === [...(q.correctIndices || [])].sort().join(','); if (q.type === 'correlation') return q.pairs.every((p, i) => a && a[i] === p.right); if (q.type === 'closed') return (a || '').trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase(); return null; };
-  const handleSubmit = () => { const ua = (formDef?.questions || []).filter(q => { const a = answers[q.id]; if (q.type === 'multiple') return !a || !a.length; if (q.type === 'open' || q.type === 'closed') return !a || !a.trim(); return a === undefined || a === null; }); if (ua.length && !window.confirm(`${ua.length} unanswered. Submit anyway?`)) return; setSubmitted(true); };
+  const handleSubmit = () => { const ua = (formDef?.questions || []).filter(q => { const a = answers[q.id]; if (q.type === 'multiple') return !a || !a.length; if (q.type === 'open' || q.type === 'closed') return !a || !a.trim(); return a === undefined || a === null; }); if (ua.length) { _showConfirm('Submit', `${ua.length} unanswered. Submit anyway?`, () => setSubmitted(true)); } else { setSubmitted(true); } };
   const scoreable = (formDef?.questions || []).filter(q => ['single', 'multiple', 'correlation', 'closed'].includes(q.type));
   const correct = scoreable.filter(q => isCorrect(q) === true).length;
   if (loading) return <div className="form-item-display"><p><em>Loading form…</em></p></div>;
