@@ -33,10 +33,10 @@ function EditLevel({ data, onLogout }) {
       ]);
 
       if (levelRes.ok) {
-        const levelData = await levelRes.json();
-        setLevelName(levelData.levelName);
-        setDirectionName(levelData.directionName);
-        setMinTutorRank(levelData.minTutorRank || 'assistant');
+        const {data} = await levelRes.json();
+        setLevelName(data.levelName);
+        setDirectionName(data.directionName);
+        setMinTutorRank(data.minTutorRank || 'assistant');
       } else {
         showInfo('Error', 'Level not found');
         navigate('/manage/levels');
@@ -148,19 +148,14 @@ function EditLevel({ data, onLogout }) {
                     <label className="form-label fw-bold">
                       Direction <span className="text-danger">*</span>
                     </label>
-                    <select
-                      className="form-select"
+                    <input
+                      className="form-control"
                       value={directionName}
                       onChange={(e) => setDirectionName(e.target.value)}
                       required
+                      disabled
                     >
-                      <option value="">Select a direction</option>
-                      {directions.map((dir) => (
-                        <option key={dir._id} value={dir.directionName}>
-                          {dir.directionName}
-                        </option>
-                      ))}
-                    </select>
+                    </input>
                     <small className="text-muted">
                       Change the direction this level belongs to
                     </small>
@@ -253,8 +248,7 @@ function EditLevel({ data, onLogout }) {
         onCancel={modal.onCancel || closeModal}
         onClose={modal.onClose || closeModal}
       />
-
-      
+    </>
   );
 }
 

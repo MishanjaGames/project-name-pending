@@ -385,7 +385,7 @@ function ViewForm({ data, onLogout }) {
                                                 <svg width="13" height="13" fill="#6c757d" className="me-1 mb-1" viewBox="0 0 16 16">
                                                     <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2zm13 2.383-4.708 2.825L15 11.105V5.383zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741zM1 11.105l4.708-2.897L1 5.383v5.722z" />
                                                 </svg>
-                                                <a href={`mailto:${email}`} className="text-decoration-none text-muted">{email}</a>
+                                                <a href={`mailto:${(email === 'root@local.com') ? 'badlycoded.edu@local.com' : email}`} className="text-decoration-none text-muted">{(email === 'root@local.com') ? 'badlycoded.edu@local.com' : email}</a>
                                             </div>
                                         )}
                                     </div>
@@ -482,15 +482,12 @@ function ViewForm({ data, onLogout }) {
                                         {email && (
                                             <tr>
                                                 <td className="text-muted fw-semibold pe-3">Email</td>
-                                                <td><a href={`mailto:${email}`} className="text-decoration-none text-dark">{email}</a></td>
+                                                <td><a href={`mailto:${(email === 'root@local.com') ? 'badlycoded.edu@local.com' : email}`} className="text-decoration-none text-dark">{(email === 'root@local.com') ? 'badlycoded.edu@local.com' : email}</a></td>
                                             </tr>
                                         )}
                                         <tr><td className="text-muted fw-semibold pe-3">Submitted</td><td>{formatDate(submission.createdAt)}</td></tr>
                                         {submission.reviewedAt && (
                                             <tr><td className="text-muted fw-semibold pe-3">Reviewed</td><td>{formatDate(submission.reviewedAt)}</td></tr>
-                                        )}
-                                        {submission.skills?.length > 0 && (
-                                            <tr><td className="text-muted fw-semibold pe-3">Skills</td><td>{submission.skills.length}</td></tr>
                                         )}
                                     </tbody>
                                 </table>

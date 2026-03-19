@@ -875,6 +875,9 @@ function ViewCourse({ data, onLogout }) {
               onNext={() => goTo(currentFlatIdx + 1)}
               setOpenVolumes={setOpenVolumes}
               setOpenChapters={setOpenChapters}
+              sessionId={sessionId}
+              sessionGroup={sessionGroup}
+              studentId={data?._id}
             />
           )}
         </main>
@@ -893,7 +896,7 @@ function ViewCourse({ data, onLogout }) {
 }
 
 // ─── Content Pane ─────────────────────────────────────────────────────────────
-function ContentPane({ selected, volumes, locked, token, onSelectItem, hasPrev, hasNext, onPrev, onNext, setOpenVolumes, setOpenChapters }) {
+function ContentPane({ selected, volumes, locked, token, onSelectItem, hasPrev, hasNext, onPrev, onNext, setOpenVolumes, setOpenChapters, sessionId, sessionGroup, studentId }) {
   const { vi, ci, ii } = selected;
   const vol = volumes[vi];
   const ch = ci != null ? vol?.chapters[ci] : null;
@@ -958,7 +961,7 @@ function ContentPane({ selected, volumes, locked, token, onSelectItem, hasPrev, 
             <p>Purchase this course to access all lessons.</p>
           </div>
         ) : (
-          <ItemRenderer item={item} token={token} actionProps={ap} />
+          <ItemRenderer item={item} token={token} actionProps={ap} sessionId={sessionId} sessionGroup={sessionGroup} studentId={studentId} />
         )}
       </div>
 
@@ -984,7 +987,7 @@ function ContentPane({ selected, volumes, locked, token, onSelectItem, hasPrev, 
 }
 
 // ─── Item Renderer ────────────────────────────────────────────────────────────
-function ItemRenderer({ item, token, actionProps }) {
+function ItemRenderer({ item, token, actionProps, sessionId, sessionGroup, studentId }) {
   const { type, url } = item;
 
   if (type === 'assignment') return (
@@ -992,7 +995,7 @@ function ItemRenderer({ item, token, actionProps }) {
       item={item}
       sessionId={sessionId}
       sessionGroup={sessionGroup}
-      studentId={data?._id}
+      studentId={studentId}
       token={token}
     />
   );

@@ -26,7 +26,7 @@ function EditDirection({ data, onLogout }) {
     try {
       const response = await fetch(`http://localhost:4040/api/directions/${id}`);
       if (response.ok) {
-        const data = await response.json();
+        const {data} = await response.json();
         setDirectionName(data.directionName);
       } else {
         showInfo('Error', 'Direction not found');

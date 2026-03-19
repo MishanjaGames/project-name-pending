@@ -13,7 +13,7 @@ function Courses({ data, onLogout }) {
     const [showModal, setShowModal] = useState(false);
     // ── Modal state ──────────────────────────────────────────────────────────
     const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
-    const closeModal = () => setModal(p => ({ ...p, show: false }));
+    const closeModal = () => setShowModal(false);
     const showInfo = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
     const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
     const showDelete = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
@@ -190,13 +190,13 @@ function Courses({ data, onLogout }) {
                                     <p className="text-muted mb-0 small">Manage all courses and content</p>
                                 </div>
                                 <div className="d-flex align-items-center gap-2">
-                                    <button className="btn btn-primary btn-sm" onClick={() => navigate('/creator/apply')}>
-                                        <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
-                                            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
-                                        </svg>
-                                        Apply Form
-                                    </button>
+                                    <select className="form-select form-select-sm"
+                                        onChange={e => navigate(`${e.target.value}`)}>
+                                        <option value="#">Select Form</option>
+                                        <option value="/creator/apply">Creator Form</option>
+                                        <option value="/tutor/apply">Tutor Form</option>
+                                        <option value="/support/open-ticket">Support Ticket</option>
+                                    </select>
                                     <button className="btn btn-success btn-sm" onClick={() => navigate('/manage/courses/create')}>
                                         <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
                                             <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
@@ -384,8 +384,18 @@ function Courses({ data, onLogout }) {
                                                     </td>
                                                     <td>
                                                         <div>
-                                                            <div className="fw-semibold small">{userInfo.nickname}</div>
-                                                            <div className="text-muted small">{userInfo.email}</div>
+                                                            <div className="fw-semibold small">
+                                                                {(userInfo.nickname === 'root')
+                                                                    ? 'BADLYCODED.EDU'
+                                                                    : userInfo.nickname
+                                                                }
+                                                            </div>
+                                                            <div className="text-muted small">
+                                                                {(userInfo.nickname === 'root')
+                                                                    ? 'badlycoded.edu@local.com'
+                                                                    : userInfo.email
+                                                                }
+                                                            </div>
                                                         </div>
                                                     </td>
                                                     <td>
@@ -398,11 +408,14 @@ function Courses({ data, onLogout }) {
                                                     <td className="text-muted fw-semibold">{c.price ? `$${c.price}` : '—'}</td>
                                                     <td className="text-end" onClick={(e) => e.stopPropagation()}>
                                                         <div className="btn-group btn-group-sm" role="group">
-                                                            <button type="button" className="btn btn-outline-primary" onClick={() => openModal(c)} title="View details">
+                                                            <button type="button" className="btn btn-outline-secondary" onClick={() => openModal(c)} title="View details">
                                                                 <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                                                                     <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
                                                                     <path d="M7.002 11a1 1 0 1 0 2 0 1 1 0 0 0-2 0zM7.1 4.995a.905.905 0 1 0 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z" />
                                                                 </svg>
+                                                            </button>
+                                                            <button type="button" className="btn btn-outline-primary" onClick={() => navigate(`/manage/course/preview/${selectedCourse._id}`)} title="View course">
+                                                                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z" /><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" /></svg>
                                                             </button>
                                                             <button type="button" className="btn btn-outline-warning" onClick={() => handleEdit(c)} title="Edit course">
                                                                 <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
@@ -582,7 +595,8 @@ function Courses({ data, onLogout }) {
                                     <button type="button" className="btn btn-outline-secondary btn-sm" onClick={closeModal}>Close</button>
                                     <button type="button" className="btn btn-primary btn-sm text-light" onClick={() => { closeModal(); navigate(`/manage/course/preview/${selectedCourse._id}`) }}>
                                         <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-
+                                            <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z" />
+                                            <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" />
                                         </svg>
                                         Preview
                                     </button>

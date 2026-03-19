@@ -13,7 +13,8 @@ function Users({ data, onLogout }) {
     const [showModal, setShowModal] = useState(false);
     // ── Modal state ──────────────────────────────────────────────────────────
     const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
-    const closeModal = () => setModal(p => ({ ...p, show: false }));
+    // At the top of the component, add a dedicated closer:
+    const closeModal = () => setShowModal(false);
     const showInfo = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
     const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
     const showDelete = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
@@ -102,7 +103,8 @@ function Users({ data, onLogout }) {
             case 'admin': return 'bg-danger';
             case 'manage': case 'manager': return 'bg-warning text-dark';
             case 'quality': case 'tester': return 'bg-success';
-            case 'create': return 'bg-info text-light';
+            case 'tutor': return 'bg-info text-warning';
+            case 'create': return 'bg-info text-white';
             case 'user': return 'bg-primary';
             default: return 'bg-secondary';
         }

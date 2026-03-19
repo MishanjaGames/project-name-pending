@@ -22,7 +22,7 @@ import EditRole from './pages/EditRole';
 import EditCourse from './pages/EditCourse';
 import CoursePreview from './pages/CoursePreview';
 import ViewCourse from './pages/ViewCourse';
-import CreatorForm from './pages/CreatorForm';
+import ApplicationForm from './pages/ApplicationForm';
 import Forms from './pages/Forms';
 import Keys from './pages/Keys';
 import Promos from './pages/Promos';
@@ -121,7 +121,12 @@ function App() {
         {/* Forms */}
         <Route path="/creator/apply" element={
           isLoggedIn ?
-            <CreatorForm formType={'creator'} data={userData} onLogout={handleLogout} /> :
+            <ApplicationForm formType={'creator'} data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/tutor/apply" element={
+          isLoggedIn ?
+            <ApplicationForm formType={'tutor'} data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
         } />
         <Route path="/manage/forms/" element={
@@ -264,6 +269,13 @@ function App() {
         <Route path="/manage/session/:id" element={
           isLoggedIn ?
             <ManageSession data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+
+        {/* Support */}
+        <Route path="/support/open-ticket" element={
+          isLoggedIn ?
+            <ApplicationForm formType={'support-ticket'} data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
         } />
 

@@ -73,7 +73,7 @@ const EMAIL_TEMPLATES = {
         templateId: "template_other",   // or null to skip
         subject:    (name) => `Your application is under review, ${name}`,
         message:    (name, formLabel) =>
-            `Hi ${name}, we have received your ${formLabel} and it is currently under review. ` +
+            `Hi ${name}, we have received your ${formLabel}, and it is currently under review. ` +
             `We will notify you once a decision has been made. We'll do our best to process it within month. `,
     },
     pending: {

@@ -160,7 +160,8 @@ function EditRole({ data, onLogout }) {
             case 'admin': return 'bg-danger';
             case 'manage': case 'manager': return 'bg-warning text-dark';
             case 'quality': return 'bg-success';
-            case 'create': return 'bg-info text-light';
+            case 'tutor': return 'bg-info text-warning';
+            case 'create': return 'bg-info text-white';
             case 'user': return 'bg-primary';
             default: return 'bg-secondary';
         }
@@ -170,7 +171,8 @@ function EditRole({ data, onLogout }) {
         switch (level) {
             case 'admin': return 'Administrator - Full system access';
             case 'manage': return 'Manager - High-level permissions';
-            case 'quality': return 'Quality Control - Content creation and control access'
+            case 'quality': return 'Quality Control - Content creation and control access';
+            case 'tutor': return 'Tutor - Create and manage sessions to teach students(users)';
             case 'create': return 'Create - Content creation access';
             case 'user': return 'User - Standard user permissions';
             default: return 'Not set';
