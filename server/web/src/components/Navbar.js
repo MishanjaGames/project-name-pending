@@ -139,6 +139,15 @@ export const Navbar = ({ data, onLogout }) => {
                         </li>
                         <li className="nav-item">
                             <Link 
+                                to='/manage/sessions' 
+                                className="nav-link text-white d-flex align-items-center"
+                                onClick={closeSidebar}
+                            >
+                                <span>Sessions</span>
+                            </Link>
+                        </li>
+                        <li className="nav-item">
+                            <Link 
                                 to='/manage/settings' 
                                 className="nav-link text-white d-flex align-items-center"
                                 onClick={closeSidebar}

@@ -11,6 +11,7 @@ function CreateUser({ data, onLogout }) {
     const [formData, setFormData] = useState({
         nickname: '',
         email: '',
+        tutorRank: null,
         password: '',
         role: ''
     });
@@ -160,7 +161,8 @@ function CreateUser({ data, onLogout }) {
                     nickname: formData.nickname,
                     email: formData.email,
                     password: formData.password,
-                    role: formData.role
+                    role: formData.role,
+                    tutorRank: formData.tutorRank || null
                 })
             });
 
@@ -434,6 +436,23 @@ function CreateUser({ data, onLogout }) {
                                             </small>
                                         )}
                                     </div>
+
+                                        {/* Tutor Sub-Rank */}
+                                        <div className="col-12 col-md-6">
+                                            <label htmlFor="tutorRank" className="form-label fw-semibold">Tutor Sub-Rank</label>
+                                            <select
+                                                className="form-select"
+                                                id="tutorRank"
+                                                value={formData.tutorRank || ''}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, tutorRank: e.target.value || null }))}
+                                            >
+                                                <option value="">None (not a tutor)</option>
+                                                {['assistant','teacher','lecturer','instructor','tutor','professor'].map(r => (
+                                                    <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                                                ))}
+                                            </select>
+                                            <small className="text-muted">Only applies if user has tutor access level</small>
+                                        </div>
 
                                     {/* Form Actions */}
                                     <div className="d-flex gap-2 justify-content-end pt-3 border-top">

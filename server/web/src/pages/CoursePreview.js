@@ -924,7 +924,11 @@ function CoursePreview({ data, onLogout }) {
               )}
 
               <div className="course-meta">
-                <span className="meta-item">Created by <strong>{author.nickname}</strong></span>
+                <span className="meta-item">Created by <strong>{
+                  (author.role?.roleName === 'root' || author.role?.accessLevel === 'root' || author.nickname === 'root')
+                    ? 'BADLYCODED.EDU'
+                    : author.nickname
+                }</strong></span>
                 <span className="meta-divider">•</span>
                 <span className="meta-item">Last updated {formatDate(course.updatedAt)}</span>
               </div>

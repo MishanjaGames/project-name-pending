@@ -12,6 +12,10 @@ const levelsRouter = require('./levels');
 const directionsRouter = require('./directions');
 const keysRouter = require('./keys');
 const promosRouter = require('./promos');
+const sessionsRouter = require('./sessions');
+const groupsRouter = require('./groups');
+const assignmentsRouter = require('./assignments');
+const submissionsRouter = require('./submissions');
 
 const utils = require('../utils/utils');
 
@@ -26,6 +30,10 @@ router.use('/levels', levelsRouter)
 router.use('/directions', directionsRouter)
 router.use('/keys', keysRouter)
 router.use('/promos', promosRouter)
+router.use('/sessions', sessionsRouter)
+router.use('/groups', groupsRouter)
+router.use('/assignments', assignmentsRouter)
+router.use('/submissions', submissionsRouter)
 
 router.get('/db/connect', utils.validate('admin'), (req, res) => {
     DB.open(config.DB_URL, { dbName: "P_01" })

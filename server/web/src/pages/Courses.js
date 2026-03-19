@@ -83,7 +83,7 @@ function Courses({ data, onLogout }) {
     // Helper: find user by userId from the users array
     const getUserInfo = (userId) => {
         const found = users.find((u) => u._id === userId);
-        return found ? { nickname: found.nickname, email: found.email } : { nickname: 'Unknown', email: '—' };
+        return found ? { nickname: found.nickname, email: found.email } : { nickname: 'BADLYCODED.EDU', email: 'badlycoded.edu@local.com' };
     };
 
     // Helper to get the first course thumbnail URL from links array

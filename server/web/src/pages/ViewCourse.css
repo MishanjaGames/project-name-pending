@@ -1401,3 +1401,69 @@
   border-radius: 999px;
   padding: .2rem .65rem;
 }
+/* ── Session / deadline badges ──────────────────────────────────────────────── */
+.vc-badge--hosted   { background: #0e7490; color: #fff; }
+.vc-badge--mentored { background: #7c3aed; color: #fff; }
+.vc-badge--session  { background: #065f46; color: #fff; }
+.vc-badge--copy     { background: #92400e; color: #fff; }
+
+.vc-deadline-badge {
+  font-size: 0.7rem;
+  margin-left: 4px;
+  cursor: default;
+}
+.vc-deadline-badge--past { color: #ef4444; }
+
+/* ── Assignment item view ────────────────────────────────────────────────────── */
+.vc-assignment-item {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+.vc-assignment-item--empty { color: var(--vc-muted, #94a3b8); }
+.vc-assignment-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--vc-text, #1e293b);
+}
+.vc-assignment-desc {
+  color: var(--vc-muted, #64748b);
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+.vc-assignment-meta {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+  color: var(--vc-text, #1e293b);
+  margin-bottom: 1rem;
+}
+.vc-assignment-files {
+  font-size: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+.vc-submission-status {
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
+}
+.vc-submission-status--pending  { background: #fef9c3; border: 1px solid #fde047; }
+.vc-submission-status--approved { background: #dcfce7; border: 1px solid #86efac; }
+.vc-submission-status--declined { background: #fee2e2; border: 1px solid #fca5a5; }
+.vc-submission-feedback {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(0,0,0,0.04);
+  border-radius: 6px;
+}
+.vc-submission-upload {
+  border: 1px dashed var(--vc-border, #e2e8f0);
+  border-radius: 10px;
+  padding: 1.25rem;
+  background: var(--vc-surface, #f8fafc);
+}

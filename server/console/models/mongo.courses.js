@@ -7,6 +7,30 @@ const courseSchema = new Schema({
         type: Schema.Types.ObjectId,
         required: true
     },
+    // Course delivery type
+    courseType: {
+        type: String,
+        required: false,
+        default: 'SELF_TAUGHT',
+        enum: ['SELF_TAUGHT', 'MENTORED', 'HOSTED']
+    },
+    // Whether this is a private tutor copy of another course
+    isPrivateCopy: {
+        type: Boolean,
+        default: false
+    },
+    original: {
+        courseId: {
+            ref: 'courses',
+            type: Schema.Types.ObjectId,
+            default: null
+        },
+        ownedBy: {
+            ref: 'users',
+            type: Schema.Types.ObjectId,
+            default: null
+        }
+    },
     status: {
         type: String,
         required: false,
@@ -129,7 +153,13 @@ const courseSchema = new Schema({
                 type: {
                     type: String,
                     required: false,
-                    enum: ['image', 'video', 'audio', 'document', 'archive', 'other']
+                    enum: ['image', 'video', 'audio', 'document', 'archive', 'other', 'assignment', 'open-answer']
+                },
+                // For assignment items: reference to Assignment._id
+                assignmentId: {
+                    type: require('mongoose').Schema.Types.ObjectId,
+                    ref: 'assignments',
+                    default: null
                 },
                 url: {
                     type: String,
@@ -160,6 +190,31 @@ const courseSchema = new Schema({
             enum: ['default', 'create', 'manage', 'admin', 'root'],
             default: 'default',
             description: 'Minimum access level required to view this link'
+        },
+        description: {
+            type: String,
+            required: false
+        }
+    }],
+    // Supplementary files uploaded by the tutor (session-level, tutor access only)
+    tutorFiles: [{
+        type: {
+            type: String,
+            required: false,
+            enum: ['image', 'video', 'audio', 'document', 'archive', 'other']
+        },
+        url: {
+            type: String,
+            required: false
+        },
+        filename: {
+            type: String,
+            required: false
+        },
+        accessLevel: {
+            type: String,
+            required: false,
+            default: 'tutor'
         },
         description: {
             type: String,

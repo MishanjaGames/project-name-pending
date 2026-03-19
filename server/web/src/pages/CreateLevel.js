@@ -7,6 +7,7 @@ function CreateLevel({ data, onLogout }) {
   const navigate = useNavigate();
   const [levelName, setLevelName] = useState('');
   const [directionName, setDirectionName] = useState('');
+  const [minTutorRank, setMinTutorRank] = useState('assistant');
   const [directions, setDirections] = useState([]);
   const [loading, setLoading] = useState(true);
     // ── Modal state ──────────────────────────────────────────────────────────
@@ -73,7 +74,8 @@ function CreateLevel({ data, onLogout }) {
         },
         body: JSON.stringify({
           levelName: levelName.trim(),
-          directionName: directionName
+          directionName: directionName,
+          minTutorRank: minTutorRank
         })
       });
 

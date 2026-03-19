@@ -16,6 +16,7 @@ function EditUser({ data, onLogout }) {
         nickname: '',
         email: '',
         role: '',
+        tutorRank: null,
         links: []
     });
     const [isCurrent, setIsCurrent] = useState(false)
@@ -62,6 +63,7 @@ function EditUser({ data, onLogout }) {
                             nickname: user.nickname || '',
                             email: user.email || '',
                             role: user.role || '',
+                            tutorRank: user.tutorRank || null,
                             links: user.links || []
                         });
                         const {_} = await jwtDecode('Bearer '+user.password)
@@ -155,7 +157,8 @@ function EditUser({ data, onLogout }) {
             const updatePayload = {
                 nickname: formData.nickname,
                 email: formData.email,
-                role: formData.role
+                role: formData.role,
+                tutorRank: formData.tutorRank || null
             };
 
             // Add password if being reset
@@ -481,6 +484,22 @@ function EditUser({ data, onLogout }) {
                                                 Selected: <span className="fw-semibold">{([].includes(getRoleName(formData.role)))?'':''}</span>
                                             </small>
                                         )}
+                                    </div>
+
+                                    {/* Tutor Sub-Rank */}
+                                    <div className="col-12 col-md-6">
+                                        <label className="form-label fw-semibold">Tutor Sub-Rank</label>
+                                        <select
+                                            className="form-select"
+                                            value={formData.tutorRank || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, tutorRank: e.target.value || null }))}
+                                        >
+                                            <option value="">None (not a tutor)</option>
+                                            {['assistant','teacher','lecturer','instructor','tutor','professor'].map(r => (
+                                                <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                                            ))}
+                                        </select>
+                                        <small className="text-muted">Only applies if user has tutor access level</small>
                                     </div>
 
                                     {/* Email Field */}

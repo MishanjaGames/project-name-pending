@@ -92,16 +92,30 @@ module.exports.generatePasswordHash = async (password) => {
 
 const comparePermission = (accessLevel, permission) => {
     if (!accessLevel) return false;
-    else {
-        if (accessLevel === permission) return true;
-        else if (accessLevel === 'root') return true;
-        else if (accessLevel === 'admin' && (permission === 'manage' || permission === 'quality' || permission === 'create' || permission === 'default')) return true;
-        else if (accessLevel === 'manage' && (permission === 'quality' || permission === 'create' || permission === 'default')) return true;
-        else if (accessLevel === 'quality' && (permission === 'create' || permission === 'default')) return true;
-        else if (accessLevel === 'create' && permission === 'default') return true;
-        else return false;
-    }
+    // Hierarchy: default < create < tutor < quality < manage < admin < root
+    const LEVELS = ['default', 'create', 'tutor', 'quality', 'manage', 'admin', 'root'];
+    const ai = LEVELS.indexOf(accessLevel);
+    const pi = LEVELS.indexOf(permission);
+    if (ai === -1 || pi === -1) return accessLevel === permission;
+    return ai >= pi;
 }
+
+// Tutor sub-rank hierarchy (ascending)
+const TUTOR_RANKS = ['assistant', 'teacher', 'lecturer', 'instructor', 'tutor', 'professor'];
+
+/**
+ * Check if a tutorRank meets or exceeds a required minimum rank.
+ * Returns true if userRank >= minRank in TUTOR_RANKS order.
+ */
+module.exports.checkTutorRank = (userRank, minRank) => {
+    if (!userRank || !minRank) return false;
+    const ui = TUTOR_RANKS.indexOf(userRank);
+    const mi = TUTOR_RANKS.indexOf(minRank);
+    if (ui === -1 || mi === -1) return false;
+    return ui >= mi;
+};
+
+module.exports.TUTOR_RANKS = TUTOR_RANKS;
 
 module.exports.validate = (permission) => {
     return async (req, res, next) => {

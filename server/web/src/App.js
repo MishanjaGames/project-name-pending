@@ -28,6 +28,8 @@ import Keys from './pages/Keys';
 import Promos from './pages/Promos';
 import RedeemKey from './pages/RedeemKey';
 import ViewForm from './pages/ViewForm';
+import Sessions from './pages/Sessions';
+import ManageSession from './pages/ManageSession';
 
 function App() {
   const navigate = useNavigate();
@@ -250,6 +252,18 @@ function App() {
         <Route path="/redeem" element={
           isLoggedIn ?
             <RedeemKey data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+
+        {/* Sessions / Tutor Routes */}
+        <Route path="/manage/sessions" element={
+          isLoggedIn ?
+            <Sessions data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/manage/session/:id" element={
+          isLoggedIn ?
+            <ManageSession data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
         } />
 

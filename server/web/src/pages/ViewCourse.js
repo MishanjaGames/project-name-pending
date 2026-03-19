@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { extendSession } from '../utils/utils';
 import './ViewCourse.css';
@@ -213,6 +213,14 @@ function ViewCourse({ data, onLogout }) {
   const showInfo = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
   const [locked, setLocked] = useState(true);
 
+  // ── Session / group context (when accessed via ?session=:id) ─────────────
+  const location = useLocation();
+  const sessionId = new URLSearchParams(location.search).get('session');
+  const [session, setSession]       = useState(null);
+  const [sessionGroup, setSessionGroup] = useState(null);  // student's group in this session
+  const [sessionDeadlines, setSessionDeadlines] = useState([]); // from session.deadlines
+
+
   // ── Comments state ─────────────────────────────────────────────────────────
   const [comments, setComments]         = useState([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -237,7 +245,34 @@ function ViewCourse({ data, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
-  useEffect(() => { fetchData(); fetchComments(); fetchRating(); }, [id]);
+  useEffect(() => { fetchData(); fetchComments(); fetchRating(); if (sessionId) fetchSession(); }, [id, sessionId]);
+
+  // ── Session fetch: load session + find student's group ────────────────────
+  const fetchSession = async () => {
+    if (!sessionId || !token) return;
+    try {
+      const res = await fetch(`http://localhost:4040/api/sessions/${sessionId}`, {
+        headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` }
+      });
+      if (!res.ok) return;
+      const { data: sess } = await res.json();
+      setSession(sess);
+      setSessionDeadlines(sess.deadlines || []);
+
+      // Find the group that contains this user as a member
+      const groupRes = await fetch(
+        `http://localhost:4040/api/groups?sessionId=${sessionId}`,
+        { headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` } }
+      );
+      if (groupRes.ok) {
+        const { data: groups } = await groupRes.json();
+        const myGroup = (groups || []).find(g =>
+          g.members?.some(m => String(m.userId?._id || m.userId) === String(data._id))
+        );
+        if (myGroup) setSessionGroup(myGroup);
+      }
+    } catch (e) { console.error('Session fetch error:', e); }
+  };
 
   const fetchComments = async () => {
     setCommentsLoading(true);
@@ -325,7 +360,22 @@ function ViewCourse({ data, onLogout }) {
       if (fetchedCourse?.userId && String(fetchedCourse.userId) === String(data._id)) {
         setLocked(false); return;
       }
-      // Check purchased courses
+      // HOSTED course in a session: group membership grants access (no purchase needed)
+      if (sessionId && fetchedCourse?.courseType === 'HOSTED') {
+        // sessionGroup may not be loaded yet — fetch inline
+        const groupRes = await fetch(
+          `http://localhost:4040/api/groups?sessionId=${sessionId}`,
+          { headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` } }
+        );
+        if (groupRes.ok) {
+          const { data: groups } = await groupRes.json();
+          const inGroup = (groups || []).some(g =>
+            g.members?.some(m => String(m.userId?._id || m.userId) === String(data._id))
+          );
+          if (inGroup) { setLocked(false); return; }
+        }
+      }
+      // Check purchased courses (SELF_TAUGHT and MENTORED)
       const res = await fetch(`http://localhost:4040/api/users/${data._id}`, {
         headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` }
       });
@@ -334,6 +384,22 @@ function ViewCourse({ data, onLogout }) {
         setLocked(!u.courses?.find(c => c._id === id));
       }
     } catch { setLocked(true); }
+  };
+
+  // ── Deadline helpers ───────────────────────────────────────────────────────
+  /**
+   * Returns deadline info for a given target (volume, chapter, or item).
+   * { deadline, isPast, isLocked }
+   */
+  const getDeadlineFor = (targetType, targetId) => {
+    if (!sessionDeadlines.length) return null;
+    const dl = sessionDeadlines.find(
+      d => d.targetType === targetType && d.targetId === targetId
+    );
+    if (!dl) return null;
+    const isPast   = new Date() > new Date(dl.dueAt);
+    const isLocked = isPast && dl.lockAfterDue;
+    return { deadline: dl, isPast, isLocked };
   };
 
   const fetchData = async () => {
@@ -512,19 +578,27 @@ function ViewCourse({ data, onLogout }) {
                                 {ch.items.map((item, ii) => {
                                   const isSel = selected?.vi === vi && selected?.ci === ci && selected?.ii === ii;
                                   const isLocked = locked;
+                                  const itemDl = getDeadlineFor('item', item.iid);
+                                  const itemDeadlineLocked = itemDl?.isLocked;
                                   return (
                                     <button
                                       key={item.iid}
-                                      className={`vc-nav-item-btn${isSel ? ' vc-nav-item-btn--active' : ''}${isLocked ? ' vc-nav-item-btn--locked' : ''}`}
-                                      onClick={() => !isLocked && setSelected({ vi, ci, ii })}
-                                      title={isLocked ? 'Purchase course to unlock' : item.title}
+                                      className={`vc-nav-item-btn${isSel ? ' vc-nav-item-btn--active' : ''}${(isLocked || itemDeadlineLocked) ? ' vc-nav-item-btn--locked' : ''}`}
+                                      onClick={() => !(isLocked || itemDeadlineLocked) && setSelected({ vi, ci, ii })}
+                                      title={isLocked ? 'Purchase course to unlock' : itemDeadlineLocked ? 'Locked after deadline' : item.title}
                                     >
                                       <i
                                         className={`bi ${typeIcon(item.type)} vc-item-icon`}
                                         style={{ color: isSel ? '#fff' : typeColor(item.type) }}
                                       ></i>
                                       <span className="vc-nav-label">{item.title}</span>
-                                      {isLocked && <i className="bi bi-lock-fill vc-lock-icon"></i>}
+                                      {(isLocked || itemDeadlineLocked) && <i className="bi bi-lock-fill vc-lock-icon"></i>}
+                                      {itemDl && !itemDeadlineLocked && itemDl.isPast && (
+                                        <span className="vc-deadline-badge vc-deadline-badge--past" title="Past deadline">⚠</span>
+                                      )}
+                                      {itemDl && !itemDl.isPast && (
+                                        <span className="vc-deadline-badge" title={`Due: ${new Date(itemDl.deadline.dueAt).toLocaleDateString()}`}>📅</span>
+                                      )}
                                     </button>
                                   );
                                 })}
@@ -600,6 +674,22 @@ function ViewCourse({ data, onLogout }) {
                 <div className="vc-welcome-meta">
                   <span className="vc-badge">{course.direction}</span>
                   <span className="vc-badge vc-badge--secondary">{course.level}</span>
+                  {course.courseType && course.courseType !== 'SELF_TAUGHT' && (
+                    <span className={`vc-badge ${course.courseType === 'HOSTED' ? 'vc-badge--hosted' : 'vc-badge--mentored'}`}>
+                      {course.courseType}
+                    </span>
+                  )}
+                  {session && (
+                    <span className="vc-badge vc-badge--session">
+                      <i className="bi bi-people-fill me-1"></i>
+                      Session: {session.hostTutor?.nickname || 'Tutor'}
+                    </span>
+                  )}
+                  {course.isPrivateCopy && (
+                    <span className="vc-badge vc-badge--copy" title="This is a tutor-edited version">
+                      <i className="bi bi-pencil-fill me-1"></i>Tutor Edition
+                    </span>
+                  )}
                 </div>
                 {locked ? (
                   <div className="vc-locked-notice">
@@ -897,6 +987,15 @@ function ContentPane({ selected, volumes, locked, token, onSelectItem, hasPrev, 
 function ItemRenderer({ item, token, actionProps }) {
   const { type, url } = item;
 
+  if (type === 'assignment') return (
+    <AssignmentItemView
+      item={item}
+      sessionId={sessionId}
+      sessionGroup={sessionGroup}
+      studentId={data?._id}
+      token={token}
+    />
+  );
   if (type === 'text') return <TextViewer url={url} token={token} actionProps={actionProps} />;
   if (type === 'form') return <FormViewer url={url} token={token} />;
   if (type === 'video') return <VideoViewer url={url} />;
@@ -1203,6 +1302,185 @@ function FormViewer({ url, token: tok }) {
         onCancel={modal.onCancel || closeModal}
         onClose={closeModal}
       />
+    </div>
+  );
+}
+
+
+// ─── AssignmentItemView ───────────────────────────────────────────────────────
+// Renders an assignment item inside the course view for students.
+function AssignmentItemView({ item, sessionId, sessionGroup, studentId, token }) {
+  const [assignment, setAssignment] = useState(null);
+  const [submission, setSubmission] = useState(null);
+  const [file, setFile]             = useState(null);
+  const [uploading, setUploading]   = useState(false);
+  const [message, setMessage]       = useState('');
+  const [error, setError]           = useState('');
+
+  useEffect(() => {
+    if (!item?.assignmentId || !sessionGroup) return;
+    // Find assignment entry in group
+    const entry = sessionGroup.assignments?.find(
+      a => String(a.assignmentId?._id || a.assignmentId) === String(item.assignmentId)
+    );
+    if (entry?.assignmentId) setAssignment(entry.assignmentId);
+
+    // Find own submission
+    if (entry && studentId) {
+      const sub = entry.submissions?.find(
+        s => String(s.studentId?._id || s.studentId) === String(studentId)
+      );
+      if (sub) setSubmission(sub);
+    }
+  }, [item, sessionGroup, studentId]);
+
+  const handleSubmit = async () => {
+    if (!file || !sessionGroup || !item?.assignmentId) return;
+    const formData = new FormData();
+    formData.append('submission', file);
+    setUploading(true); setError(''); setMessage('');
+    try {
+      const res = await fetch(
+        `http://localhost:4040/api/submissions/${sessionGroup._id}/${item.assignmentId}`,
+        {
+          method: 'POST',
+          headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` },
+          body: formData
+        }
+      );
+      const json = await res.json();
+      if (res.ok) {
+        setMessage(json.message || 'Submitted!');
+        setSubmission({ status: 'pending', submittedAt: new Date(), isOverdue: json.data?.isOverdue });
+        setFile(null);
+      } else { setError(json.message || 'Upload failed'); }
+    } catch (e) { setError('Network error'); }
+    setUploading(false);
+  };
+
+  const isOverdueNow = assignment?.dueAt && (() => {
+    const sanctionStart = new Date(assignment.dueAt);
+    sanctionStart.setDate(sanctionStart.getDate() + 1);
+    sanctionStart.setHours(0, 0, 0, 0);
+    return new Date() >= sanctionStart;
+  })();
+
+  const canResubmit = !submission || submission.status === 'declined' ||
+    (assignment?.dueAt && new Date() <= new Date(assignment.dueAt));
+
+  if (!assignment && !item?.assignmentId) {
+    return <div className="vc-assignment-item vc-assignment-item--empty">Assignment not configured.</div>;
+  }
+
+  return (
+    <div className="vc-assignment-item">
+      <div className="vc-assignment-header">
+        <i className="bi bi-clipboard-check me-2"></i>
+        <h3>{item?.title || 'Assignment'}</h3>
+      </div>
+
+      {assignment ? (
+        <>
+          {assignment.description && (
+            <p className="vc-assignment-desc">{assignment.description}</p>
+          )}
+          <div className="vc-assignment-meta">
+            <span>
+              <i className="bi bi-calendar me-1"></i>
+              Due: <strong>{new Date(assignment.dueAt).toLocaleString()}</strong>
+              {isOverdueNow && <span className="badge bg-danger ms-2">Overdue</span>}
+            </span>
+            <span>
+              <i className="bi bi-star me-1"></i>
+              Max mark: <strong>{assignment.maxMark}</strong>
+              {isOverdueNow && (
+                <span className="text-warning ms-2">
+                  (overdue penalty: −{assignment.overdueDeduction})
+                </span>
+              )}
+            </span>
+          </div>
+
+          {/* Task files from tutor */}
+          {assignment.taskFiles?.length > 0 && (
+            <div className="vc-assignment-files">
+              <strong>Task files:</strong>
+              {assignment.taskFiles.map((f, i) => (
+                <a key={i} href={`http://localhost:4040${f.url}`}
+                   className="vc-dl-link ms-2" target="_blank" rel="noopener noreferrer">
+                  <i className="bi bi-download me-1"></i>{f.originalName || f.filename}
+                </a>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="text-muted small">Loading assignment details…</p>
+      )}
+
+      {/* Submission status */}
+      {submission && (
+        <div className={`vc-submission-status vc-submission-status--${submission.status}`}>
+          <div className="d-flex align-items-center gap-2 mb-1">
+            <i className={`bi ${
+              submission.status === 'approved' ? 'bi-check-circle-fill text-success' :
+              submission.status === 'declined' ? 'bi-x-circle-fill text-danger' :
+              'bi-hourglass-split text-warning'
+            }`}></i>
+            <strong>
+              {submission.status === 'approved' ? 'Approved' :
+               submission.status === 'declined' ? 'Declined — resubmission required' :
+               'Pending review'}
+            </strong>
+            {submission.isOverdue && <span className="badge bg-warning text-dark">Was overdue</span>}
+          </div>
+          {submission.mark !== null && submission.mark !== undefined && (
+            <div>Mark: <strong>{submission.mark}</strong> / {assignment?.maxMark}</div>
+          )}
+          {submission.feedback && (
+            <div className="vc-submission-feedback">
+              <strong>Tutor feedback:</strong> {submission.feedback}
+            </div>
+          )}
+          <small className="text-muted">
+            Submitted: {new Date(submission.submittedAt).toLocaleString()}
+          </small>
+        </div>
+      )}
+
+      {/* Upload form */}
+      {sessionGroup && canResubmit && (
+        <div className="vc-submission-upload">
+          <label className="form-label fw-semibold">
+            {submission ? 'Re-submit' : 'Submit your work'} (.zip file)
+          </label>
+          <div className="d-flex gap-2 align-items-center flex-wrap">
+            <input
+              type="file"
+              accept=".zip"
+              className="form-control"
+              style={{ maxWidth: 340 }}
+              onChange={e => { setFile(e.target.files[0]); setError(''); setMessage(''); }}
+            />
+            <button
+              className="btn btn-primary"
+              onClick={handleSubmit}
+              disabled={!file || uploading}
+            >
+              {uploading
+                ? <><span className="spinner-border spinner-border-sm me-1" />Uploading…</>
+                : <><i className="bi bi-upload me-1" />Submit</>}
+            </button>
+          </div>
+          {isOverdueNow && (
+            <small className="text-warning d-block mt-1">
+              ⚠ Submitting after deadline — mark may be reduced by {assignment?.overdueDeduction || 1} point(s).
+            </small>
+          )}
+          {error   && <div className="text-danger small mt-1">{error}</div>}
+          {message && <div className="text-success small mt-1">{message}</div>}
+        </div>
+      )}
     </div>
   );
 }

@@ -37,8 +37,9 @@ module.exports.create = async (req, res) => {
 
     try {
         const level = await new Levels({
-            levelName: req.body.levelName,
+            levelName:    req.body.levelName,
             directionName: req.body.directionName,
+            minTutorRank: req.body.minTutorRank || 'assistant',
             createdAt: Date.now(),
             updatedAt: Date.now()
         })
@@ -71,8 +72,9 @@ module.exports.remove = async (req, res) => {
 module.exports.update = async (req, res) => {
     try {
         const updatedLevel = {
-            levelName: req.body.levelName,
+            levelName:    req.body.levelName,
             directionName: req.body.directionName,
+            minTutorRank: req.body.minTutorRank || 'assistant',
             updatedAt: Date.now()
         }
 

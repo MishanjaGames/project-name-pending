@@ -8,6 +8,7 @@ function EditLevel({ data, onLogout }) {
   const { id } = useParams();
   const [levelName, setLevelName] = useState('');
   const [directionName, setDirectionName] = useState('');
+  const [minTutorRank, setMinTutorRank] = useState('assistant');
   const [directions, setDirections] = useState([]);
   const [loading, setLoading] = useState(true);
   // ── Modal state ──────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ function EditLevel({ data, onLogout }) {
         const levelData = await levelRes.json();
         setLevelName(levelData.levelName);
         setDirectionName(levelData.directionName);
+        setMinTutorRank(levelData.minTutorRank || 'assistant');
       } else {
         showInfo('Error', 'Level not found');
         navigate('/manage/levels');
@@ -89,6 +91,7 @@ function EditLevel({ data, onLogout }) {
         body: JSON.stringify({
           levelName: levelName.trim(),
           directionName: directionName,
+          minTutorRank: minTutorRank,
           updatedAt: new Date()
         })
       });
@@ -180,6 +183,22 @@ function EditLevel({ data, onLogout }) {
                     </small>
                   </div>
 
+                  <div className="mb-3">
+                    <label className="form-label fw-bold">Minimum Tutor Sub-Rank</label>
+                    <select
+                      className="form-select"
+                      value={minTutorRank}
+                      onChange={(e) => setMinTutorRank(e.target.value)}
+                    >
+                      {['assistant','teacher','lecturer','instructor','tutor','professor'].map(r => (
+                        <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                      ))}
+                    </select>
+                    <small className="text-muted">
+                      Tutors must have at least this sub-rank to host courses at this level
+                    </small>
+                  </div>
+
                   <div className="d-flex gap-2">
                     <button
                       type="submit"
@@ -235,21 +254,7 @@ function EditLevel({ data, onLogout }) {
         onClose={modal.onClose || closeModal}
       />
 
-      <UtilityModal
-        show={modal.show}
-        type={modal.type}
-        title={modal.title}
-        message={modal.message}
-        danger={modal.danger}
-        confirmToken={modal.confirmToken}
-        tokenLabel={modal.tokenLabel}
-        deleteLabel={modal.deleteLabel || 'Delete'}
-        onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
-        onDelete={() => { modal.onDelete?.(); closeModal(); }}
-        onCancel={modal.onCancel || closeModal}
-        onClose={modal.onClose || closeModal}
-      />
-    </>
+      
   );
 }
 

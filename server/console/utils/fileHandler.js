@@ -439,9 +439,76 @@ module.exports = {
     renameThumbnail: (courseId, uploaded) =>
         registry.get('courses').renameFile(courseId, uploaded, 'thumbnail'),
 
+    // ── Private course copies ─────────────────────────────────────────────────
+    // Path: storage/data/u/[tutorId]/p-c/[originalCourseId]/
+    getPrivateCopyDir(tutorId, originalCourseId) {
+        const dir = path.join(STORAGE_ROOT, 'u', tutorId, 'p-c', originalCourseId);
+        fs.mkdirSync(dir, { recursive: true });
+        return dir;
+    },
+    getPrivateCopyFilePath(tutorId, originalCourseId, filename) {
+        return path.join(STORAGE_ROOT, 'u', tutorId, 'p-c', originalCourseId, filename);
+    },
+    listPrivateCopyFiles(tutorId, originalCourseId) {
+        const dir = path.join(STORAGE_ROOT, 'u', tutorId, 'p-c', originalCourseId);
+        if (!fs.existsSync(dir)) return [];
+        return fs.readdirSync(dir).map(filename => {
+            const fp = path.join(dir, filename);
+            const stats = fs.statSync(fp);
+            return { filename, size: stats.size, modified: stats.mtime };
+        });
+    },
+    deletePrivateCopyFile(tutorId, originalCourseId, filename) {
+        const fp = path.join(STORAGE_ROOT, 'u', tutorId, 'p-c', originalCourseId, filename);
+        if (fs.existsSync(fp)) { fs.unlinkSync(fp); return true; }
+        return false;
+    },
+    deletePrivateCopyDir(tutorId, originalCourseId) {
+        const dir = path.join(STORAGE_ROOT, 'u', tutorId, 'p-c', originalCourseId);
+        if (fs.existsSync(dir)) { fs.rmSync(dir, { recursive: true, force: true }); return true; }
+        return false;
+    },
+    /**
+     * Copy all files from the original course directory into the tutor's private copy dir.
+     * Called when a tutor creates a private copy.
+     */
+    copyCourseTutor(originalCourseId, tutorId) {
+        const src = path.join(STORAGE_ROOT, 'c', originalCourseId);
+        const dst = path.join(STORAGE_ROOT, 'u', tutorId, 'p-c', originalCourseId);
+        fs.mkdirSync(dst, { recursive: true });
+        if (!fs.existsSync(src)) return { copied: 0 };
+        const files = fs.readdirSync(src);
+        files.forEach(f => {
+            fs.copyFileSync(path.join(src, f), path.join(dst, f));
+        });
+        return { copied: files.length };
+    },
+
+    // ── Assignment submissions ─────────────────────────────────────────────────
+    // Path: storage/data/u/[studentId]/g/[groupId]/[courseId]/
+    getSubmissionDir(studentId, groupId, courseId) {
+        const dir = path.join(STORAGE_ROOT, 'u', studentId, 'g', groupId, courseId);
+        fs.mkdirSync(dir, { recursive: true });
+        return dir;
+    },
+    buildSubmissionPath(studentId, groupId, courseId, assignmentNumber, nickname) {
+        const safeNick = nickname.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = `${assignmentNumber}_${safeNick}-${studentId}.zip`;
+        const dir = path.join(STORAGE_ROOT, 'u', studentId, 'g', groupId, courseId);
+        fs.mkdirSync(dir, { recursive: true });
+        return { dir, filename, fullPath: path.join(dir, filename) };
+    },
+    deleteSubmission(studentId, groupId, courseId, filename) {
+        const fp = path.join(STORAGE_ROOT, 'u', studentId, 'g', groupId, courseId, filename);
+        if (fs.existsSync(fp)) { fs.unlinkSync(fp); return true; }
+        return false;
+    },
+
     // legacy path references
     paths: {
         userProfiles: path.join(STORAGE_ROOT, 'u'),
         courseFiles:  path.join(STORAGE_ROOT, 'c'),
+        privateCopies: path.join(STORAGE_ROOT, 'u'),  // sub-path: [userId]/p-c/[courseId]/
+        submissions:   path.join(STORAGE_ROOT, 'u'),  // sub-path: [userId]/g/[groupId]/[courseId]/
     },
 };
