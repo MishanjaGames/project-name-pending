@@ -16,6 +16,9 @@ function Levels({ data, onLogout }) {
     const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
     const showDelete  = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterRank, setFilterRank] = useState('');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
   const [filterDirection, setFilterDirection] = useState('');
 
   useEffect(() => {
@@ -82,13 +85,23 @@ function Levels({ data, onLogout }) {
     );
   };
 
-  const filteredLevels = Array.isArray(levels)
-    ? levels.filter(level => {
-      const matchesSearch = level.levelName.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredLevels = (() => {
+    let result = Array.isArray(levels) ? levels.filter(level => {
+      const matchesSearch = level.levelName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        level.directionName?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesDirection = !filterDirection || level.directionName === filterDirection;
-      return matchesSearch && matchesDirection;
-    })
-    : [];
+      const matchesRank = !filterRank || (level.minTutorRank || 'assistant') === filterRank;
+      return matchesSearch && matchesDirection && matchesRank;
+    }) : [];
+    result = [...result].sort((a, b) => {
+      const ranks = ['assistant','teacher','lecturer','instructor','tutor','professor'];
+      if (sortBy === 'name')    return sortDir==='asc' ? a.levelName.localeCompare(b.levelName) : b.levelName.localeCompare(a.levelName);
+      if (sortBy === 'rank')    { const ai=ranks.indexOf(a.minTutorRank||'assistant'), bi=ranks.indexOf(b.minTutorRank||'assistant'); return sortDir==='asc' ? ai-bi : bi-ai; }
+      if (sortBy === 'created') return sortDir==='asc' ? new Date(a.createdAt)-new Date(b.createdAt) : new Date(b.createdAt)-new Date(a.createdAt);
+      return 0;
+    });
+    return result;
+  })();
 
   // Group levels by direction
   const levelsByDirection = filteredLevels.reduce((acc, level) => {
@@ -177,7 +190,21 @@ function Levels({ data, onLogout }) {
                 </select>
               </div>
               <div className="col-md-3">
-                <button
+                              <select className="form-select" value={filterRank} onChange={e => setFilterRank(e.target.value)} style={{maxWidth:170}}>
+                <option value="">All Ranks</option>
+                {['assistant','teacher','lecturer','instructor','tutor','professor'].map(r => (
+                  <option key={r} value={r}>{r.charAt(0).toUpperCase()+r.slice(1)}</option>
+                ))}
+              </select>
+              <div className="input-group" style={{maxWidth:200}}>
+                <select className="form-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                  <option value="name">Name</option>
+                  <option value="rank">Min. Rank</option>
+                  <option value="created">Created</option>
+                </select>
+                <button className="btn btn-outline-secondary" onClick={() => setSortDir(d => d==='asc'?'desc':'asc')}>{sortDir==='asc'?'↑':'↓'}</button>
+              </div>
+              <button
                   className="btn btn-outline-secondary w-100"
                   onClick={() => {
                     setSearchTerm('');

@@ -18,7 +18,7 @@ function CreateCourse({ data, onLogout }) {
     const [trans, setTrans]               = useState([emptyTrans()]);
     const [activeLang, setActiveLang]     = useState(0);
     const [skillInputs, setSkillInputs]   = useState([""]);
-    const [formData, setFormData]         = useState({ userId: "", direction: "", level: "", price: "" });
+    const [formData, setFormData]         = useState({ userId: "", direction: "", level: "", price: "", courseType: "SELF_TAUGHT" });
     const [errors, setErrors]             = useState({});
     const [thumbnailFile, setThumbnailFile]       = useState(null);
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
@@ -127,7 +127,8 @@ function CreateCourse({ data, onLogout }) {
                     userId: formData.userId, status: "editing",
                     base_lang: baseLang, add_langs: addLangs, trans,
                     direction: formData.direction, level: formData.level,
-                    price: formData.price ? parseFloat(formData.price) : 0
+                    price: formData.price ? parseFloat(formData.price) : 0,
+                    courseType: formData.courseType || "SELF_TAUGHT"
                 })
             });
             if (!res.ok) { const err = await res.json(); showInfo('Error', `Failed: ${err.message || "Unknown error"}`); setSaving(false); return; }
@@ -330,6 +331,18 @@ function CreateCourse({ data, onLogout }) {
                                                     placeholder="0.00" step="0.01" min="0" />
                                             </div>
                                             {errors.price && <div className="text-danger small mt-1">{errors.price}</div>}
+                                        </div>
+
+                                        {/* Course type */}
+                                        <div className="mb-3">
+                                            <label className="form-label fw-semibold">Course Type <span className="text-danger">*</span></label>
+                                            <select className="form-select" name="courseType"
+                                                value={formData.courseType} onChange={handleChange}>
+                                                <option value="SELF_TAUGHT">Self-Taught — student buys &amp; learns independently</option>
+                                                <option value="MENTORED">Mentored — student owns course, tutor guides</option>
+                                                <option value="HOSTED">Hosted — tutor hosts, no purchase needed</option>
+                                            </select>
+                                            <small className="text-muted">Determines how students access this course</small>
                                         </div>
 
                                         {/* Content files */}

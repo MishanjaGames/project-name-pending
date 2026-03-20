@@ -3,9 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import { extendSession } from "../utils/utils";
 import { UtilityModal } from '../components/UtilityModal';
+import { ItemModal } from '../components/ItemModal';
 
 function Roles({ data, onLogout }) {
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [roles, setRoles] = useState([]);
     const [selectedRole, setSelectedRole] = useState(null);
     const [showModal, setShowModal] = useState(false);
@@ -17,6 +18,8 @@ function Roles({ data, onLogout }) {
     const showDelete = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
     const [searchText, setSearchText] = useState('');
     const [selectedAccessLevel, setSelectedAccessLevel] = useState('');
+    const [sortBy, setSortBy] = useState('');
+    const [sortDir, setSortDir] = useState('asc');
     const navigate = useNavigate();
 
     const token = localStorage.getItem('token');
@@ -35,6 +38,7 @@ function Roles({ data, onLogout }) {
     }
 
     const fetchRoles = async () => {
+        setLoading(true);
         try {
             const response = await fetch('http://localhost:4040/api/manage/roles', {
                 method: 'GET',
@@ -52,20 +56,33 @@ function Roles({ data, onLogout }) {
             }
         } catch (error) {
             console.error('Error fetching roles:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
     const uniqueAccessLevels = [...new Set(roles.map(r => r.accessLevel))].sort((a, b) => a - b);
 
-    const filteredRoles = roles.filter((r) => {
-        const text = searchText.toLowerCase();
-        const matchesText =
-            !text ||
-            (r.roleName || '').toLowerCase().includes(text) ||
-            (r.accessLevel?.toString() || '').includes(text);
-        const matchesAccessLevel = !selectedAccessLevel || r.accessLevel?.toString() === selectedAccessLevel;
-        return matchesText && matchesAccessLevel;
-    });
+    const filteredRoles = (() => {
+        const ORDER = ['default','create','tutor','quality','manage','admin','root'];
+        let result = roles.filter((r) => {
+            const text = searchText.toLowerCase();
+            const matchesText = !text ||
+                (r.roleName || '').toLowerCase().includes(text) ||
+                (r.accessLevel?.toString() || '').includes(text);
+            const matchesAccessLevel = !selectedAccessLevel || r.accessLevel?.toString() === selectedAccessLevel;
+            return matchesText && matchesAccessLevel;
+        });
+        if (sortBy) {
+            result = [...result].sort((a,b) => {
+                if (sortBy==='name')  { const cmp=(a.roleName||'').localeCompare(b.roleName||''); return sortDir==='asc'?cmp:-cmp; }
+                if (sortBy==='level') { const ai=ORDER.indexOf(a.accessLevel), bi=ORDER.indexOf(b.accessLevel); return sortDir==='asc'?ai-bi:bi-ai; }
+                if (sortBy==='date')  { const av=new Date(a.createdAt), bv=new Date(b.createdAt); return sortDir==='asc'?av-bv:bv-av; }
+                return 0;
+            });
+        }
+        return result;
+    })();
 
     const openModal = (role) => {
         setSelectedRole(role);
@@ -116,6 +133,20 @@ function Roles({ data, onLogout }) {
             minute: '2-digit'
         });
     };
+
+    if (loading) {
+        return (
+            <>
+                <Navbar data={data} onLogout={onLogout} />
+                <div className="flex-grow-1 d-flex align-items-center justify-content-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
+                    <div className="text-center">
+                        <div className="spinner-border text-primary mb-3" style={{ width: '2.5rem', height: '2.5rem' }}></div>
+                        <p className="text-muted small mb-0">Loading roles…</p>
+                    </div>
+                </div>
+            </>
+        );
+    }
 
     return (
         <>
@@ -204,6 +235,17 @@ function Roles({ data, onLogout }) {
                                     ))}
                                 </select>
                             </div>
+                        <div className="col-auto">
+                            <div className="input-group input-group-sm">
+                                <select className="form-select form-select-sm" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                                    <option value="">Sort…</option>
+                                    <option value="name">Name</option>
+                                    <option value="level">Level</option>
+                                    <option value="date">Created</option>
+                                </select>
+                                <button className="btn btn-outline-secondary btn-sm" onClick={() => setSortDir(d=>d==='asc'?'desc':'asc')}>{sortDir==='asc'?'↑':'↓'}</button>
+                            </div>
+                        </div>
                         </div>
 
                         {(searchText || selectedAccessLevel) && (
@@ -317,104 +359,15 @@ function Roles({ data, onLogout }) {
                 </div>
             </div>
 
-            {showModal && selectedRole && (
-                <>
-                    <div
-                        className="modal-backdrop fade show"
-                        onClick={closeModal}
-                        style={{
-                            position: 'fixed',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            height: '100%',
-                            backgroundColor: 'rgba(0,0,0,0.5)',
-                            zIndex: 1040
-                        }}
-                    ></div>
-                    <div
-                        className="modal fade show d-block"
-                        tabIndex="-1"
-                        style={{
-                            position: 'fixed',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            zIndex: 1050,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            pointerEvents: 'none'
-                        }}
-                    >
-                        <div className="modal-dialog modal-dialog-centered" style={{ pointerEvents: 'auto' }}>
-                            <div className="card border-0 shadow-lg rounded-3 overflow-hidden">
-                                <div className="card-header bg-primary text-white border-0 d-flex align-items-center justify-content-between py-3 px-4">
-                                    <h5 className="mb-0 fw-semibold">Role Details</h5>
-                                    <button type="button" className="btn-close btn-close-white btn-sm" onClick={closeModal} aria-label="Close"></button>
-                                </div>
-
-                                <div className="card-body p-4">
-                                    <div className="text-center mb-4">
-                                        <div className={`rounded-circle ${getAccessLevelBadgeColor(selectedRole.accessLevel)} d-flex align-items-center justify-content-center text-white mx-auto mb-3`}
-                                            style={{ width: '72px', height: '72px', fontSize: '1.8rem' }}>
-                                            {selectedRole.roleName ? selectedRole.roleName.charAt(0).toUpperCase() : '?'}
-                                        </div>
-                                        <h5 className="fw-bold mb-1">{selectedRole.roleName || 'Unknown'}</h5>
-                                        <span className={`badge rounded-pill ${getAccessLevelBadgeColor(selectedRole.accessLevel)}`}>
-                                            Level {selectedRole.accessLevel ?? '—'}
-                                        </span>
-                                    </div>
-
-                                    <table className="table table-sm table-borderless mb-0">
-                                        <tbody>
-                                            <tr>
-                                                <td className="text-muted fw-semibold small text-uppercase py-2" style={{ width: '35%' }}>Role Name</td>
-                                                <td className="py-2">{selectedRole.roleName || '—'}</td>
-                                            </tr>
-                                            <tr>
-                                                <td className="text-muted fw-semibold small text-uppercase py-2">Access Level</td>
-                                                <td className="py-2">
-                                                    <span className={`badge rounded-pill ${getAccessLevelBadgeColor(selectedRole.accessLevel)}`}>
-                                                        Level {selectedRole.accessLevel ?? '—'}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td className="text-muted fw-semibold small text-uppercase py-2">Created At</td>
-                                                <td className="py-2">{formatDate(selectedRole.createdAt)}</td>
-                                            </tr>
-                                            <tr>
-                                                <td className="text-muted fw-semibold small text-uppercase py-2">Last Updated</td>
-                                                <td className="py-2">{formatDate(selectedRole.updatedAt)}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                <div className="card-footer bg-white border-top d-flex justify-content-end gap-2 py-3 px-4">
-                                    <button type="button" className="btn btn-outline-secondary btn-sm" onClick={closeModal}>Close</button>
-                                    <button type="button" className="btn btn-warning btn-sm text-dark" onClick={() => { closeModal(); handleEdit(selectedRole); }}>
-                                        <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                            <path d="M12.146.146a.5.5 0 0 1 .707 0l3 3a.5.5 0 0 1 0 .707l-10 10a.5.5 0 0 1-.203.134l-6 2a.5.5 0 0 1-.633-.633l2-6a.5.5 0 0 1 .134-.203l10-10z" />
-                                        </svg>
-                                        Edit
-                                    </button>
-                                    <button type="button" className="btn btn-danger btn-sm" onClick={() => { closeModal(); handleDelete(selectedRole); }}>
-                                        <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                            <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z" />
-                                            <path d="M5 0 4.5.5l-.5 1H2a1 1 0 0 0-1 1v1h12V2.5a1 1 0 0 0-1-1H10.5l-.5-1L9.5 0h-5zM3 14.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4H3v10.5zM4.5 3h7L11 2H5l-.5 1z" />
-                                        </svg>
-                                        Delete
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </>
-            )}
-            <UtilityModal
+            <ItemModal
+                show={showModal}
+                type="role"
+                item={selectedRole}
+                onClose={() => setShowModal(false)}
+                onEdit={selectedRole ? () => navigate(`/manage/role/${selectedRole._id}`) : undefined}
+                onDelete={selectedRole ? () => { setShowModal(false); handleDelete(selectedRole); } : undefined}
+            />
+                        <UtilityModal
                 show={modal.show}
                 type={modal.type}
                 title={modal.title}

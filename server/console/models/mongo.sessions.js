@@ -48,14 +48,29 @@ const sessionSchema = new Schema({
         // Host controls whether co-tutors may edit the private copy
         canEditCopy:   { type: Boolean, default: false }
     }],
-    // Whether the level's minTutorRank check was bypassed
+    // Per-tutor rank overrides (replaces the old session-wide restrictionIgnored boolean).
+    // Each entry records that a specific tutor's rank check was waived for this session.
+    rankOverrides: [{
+        tutorId: {
+            ref: 'users',
+            type: require('mongoose').Schema.Types.ObjectId,
+            required: true
+        },
+        overriddenBy: {
+            ref: 'users',
+            type: require('mongoose').Schema.Types.ObjectId,
+            required: true
+        },
+        overriddenAt: { type: Date, default: Date.now }
+    }],
+    // Kept for backwards compat — true when ANY tutor in this session has an override
     restrictionIgnored: {
         type: Boolean,
         default: false
     },
     restrictionOverrideBy: {
         ref: 'users',
-        type: Schema.Types.ObjectId,
+        type: require('mongoose').Schema.Types.ObjectId,
         default: null
     },
     // Host-controlled: whether private-copy editing is permitted at all
@@ -75,7 +90,26 @@ const sessionSchema = new Schema({
         datetime:    { type: Date,   required: true },
         durationMin: { type: Number, default: 60 },
         meetingLink: { type: String, default: '' },  // Zoom/Teams/Meet/Classroom link
-        notes:       { type: String, default: '' }
+        notes:       { type: String, default: '' },
+
+        // ── Recurrence ────────────────────────────────────────────────────────
+        // If isRecurring is false (default), this is a one-time meeting.
+        // If true, the meeting repeats according to recurrence settings.
+        isRecurring:     { type: Boolean, default: false },
+        recurrence: {
+            // How often to repeat
+            frequency: {
+                type: String,
+                enum: ['daily', 'weekly', 'biweekly', 'monthly'],
+                default: 'weekly'
+            },
+            // Which days of the week (0=Sun … 6=Sat). Used for weekly/biweekly.
+            daysOfWeek:  { type: [Number], default: [] },
+            // Date after which no more occurrences are generated (inclusive)
+            endDate:     { type: Date, default: null },
+            // Max number of occurrences (null = no limit)
+            maxOccurrences: { type: Number, default: null }
+        }
     }],
     // Per-item deadlines (volumes, chapters, items, or assignments)
     deadlines: [{

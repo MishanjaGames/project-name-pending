@@ -91,11 +91,13 @@ function Forms({ data, onLogout }) {
     const token = localStorage.getItem("token");
 
     const [submissions, setSubmissions] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [searchText, setSearchText] = useState("");
     const [selectedStatus, setSelectedStatus] = useState("");
     const [selectedFormType, setSelectedFormType] = useState("");
     const [confirm, setConfirm] = useState(null);
+    const [sortBy, setSortBy] = useState('date');
+    const [sortDir, setSortDir] = useState('desc');
 
     const authHeaders = {
         Authorization: `${token?.split(" ")[0]} ${token?.split(" ")[1]}`,
@@ -157,14 +159,24 @@ function Forms({ data, onLogout }) {
     const knownTypes = Object.keys(FORM_CONFIGS);
     const allFormTypes = [...new Set([...knownTypes, ...dataTypes])].sort();
 
-    const filtered = submissions.filter(s => {
-        const text = searchText.toLowerCase();
-        const email = getEmail(s)?.toLowerCase() ?? "";
-        const matchText = !text || getTitle(s).toLowerCase().includes(text) || getSubtitle(s).toLowerCase().includes(text) || email.includes(text);
-        const matchStatus = !selectedStatus || s.status === selectedStatus;
-        const matchFormType = !selectedFormType || s.formType === selectedFormType;
-        return matchText && matchStatus && matchFormType;
-    });
+    const filtered = (() => {
+        let result = submissions.filter(s => {
+            const text = searchText.toLowerCase();
+            const email = getEmail(s)?.toLowerCase() ?? "";
+            const matchText = !text || getTitle(s).toLowerCase().includes(text) || getSubtitle(s).toLowerCase().includes(text) || email.includes(text);
+            const matchStatus = !selectedStatus || s.status === selectedStatus;
+            const matchFormType = !selectedFormType || s.formType === selectedFormType;
+            return matchText && matchStatus && matchFormType;
+        });
+        result = [...result].sort((a, b) => {
+            if (sortBy === 'date')   { return sortDir==='asc' ? new Date(a.createdAt)-new Date(b.createdAt) : new Date(b.createdAt)-new Date(a.createdAt); }
+            if (sortBy === 'name')   { const cmp=getTitle(a).localeCompare(getTitle(b)); return sortDir==='asc'?cmp:-cmp; }
+            if (sortBy === 'status') { const cmp=(a.status||'').localeCompare(b.status||''); return sortDir==='asc'?cmp:-cmp; }
+            if (sortBy === 'type')   { const cmp=(a.formType||'').localeCompare(b.formType||''); return sortDir==='asc'?cmp:-cmp; }
+            return 0;
+        });
+        return result;
+    })();
 
     const statusCounts = submissions
         .filter(s => !selectedFormType || s.formType === selectedFormType)
@@ -174,7 +186,22 @@ function Forms({ data, onLogout }) {
         acc[s.formType] = (acc[s.formType] || 0) + 1; return acc;
     }, {});
 
-    return (
+
+    if (loading) {
+        return (
+            <>
+                <Navbar data={data} onLogout={onLogout} />
+                <div className="flex-grow-1 d-flex align-items-center justify-content-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
+                    <div className="text-center">
+                        <div className="spinner-border text-primary mb-3" style={{ width: '2.5rem', height: '2.5rem' }}></div>
+                        <p className="text-muted small mb-0">Loading forms…</p>
+                    </div>
+                </div>
+            </>
+        );
+    }
+
+        return (
         <>
             <Navbar data={data} onLogout={onLogout} />
 
@@ -280,6 +307,15 @@ function Forms({ data, onLogout }) {
                                     ))}
                                 </select>
                             </div>
+                                    <div className="input-group input-group-sm" style={{maxWidth:200}}>
+                                        <select className="form-select form-select-sm" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                                            <option value="date">Sort: Date</option>
+                                            <option value="name">Sort: Name</option>
+                                            <option value="status">Sort: Status</option>
+                                            <option value="type">Sort: Type</option>
+                                        </select>
+                                        <button className="btn btn-outline-secondary btn-sm" onClick={() => setSortDir(d => d==='asc'?'desc':'asc')}>{sortDir==='asc'?'↑':'↓'}</button>
+                                    </div>
                         </div>
                     </div>
                 </div>

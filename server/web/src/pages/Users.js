@@ -4,9 +4,10 @@ import { Navbar } from "../components/Navbar";
 import AuthImage from "../components/AuthImage";
 import { extendSession } from "../utils/utils";
 import { UtilityModal } from '../components/UtilityModal';
+import { ItemModal } from '../components/ItemModal';
 
 function Users({ data, onLogout }) {
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
@@ -19,6 +20,9 @@ function Users({ data, onLogout }) {
     const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
     const showDelete = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
     const [searchText, setSearchText] = useState('');
+    const [sortBy, setSortBy] = useState('');
+    const [sortDir, setSortDir] = useState('asc');
+    const [filterTutorRank, setFilterTutorRank] = useState('');
     const [selectedRole, setSelectedRole] = useState('');
     const navigate = useNavigate();
 
@@ -42,6 +46,7 @@ function Users({ data, onLogout }) {
     }
 
     const fetchUsers = async () => {
+        setLoading(true);
         try {
             const response = await fetch('http://localhost:4040/api/manage/users', {
                 method: 'GET',
@@ -76,6 +81,8 @@ function Users({ data, onLogout }) {
             }
         } catch (error) {
             console.error('Error fetching users:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -135,17 +142,30 @@ function Users({ data, onLogout }) {
         return profilePic ? profilePic.url : (user.links[0]?.url || null);
     };
 
-    const filteredUsers = users.filter((u) => {
-        const text = searchText.toLowerCase();
-        const roleName = getRoleName(u.role);
-        const matchesText =
-            !text ||
-            (u.nickname || '').toLowerCase().includes(text) ||
-            (u.email || '').toLowerCase().includes(text) ||
-            roleName.includes(text);
-        const matchesRole = !selectedRole || u.role === selectedRole;
-        return matchesText && matchesRole;
-    });
+    const filteredUsers = (() => {
+        let result = users.filter((u) => {
+            const text = searchText.toLowerCase();
+            const roleName = getRoleName(u.role);
+            const matchesText = !text ||
+                (u.nickname || '').toLowerCase().includes(text) ||
+                (u.email || '').toLowerCase().includes(text) ||
+                roleName.includes(text);
+            const matchesRole = !selectedRole || u.role === selectedRole || u.role?._id === selectedRole;
+            const matchesTutorRank = !filterTutorRank || u.tutorRank === filterTutorRank;
+            return matchesText && matchesRole && matchesTutorRank;
+        });
+        if (sortBy) {
+            result = [...result].sort((a,b) => {
+                let av, bv;
+                if (sortBy==='nickname') { av=a.nickname||''; bv=b.nickname||''; const cmp=av.localeCompare(bv); return sortDir==='asc'?cmp:-cmp; }
+                if (sortBy==='email')    { av=a.email||'';    bv=b.email||'';    const cmp=av.localeCompare(bv); return sortDir==='asc'?cmp:-cmp; }
+                if (sortBy==='date')     { av=new Date(a.createdAt); bv=new Date(b.createdAt); return sortDir==='asc'?av-bv:bv-av; }
+                if (sortBy==='courses')  { av=a.courses?.length||0; bv=b.courses?.length||0; return sortDir==='asc'?av-bv:bv-av; }
+                return 0;
+            });
+        }
+        return result;
+    })();
 
     const activeRoleLabel = selectedRole ? getRoleName(selectedRole) : '';
 
@@ -185,6 +205,20 @@ function Users({ data, onLogout }) {
             minute: '2-digit'
         });
     };
+
+    if (loading) {
+        return (
+            <>
+                <Navbar data={data} onLogout={onLogout} />
+                <div className="flex-grow-1 d-flex align-items-center justify-content-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
+                    <div className="text-center">
+                        <div className="spinner-border text-primary mb-3" style={{ width: '2.5rem', height: '2.5rem' }}></div>
+                        <p className="text-muted small mb-0">Loading users…</p>
+                    </div>
+                </div>
+            </>
+        );
+    }
 
     return (
         <>
@@ -273,6 +307,26 @@ function Users({ data, onLogout }) {
                                     ))}
                                 </select>
                             </div>
+                                <div className="col-12 col-sm-4 col-md-2">
+                                    <select className="form-select form-select-sm" value={filterTutorRank} onChange={e => setFilterTutorRank(e.target.value)}>
+                                        <option value="">All ranks</option>
+                                        {['assistant','teacher','lecturer','instructor','tutor','professor'].map(r => (
+                                            <option key={r} value={r}>{r.charAt(0).toUpperCase()+r.slice(1)}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="col-12 col-sm-4 col-md-2">
+                                    <div className="input-group input-group-sm">
+                                        <select className="form-select form-select-sm" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                                            <option value="">Sort…</option>
+                                            <option value="nickname">Nickname</option>
+                                            <option value="email">Email</option>
+                                            <option value="date">Joined</option>
+                                            <option value="courses">Courses</option>
+                                        </select>
+                                        <button className="btn btn-outline-secondary btn-sm" onClick={() => setSortDir(d=>d==='asc'?'desc':'asc')}>{sortDir==='asc'?'↑':'↓'}</button>
+                                    </div>
+                                </div>
                         </div>
 
                         {(searchText || selectedRole) && (
@@ -415,128 +469,16 @@ function Users({ data, onLogout }) {
                 </div>
             </div>
 
-            {showModal && selectedUser && (
-                <>
-                    <div
-                        className="modal-backdrop fade show"
-                        onClick={closeModal}
-                        style={{
-                            position: 'fixed',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            height: '100%',
-                            backgroundColor: 'rgba(0,0,0,0.5)',
-                            zIndex: 1040
-                        }}
-                    ></div>
-                    <div
-                        className="modal fade show d-block"
-                        tabIndex="-1"
-                        style={{
-                            position: 'fixed',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            zIndex: 1050,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            pointerEvents: 'none'
-                        }}
-                    >
-                        <div className="modal-dialog modal-dialog-centered" style={{ pointerEvents: 'auto' }}>
-                            <div className="card border-0 shadow-lg rounded-3 overflow-hidden">
-                                <div className="card-header bg-primary text-white border-0 d-flex align-items-center justify-content-between py-3 px-4">
-                                    <h5 className="mb-0 fw-semibold">User Details</h5>
-                                    <button type="button" className="btn-close btn-close-white btn-sm" onClick={closeModal} aria-label="Close"></button>
-                                </div>
-
-                                <div className="card-body p-4">
-                                    <div className="text-center mb-4">
-                                        {(() => {
-                                            const avatarUrl = getProfilePictureUrl(selectedUser);
-                                            return avatarUrl ? (
-                                                <AuthImage
-                                                    src={avatarUrl}
-                                                    alt={selectedUser.nickname}
-                                                    className="rounded-circle flex-shrink-0"
-                                                    style={{ width: '96px', height: '96px', objectFit: 'cover' }}
-                                                    fallback={
-                                                        <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white flex-shrink-0"
-                                                            style={{ width: '96px', height: '96px', fontSize: '0.8rem' }}>
-                                                            {selectedUser.nickname ? selectedUser.nickname.charAt(0).toUpperCase() : '?'}
-                                                        </div>
-                                                    }
-                                                />
-                                            ) : (
-                                                <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white flex-shrink-0"
-                                                    style={{ width: '34px', height: '34px', fontSize: '0.8rem' }}>
-                                                    {selectedUser.nickname ? selectedUser.nickname.charAt(0).toUpperCase() : '?'}
-                                                </div>
-                                            );
-                                        })()}
-                                        <h5 className="fw-bold mb-1">{selectedUser.nickname || 'Unknown'}</h5>
-                                    </div>
-
-                                    <table className="table table-sm table-borderless mb-0">
-                                        <tbody>
-                                            <tr>
-                                                <td className="text-muted fw-semibold small text-uppercase py-2" style={{ width: '35%' }}>Email</td>
-                                                <td className="py-2">{selectedUser.email || '—'}</td>
-                                            </tr>
-                                            <tr>
-                                                <td className="text-muted fw-semibold small text-uppercase py-2">Nickname</td>
-                                                <td className="py-2">{selectedUser.nickname || '—'}</td>
-                                            </tr>
-                                            <tr>
-                                                <td className="text-muted fw-semibold small text-uppercase py-2">Role</td>
-                                                <td className="py-2">
-                                                    {(() => {
-                                                        const name = getRoleName(selectedUser.role)
-                                                        return (
-                                                            <span className={`badge rounded-pill ${name.toLowerCase() === 'root' ? 'bg-dark text-light' : name.toLowerCase() === 'admin' ? 'bg-danger' : name.toLowerCase() === 'manage' ? 'bg-warning text-dark' : 'bg-info text-light'}`}>
-                                                                {name}
-                                                            </span>
-                                                        );
-                                                    })()}
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td className="text-muted fw-semibold small text-uppercase py-2">Created At</td>
-                                                <td className="py-2">{formatDate(selectedUser.createdAt)}</td>
-                                            </tr>
-                                            <tr>
-                                                <td className="text-muted fw-semibold small text-uppercase py-2">Updated At</td>
-                                                <td className="py-2">{formatDate(selectedUser.updatedAt)}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                <div className="card-footer bg-white border-top d-flex justify-content-end gap-2 py-3 px-4">
-                                    <button type="button" className="btn btn-outline-secondary btn-sm" onClick={closeModal}>Close</button>
-                                    <button type="button" className="btn btn-warning btn-sm text-dark" onClick={() => { closeModal(); handleEdit(selectedUser); }}>
-                                        <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                            <path d="M12.146.146a.5.5 0 0 1 .707 0l3 3a.5.5 0 0 1 0 .707l-10 10a.5.5 0 0 1-.203.134l-6 2a.5.5 0 0 1-.633-.633l2-6a.5.5 0 0 1 .134-.203l10-10z" />
-                                        </svg>
-                                        Edit
-                                    </button>
-                                    <button type="button" className="btn btn-danger btn-sm" onClick={() => { closeModal(); handleDelete(selectedUser); }}>
-                                        <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                            <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z" />
-                                            <path d="M5 0 4.5.5l-.5 1H2a1 1 0 0 0-1 1v1h12V2.5a1 1 0 0 0-1-1H10.5l-.5-1L9.5 0h-5zM3 14.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4H3v10.5zM4.5 3h7L11 2H5l-.5 1z" />
-                                        </svg>
-                                        Delete
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </>
-            )}
-            <UtilityModal
+            <ItemModal
+                show={showModal}
+                type="user"
+                item={selectedUser}
+                extraData={{ roles }}
+                onClose={() => setShowModal(false)}
+                onEdit={selectedUser ? () => navigate(`/manage/user/${selectedUser._id}`) : undefined}
+                onDelete={selectedUser ? () => { setShowModal(false); handleDelete(selectedUser); } : undefined}
+            />
+                        <UtilityModal
                 show={modal.show}
                 type={modal.type}
                 title={modal.title}

@@ -28,7 +28,7 @@ function EditCourse({ data, onLogout }) {
     const [activeLang, setActiveLang]   = useState(0);
     const [skillInputs, setSkillInputs] = useState([""]);
 
-    const [formData, setFormData] = useState({ userId: "", status: "", direction: "", level: "", price: "", links: [] });
+    const [formData, setFormData] = useState({ userId: "", status: "", direction: "", level: "", price: "", courseType: "SELF_TAUGHT", links: [] });
     const [errors, setErrors]     = useState({});
 
     // File states
@@ -36,6 +36,10 @@ function EditCourse({ data, onLogout }) {
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
     const [courseFiles, setCourseFiles]           = useState([]);
     const [existingFiles, setExistingFiles]       = useState([]);
+    // File filter/sort for existingFiles
+    const [fileSearch, setFileSearch]   = useState('');
+    const [fileTypeFilter, setFileTypeFilter] = useState('all');
+    const [fileSortBy, setFileSortBy]   = useState('name'); // 'name' | 'date' | 'type' | 'size'
     // ── Modal state ──────────────────────────────────────────────────────────
     const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
     const closeModal  = () => setModal(p => ({ ...p, show: false }));
@@ -87,12 +91,13 @@ function EditCourse({ data, onLogout }) {
                 setSkillInputs(langs.map(() => ""));
 
                 setFormData({
-                    userId:    course.userId    || "",
-                    status:    course.status    || "editing",
-                    direction: course.direction || "",
-                    level:     course.level     || "",
-                    price:     course.price?.toString() || "",
-                    links:     course.links     || []
+                    userId:     course.userId     || "",
+                    status:     course.status     || "editing",
+                    direction:  course.direction  || "",
+                    level:      course.level      || "",
+                    courseType: course.courseType || "SELF_TAUGHT",
+                    price:      course.price?.toString() || "",
+                    links:      course.links      || []
                 });
 
                 if (usersRes.ok) { const d = await usersRes.json(); setUsers(d.data || d); }
@@ -208,6 +213,7 @@ function EditCourse({ data, onLogout }) {
                     userId: formData.userId, status: formData.status,
                     base_lang: baseLang, add_langs: addLangs, trans,
                     direction: formData.direction, level: formData.level,
+                    courseType: formData.courseType || "SELF_TAUGHT",
                     price: formData.price ? parseFloat(formData.price) : 0,
                     links: mergedLinks
                 })
@@ -327,6 +333,19 @@ function EditCourse({ data, onLogout }) {
                                             {errors.status && <div className="invalid-feedback">{errors.status}</div>}
                                         </div>
 
+                                        {/* Course Type */}
+                                        <div className="col-12 col-md-6">
+                                            <label className="form-label fw-semibold">Course Type</label>
+                                            <select className="form-select"
+                                                value={formData.courseType || "SELF_TAUGHT"}
+                                                onChange={e => setFormData(p => ({ ...p, courseType: e.target.value }))}>
+                                                <option value="SELF_TAUGHT">Self-Taught — student buys &amp; learns independently</option>
+                                                <option value="MENTORED">Mentored — student owns course, tutor guides</option>
+                                                <option value="HOSTED">Hosted — tutor hosts, no purchase needed</option>
+                                            </select>
+                                            <small className="text-muted">Determines how students access this course</small>
+                                        </div>
+
                                         {/* Base language */}
                                         <div className="col-12 col-md-6">
                                             <label className="form-label fw-semibold">Base Language <span className="text-danger">*</span></label>
@@ -420,10 +439,48 @@ function EditCourse({ data, onLogout }) {
                                             <div className="col-12">
                                                 <div className="d-flex justify-content-between align-items-center mb-1">
                                                     <label className="form-label fw-semibold mb-0">Uploaded Course Files ({existingFiles.length})</label>
+                                                    {/* File filters */}
+                                                    {existingFiles.length > 1 && (
+                                                        <div className="d-flex gap-2 flex-wrap mt-2 mb-2">
+                                                            <input type="text" className="form-control form-control-sm" placeholder="Search files…"
+                                                                style={{ maxWidth: 180 }} value={fileSearch}
+                                                                onChange={e => setFileSearch(e.target.value)} />
+                                                            <select className="form-select form-select-sm" style={{ maxWidth: 130 }}
+                                                                value={fileTypeFilter} onChange={e => setFileTypeFilter(e.target.value)}>
+                                                                <option value="all">All types</option>
+                                                                <option value="image">Images</option>
+                                                                <option value="video">Videos</option>
+                                                                <option value="audio">Audio</option>
+                                                                <option value="document">Documents</option>
+                                                                <option value="archive">Archives</option>
+                                                                <option value="other">Other</option>
+                                                            </select>
+                                                            <select className="form-select form-select-sm" style={{ maxWidth: 140 }}
+                                                                value={fileSortBy} onChange={e => setFileSortBy(e.target.value)}>
+                                                                <option value="name">Sort: Name</option>
+                                                                <option value="date">Sort: Date</option>
+                                                                <option value="type">Sort: Type</option>
+                                                                <option value="size">Sort: Size</option>
+                                                            </select>
+                                                        </div>
+                                                    )}
                                                     <small className="text-muted">Use ▲ ▼ to reorder · order is saved on submit</small>
                                                 </div>
                                                 <div className="border rounded p-2 bg-light" style={{ maxHeight: 350, overflowY: "auto" }}>
-                                                    {existingFiles.map((file, idx) => {
+                                                    {[...existingFiles]
+                                                        .filter(file => {
+                                                            if (fileSearch && !file.filename?.toLowerCase().includes(fileSearch.toLowerCase()) &&
+                                                                !file.url?.toLowerCase().includes(fileSearch.toLowerCase())) return false;
+                                                            if (fileTypeFilter !== 'all' && (file.type || 'other') !== fileTypeFilter) return false;
+                                                            return true;
+                                                        })
+                                                        .sort((a, b) => {
+                                                            if (fileSortBy === 'name') return (a.filename || '').localeCompare(b.filename || '');
+                                                            if (fileSortBy === 'type') return (a.type || '').localeCompare(b.type || '');
+                                                            if (fileSortBy === 'size') return (b.size || 0) - (a.size || 0);
+                                                            return 0; // date — keep original order
+                                                        })
+                                                        .map((file, idx) => {
                                                         const fn = file.originalName || file.filename || `File ${idx + 1}`;
                                                         const mime = file.mimetype || file.mimeType || "";
                                                         const isImg = mime.startsWith("image/"), isVid = mime.startsWith("video/"), isAud = mime.startsWith("audio/");

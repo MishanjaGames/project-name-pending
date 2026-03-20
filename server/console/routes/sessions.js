@@ -19,6 +19,9 @@ router.delete('/:id',         jwtAuth, tutorVal,  controller.remove)
 
 // Special actions
 router.post('/:id/override-rank',  jwtAuth, tutorVal,  controller.overrideRank)
+router.post('/:id/revoke-rank-override', jwtAuth, tutorVal, controller.revokeRankOverride)
 router.post('/:id/private-copy',   jwtAuth, tutorVal,  controller.createPrivateCopy)
+router.patch('/:id/archive',       jwtAuth, tutorVal,  controller.archive)
+router.get('/:id/schedule/expanded', jwtAuth, tutorVal,  controller.getExpandedSchedule)
 
 module.exports = router

@@ -15,6 +15,8 @@ function Directions({ data, onLogout }) {
     const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
     const showDelete  = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('name');   // 'name' | 'created' | 'updated'
+  const [sortDir, setSortDir] = useState('asc');
 
   useEffect(() => {
     fetchDirections();
@@ -69,11 +71,20 @@ function Directions({ data, onLogout }) {
     );
   };
 
-  const filteredDirections = Array.isArray(directions)
-    ? directions.filter(direction =>
-      direction.directionName.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    : [];
+  const filteredDirections = (() => {
+    let result = Array.isArray(directions)
+      ? directions.filter(d => d.directionName.toLowerCase().includes(searchTerm.toLowerCase()))
+      : [];
+    result = [...result].sort((a, b) => {
+      let av, bv;
+      if (sortBy === 'name')    { av = a.directionName || ''; bv = b.directionName || ''; return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av); }
+      if (sortBy === 'created') { av = new Date(a.createdAt); bv = new Date(b.createdAt); }
+      else if (sortBy === 'updated') { av = new Date(a.updatedAt); bv = new Date(b.updatedAt); }
+      else { return 0; }
+      return sortDir === 'asc' ? av - bv : bv - av;
+    });
+    return result;
+  })();
 
   if (loading) {
     return (
@@ -129,7 +140,7 @@ function Directions({ data, onLogout }) {
         <div className="card shadow-sm mb-4">
           <div className="card-body">
             <div className="row g-3">
-              <div className="col-md-6">
+              <div className="col-md-5">
                 <input
                   type="text"
                   className="form-control"
@@ -137,6 +148,18 @@ function Directions({ data, onLogout }) {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
+              </div>
+              <div className="col-md-3">
+                <div className="input-group">
+                  <select className="form-select form-select-sm" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                    <option value="name">Sort: Name</option>
+                    <option value="created">Sort: Created</option>
+                    <option value="updated">Sort: Updated</option>
+                  </select>
+                  <button className="btn btn-outline-secondary btn-sm" onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} title="Toggle order">
+                    {sortDir === 'asc' ? '↑' : '↓'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

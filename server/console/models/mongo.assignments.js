@@ -61,7 +61,10 @@ const assignmentSchema = new Schema({
     },
     maxMark: { type: Number, required: true },
     // Computed from markScale — stored so it doesn't need recalculating
+    // Can be overridden by setting customOverdueDeduction
     overdueDeduction: { type: Number, required: true },  // 1 or 2
+    // Optional custom overdue deduction (overrides the scale-based one)
+    customOverdueDeduction: { type: Number, default: null },
     createdBy: {
         ref: 'users',
         type: Schema.Types.ObjectId,

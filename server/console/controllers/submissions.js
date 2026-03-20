@@ -230,8 +230,11 @@ module.exports.grade = async (req, res) => {
 
         let finalMark = parseFloat(mark);
         if (submission.isOverdue && status === 'approved') {
-            const deducted = Math.max(0, finalMark - assignment.overdueDeduction);
-            finalMark = deducted;
+            // Use customOverdueDeduction if the tutor set one, otherwise use scale-based
+            const effectiveDeduction = (assignment.customOverdueDeduction !== null && assignment.customOverdueDeduction !== undefined)
+                ? assignment.customOverdueDeduction
+                : assignment.overdueDeduction;
+            finalMark = Math.max(0, finalMark - effectiveDeduction);
         }
         // Clamp to maxMark
         finalMark = Math.min(finalMark, assignment.maxMark);
@@ -259,9 +262,16 @@ module.exports.grade = async (req, res) => {
             }
         );
 
+        const effectiveDeduction = (assignment.customOverdueDeduction !== null && assignment.customOverdueDeduction !== undefined)
+            ? assignment.customOverdueDeduction
+            : assignment.overdueDeduction;
         res.status(200).json({
             message: `Submission ${status}`,
-            data: { mark: finalMark, overdueDeduction: submission.isOverdue ? assignment.overdueDeduction : 0 }
+            data: {
+                mark:             finalMark,
+                overdueDeduction: submission.isOverdue ? effectiveDeduction : 0,
+                wasOverdue:       submission.isOverdue
+            }
         });
     } catch (e) { errorHandler(res, 500, e); }
 };

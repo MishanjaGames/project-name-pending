@@ -176,7 +176,7 @@ function Settings({ data, onLogout }) {
                                     {autoRefresh && selectedDate === 'today' && sseState === 'open' && (
                                         <span className="badge bg-success d-flex align-items-center gap-1">
                                             <span className="rounded-circle" style={{ width: '6px', height: '6px', backgroundColor: 'rgba(255,255,255,0.7)', animation: 'pulse 1s infinite' }}></span>
-                                            Live (SSE)
+                                            Live
                                         </span>
                                     )}
                                     {autoRefresh && selectedDate === 'today' && sseState === 'connecting' && (

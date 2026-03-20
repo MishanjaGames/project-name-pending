@@ -875,8 +875,13 @@ function CoursePreview({ data, onLogout }) {
               <div className="badges-row">
                 {editMode
                   ? <><select className="form-select badge-input" value={editableCourse.direction} onChange={e => handleCourseFieldChange('direction', e.target.value)}><option value="">Select Direction</option>{directions.map(d => <option key={d._id} value={d.directionName}>{d.directionName}</option>)}</select>
-                    <select className="form-select badge-input" value={editableCourse.level} onChange={e => handleCourseFieldChange('level', e.target.value)}><option value="">Select Level</option>{levels.filter(l => l.directionName === editableCourse.direction).map(l => <option key={l._id} value={l.levelName}>{l.levelName}</option>)}</select></>
-                  : <><span className="badge badge-direction">{course.direction}</span><span className="badge badge-level">{course.level}</span></>}
+                    <select className="form-select badge-input" value={editableCourse.level} onChange={e => handleCourseFieldChange('level', e.target.value)}><option value="">Select Level</option>{levels.filter(l => l.directionName === editableCourse.direction).map(l => <option key={l._id} value={l.levelName}>{l.levelName}</option>)}</select>
+                    <select className="form-select badge-input" value={editableCourse.courseType || 'SELF_TAUGHT'} onChange={e => handleCourseFieldChange('courseType', e.target.value)}>
+                      <option value="SELF_TAUGHT">Self-Taught</option>
+                      <option value="MENTORED">Mentored</option>
+                      <option value="HOSTED">Hosted</option>
+                    </select></>
+                  : <><span className="badge badge-direction">{course.direction}</span><span className="badge badge-level">{course.level}</span><span className="badge" style={{background:'#0dcaf0',color:'#000'}}>{course.courseType || 'SELF_TAUGHT'}</span></>}
               </div>
 
               <div className="description-box">

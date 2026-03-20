@@ -1,4 +1,7 @@
 const Assignments  = require('../models/mongo.assignments')
+const path         = require('path')
+const fs           = require('fs')
+const fileHandler  = require('../utils/fileHandler')
 const Groups       = require('../models/mongo.groups')
 const Sessions     = require('../models/mongo.sessions')
 const Courses      = require('../models/mongo.courses')
@@ -21,7 +24,8 @@ async function getAccessLevel(user) {
 
 const MANAGE_LEVELS = ['manage', 'admin', 'root'];
 
-function computeOverdueDeduction(markScale) {
+function computeOverdueDeduction(markScale, custom = null) {
+    if (custom !== null && custom !== undefined) return parseFloat(custom);
     return ['12', '100'].includes(markScale) ? 2 : 1;
 }
 
@@ -84,7 +88,9 @@ module.exports.create = async (req, res) => {
             return errorHandler(res, 403, 'Tutor access level required');
 
         const { sessionId, groupId, courseId, title, description,
-                dueAt, markScale, maxMark, taskFiles = [] } = req.body;
+                dueAt, markScale, maxMark, customOverdueDeduction } = req.body;
+        // taskFiles from multer: req.files
+        const uploadedFiles = req.files || [];
 
         if (!sessionId || !groupId || !courseId || !title || !dueAt || !markScale || !maxMark)
             return errorHandler(res, 400, 'sessionId, groupId, courseId, title, dueAt, markScale, maxMark are required');
@@ -101,7 +107,25 @@ module.exports.create = async (req, res) => {
         if (!['5', '12', '100', 'custom'].includes(markScale))
             return errorHandler(res, 400, 'markScale must be 5, 12, 100, or custom');
 
-        const overdueDeduction = computeOverdueDeduction(markScale);
+        const customDed = customOverdueDeduction !== undefined && customOverdueDeduction !== ''
+            ? parseFloat(customOverdueDeduction)
+            : null;
+        const overdueDeduction = computeOverdueDeduction(markScale, customDed);
+
+        // Build task file records from uploaded multer files
+        const STORAGE_ROOT = path.join(__dirname, '../../storage/data');
+        const taskFiles = uploadedFiles.map(f => {
+            // Move from tmp to permanent location: storage/data/assignments/[sessionId]/[filename]
+            const destDir = path.join(STORAGE_ROOT, 'assignments', sessionId.toString());
+            fs.mkdirSync(destDir, { recursive: true });
+            const destPath = path.join(destDir, f.filename);
+            fs.renameSync(f.path, destPath);
+            return {
+                url:          `/api/files/assignments/${sessionId}/${f.filename}`,
+                filename:     f.filename,
+                originalName: f.originalname
+            };
+        });
 
         const assignment = await new Assignments({
             sessionId, groupId, courseId,
@@ -112,6 +136,7 @@ module.exports.create = async (req, res) => {
             markScale,
             maxMark:   parseFloat(maxMark),
             overdueDeduction,
+            customOverdueDeduction: customDed,
             createdBy: requester._id,
             createdAt: new Date(),
             updatedAt: new Date()
@@ -159,9 +184,38 @@ module.exports.update = async (req, res) => {
         const hasSubmissions = (entry?.submissions?.length || 0) > 0;
 
         const update = { updatedAt: new Date() };
-        ['title', 'description', 'dueAt', 'taskFiles'].forEach(f => {
+        ['title', 'description', 'dueAt'].forEach(f => {
             if (req.body[f] !== undefined) update[f] = req.body[f];
         });
+        // Handle new uploaded files (append to existing)
+        const uploadedFiles = req.files || [];
+        if (uploadedFiles.length > 0) {
+            const STORAGE_ROOT = path.join(__dirname, '../../storage/data');
+            const newFiles = uploadedFiles.map(f => {
+                const destDir = path.join(STORAGE_ROOT, 'assignments', assignment.sessionId.toString());
+                fs.mkdirSync(destDir, { recursive: true });
+                const destPath = path.join(destDir, f.filename);
+                fs.renameSync(f.path, destPath);
+                return {
+                    url:          `/api/files/assignments/${assignment.sessionId}/${f.filename}`,
+                    filename:     f.filename,
+                    originalName: f.originalname
+                };
+            });
+            update.taskFiles = [...(assignment.taskFiles || []), ...newFiles];
+        }
+        // customOverdueDeduction update
+        if (req.body.customOverdueDeduction !== undefined) {
+            const customDed = req.body.customOverdueDeduction !== ''
+                ? parseFloat(req.body.customOverdueDeduction) : null;
+            update.customOverdueDeduction = customDed;
+            // Recalculate effective overdueDeduction
+            if (!hasSubmissions) {
+                update.overdueDeduction = computeOverdueDeduction(
+                    req.body.markScale || assignment.markScale, customDed
+                );
+            }
+        }
         // Prevent mark scale changes if submissions already exist
         if (!hasSubmissions) {
             if (req.body.markScale) {
@@ -244,5 +298,41 @@ module.exports.remove = async (req, res) => {
 
         await Assignments.deleteOne({ _id: assignment._id });
         res.status(200).json({ message: 'Assignment deleted', data: { _id: assignment._id } });
+    } catch (e) { errorHandler(res, 500, e); }
+};
+
+/**
+ * DELETE /api/assignments/:id/files/:filename
+ * Remove a specific task file from an assignment.
+ * Host/co-tutor only.
+ */
+module.exports.removeTaskFile = async (req, res) => {
+    try {
+        const requester = await getRequester(req);
+        if (!requester) return errorHandler(res, 401, 'Authentication required');
+
+        const assignment = await Assignments.findById(req.params.id);
+        if (!assignment) return errorHandler(res, 404, 'Assignment not found');
+
+        const session = await Sessions.findById(assignment.sessionId);
+        const level   = await getAccessLevel(requester);
+        const ok      = await assertSessionTutor(session, requester, level);
+        if (!ok) return errorHandler(res, 403, 'Not authorized');
+
+        const filename = req.params.filename;
+        const STORAGE_ROOT = path.join(__dirname, '../../storage/data');
+        const filePath = path.join(STORAGE_ROOT, 'assignments', assignment.sessionId.toString(), filename);
+
+        // Remove from disk
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+        // Remove from taskFiles array
+        const updated = await Assignments.findByIdAndUpdate(
+            req.params.id,
+            { $pull: { taskFiles: { filename } }, $set: { updatedAt: new Date() } },
+            { new: true }
+        );
+
+        res.status(200).json({ message: 'Task file removed', data: updated });
     } catch (e) { errorHandler(res, 500, e); }
 };

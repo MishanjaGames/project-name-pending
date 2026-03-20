@@ -148,6 +148,7 @@ module.exports.update = async (req, res) => {
         const updatedCourse = {
             userId:    req.body.userId,
             status:    req.body.status,
+            courseType:req.body.courseType,
             direction: req.body.direction,
             level:     req.body.level,
             base_lang: req.body.base_lang,

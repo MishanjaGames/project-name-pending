@@ -12,6 +12,11 @@ function Sessions({ data, onLogout }) {
     const ah = { Authorization: `${token?.split(" ")[0]} ${token?.split(" ")[1]}`, "Content-Type": "application/json" };
 
     const [sessions, setSessions] = useState([]);
+    const [searchText, setSearchText] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterCourseType, setFilterCourseType] = useState('');
+    const [sortBy, setSortBy] = useState('date');
+    const [sortDir, setSortDir] = useState('desc');
     const [courses, setCourses]   = useState([]);
     const [users, setUsers]       = useState([]);
     const [loading, setLoading]   = useState(true);
@@ -45,6 +50,24 @@ function Sessions({ data, onLogout }) {
     };
 
     const courseTitle = (c) => c?.trans?.[0]?.title || "(untitled)";
+
+    const filteredSessions = (() => {
+        let result = sessions.filter(s => {
+            const t = courseTitle(s.courseId).toLowerCase();
+            const matchesText = !searchText || t.includes(searchText.toLowerCase()) ||
+                (s.hostTutor?.nickname || '').toLowerCase().includes(searchText.toLowerCase());
+            const matchesStatus = !filterStatus || s.status === filterStatus;
+            const matchesType   = !filterCourseType || s.courseType === filterCourseType;
+            return matchesText && matchesStatus && matchesType;
+        });
+        result = [...result].sort((a, b) => {
+            if (sortBy === 'title')  { const cmp = courseTitle(a.courseId).localeCompare(courseTitle(b.courseId)); return sortDir === 'asc' ? cmp : -cmp; }
+            if (sortBy === 'status') { const cmp = (a.status||'').localeCompare(b.status||''); return sortDir === 'asc' ? cmp : -cmp; }
+            if (sortBy === 'date')   { return sortDir === 'asc' ? new Date(a.createdAt)-new Date(b.createdAt) : new Date(b.createdAt)-new Date(a.createdAt); }
+            return 0;
+        });
+        return result;
+    })();
     const getStatus = (s) => ({
         draft: "bg-secondary", active: "bg-success", completed: "bg-primary", archived: "bg-dark"
     }[s] || "bg-secondary");
@@ -162,57 +185,86 @@ function Sessions({ data, onLogout }) {
                         <p>No sessions yet. Create your first session above.</p>
                     </div>
                 ) : (
-                    <div className="row g-3">
-                        {sessions.map(sess => {
-                            const course = sess.courseId;
-                            const isHost = String(sess.hostTutor?._id || sess.hostTutor) === String(data._id);
-                            return (
-                                <div key={sess._id} className="col-12 col-md-6 col-xl-4">
-                                    <div className="card border-0 shadow-sm h-100">
-                                        <div className="card-body">
-                                            <div className="d-flex align-items-start justify-content-between mb-2">
-                                                <h5 className="fw-bold mb-0 text-truncate" style={{ maxWidth: 220 }}>
-                                                    {courseTitle(course)}
-                                                </h5>
-                                                <span className={`badge ${getStatus(sess.status)} ms-2 flex-shrink-0`}>
-                                                    {sess.status}
-                                                </span>
-                                            </div>
-                                            <div className="text-muted small mb-3">
-                                                <div><i className="bi bi-layers me-1"></i>{course?.level} · {sess.courseType}</div>
-                                                <div><i className="bi bi-person-fill me-1"></i>
-                                                    Host: {sess.hostTutor?.nickname || "you"}
-                                                    {isHost && <span className="badge bg-primary ms-1">you</span>}
+                    <>
+                        <div className="d-flex gap-2 flex-wrap mb-3 align-items-center">
+                            <input type="text" className="form-control form-control-sm" style={{maxWidth:200}}
+                                placeholder="Search by title or tutor…"
+                                value={searchText} onChange={e => setSearchText(e.target.value)} />
+                            <select className="form-select form-select-sm" style={{maxWidth:140}} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                                <option value="">All statuses</option>
+                                <option value="draft">Draft</option>
+                                <option value="active">Active</option>
+                                <option value="completed">Completed</option>
+                                <option value="archived">Archived</option>
+                            </select>
+                            <select className="form-select form-select-sm" style={{maxWidth:150}} value={filterCourseType} onChange={e => setFilterCourseType(e.target.value)}>
+                                <option value="">All types</option>
+                                <option value="HOSTED">Hosted</option>
+                                <option value="MENTORED">Mentored</option>
+                                <option value="SELF_TAUGHT">Self-Taught</option>
+                            </select>
+                            <div className="input-group input-group-sm" style={{maxWidth:190}}>
+                                <select className="form-select form-select-sm" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                                    <option value="date">Date</option>
+                                    <option value="title">Title</option>
+                                    <option value="status">Status</option>
+                                </select>
+                                <button className="btn btn-outline-secondary btn-sm" onClick={() => setSortDir(d => d==='asc'?'desc':'asc')}>{sortDir==='asc'?'↑':'↓'}</button>
+                            </div>
+                            <small className="text-muted">{filteredSessions.length} / {sessions.length}</small>
+                        </div>
+                        <div className="row g-3">
+                            {filteredSessions.map(sess => {
+                                const course = sess.courseId;
+                                const isHost = String(sess.hostTutor?._id || sess.hostTutor) === String(data._id);
+                                return (
+                                    <div key={sess._id} className="col-12 col-md-6 col-xl-4">
+                                        <div className="card border-0 shadow-sm h-100">
+                                            <div className="card-body">
+                                                <div className="d-flex align-items-start justify-content-between mb-2">
+                                                    <h5 className="fw-bold mb-0 text-truncate" style={{ maxWidth: 220 }}>
+                                                        {courseTitle(course)}
+                                                    </h5>
+                                                    <span className={`badge ${getStatus(sess.status)} ms-2 flex-shrink-0`}>
+                                                        {sess.status}
+                                                    </span>
                                                 </div>
-                                                {sess.coTutors?.length > 0 && (
-                                                    <div><i className="bi bi-people me-1"></i>
-                                                        {sess.coTutors.length} co-tutor{sess.coTutors.length > 1 ? "s" : ""}
+                                                <div className="text-muted small mb-3">
+                                                    <div><i className="bi bi-layers me-1"></i>{course?.level} · {sess.courseType}</div>
+                                                    <div><i className="bi bi-person-fill me-1"></i>
+                                                        Host: {sess.hostTutor?.nickname || "you"}
+                                                        {isHost && <span className="badge bg-primary ms-1">you</span>}
                                                     </div>
-                                                )}
-                                                {sess.schedule?.length > 0 && (
-                                                    <div><i className="bi bi-calendar-event me-1"></i>
-                                                        {sess.schedule.length} scheduled session{sess.schedule.length > 1 ? "s" : ""}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="d-flex gap-2">
-                                                <button className="btn btn-sm btn-primary flex-grow-1"
-                                                    onClick={() => navigate(`/manage/session/${sess._id}`)}>
-                                                    <i className="bi bi-gear me-1"></i>Manage
-                                                </button>
-                                                {isHost && sess.status !== "archived" && (
-                                                    <button className="btn btn-sm btn-outline-danger"
-                                                        onClick={() => handleArchive(sess)} title="Archive session">
-                                                        <i className="bi bi-archive"></i>
+                                                    {sess.coTutors?.length > 0 && (
+                                                        <div><i className="bi bi-people me-1"></i>
+                                                            {sess.coTutors.length} co-tutor{sess.coTutors.length > 1 ? "s" : ""}
+                                                        </div>
+                                                    )}
+                                                    {sess.schedule?.length > 0 && (
+                                                        <div><i className="bi bi-calendar-event me-1"></i>
+                                                            {sess.schedule.length} scheduled session{sess.schedule.length > 1 ? "s" : ""}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="d-flex gap-2">
+                                                    <button className="btn btn-sm btn-primary flex-grow-1"
+                                                        onClick={() => navigate(`/manage/session/${sess._id}`)}>
+                                                        <i className="bi bi-gear me-1"></i>Manage
                                                     </button>
-                                                )}
+                                                    {isHost && sess.status !== "archived" && (
+                                                        <button className="btn btn-sm btn-outline-danger"
+                                                            onClick={() => handleArchive(sess)} title="Archive session">
+                                                            <i className="bi bi-archive"></i>
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                );
+                            })}
+                        </div>
+                    </>
                 )}
             </div>
 

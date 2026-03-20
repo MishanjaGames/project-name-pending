@@ -73,20 +73,76 @@ router.get('/status/stream', async (req, res) => {
 
     const sendStatus = async () => {
         try {
-            let userCount = 0, courseCount = 0;
+            let userCount = 0, courseCount = 0, sessionCount = 0,
+                activeSessionCount = 0, groupCount = 0, pendingSubmissionCount = 0,
+                assignmentCount = 0, upcomingMeetings = [];
+
             if (global.db.status === 'connected') {
-                [userCount, courseCount] = await Promise.all([
-                    User.countDocuments({}),
-                    Course.countDocuments({})
-                ]);
+                const Session    = require('../models/mongo.sessions');
+                const Group      = require('../models/mongo.groups');
+                const Assignment = require('../models/mongo.assignments');
+
+                const now  = new Date();
+                const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // next 7 days
+
+                [userCount, courseCount, sessionCount, activeSessionCount, groupCount, assignmentCount] =
+                    await Promise.all([
+                        User.countDocuments({}),
+                        Course.countDocuments({}),
+                        Session.countDocuments({}),
+                        Session.countDocuments({ status: 'active' }),
+                        Group.countDocuments({}),
+                        Assignment.countDocuments({})
+                    ]);
+
+                // Count pending submissions across all groups
+                const groupsWithSubs = await Group.find(
+                    { 'assignments.submissions.status': 'pending' },
+                    { 'assignments.submissions.$': 1 }
+                ).lean();
+                groupsWithSubs.forEach(g => {
+                    (g.assignments || []).forEach(a => {
+                        pendingSubmissionCount += (a.submissions || []).filter(s => s.status === 'pending').length;
+                    });
+                });
+
+                // Upcoming meetings in the next 7 days
+                const sessionsWithSchedule = await Session.find(
+                    { status: 'active', 'schedule.datetime': { $gte: now, $lte: soon } },
+                    { schedule: 1, courseId: 1 }
+                ).populate('courseId', 'trans').lean();
+
+                sessionsWithSchedule.forEach(s => {
+                    (s.schedule || []).forEach(m => {
+                        const d = new Date(m.datetime);
+                        if (d >= now && d <= soon) {
+                            upcomingMeetings.push({
+                                title:       m.title,
+                                datetime:    m.datetime,
+                                durationMin: m.durationMin,
+                                meetingLink: m.meetingLink,
+                                courseTitle: s.courseId?.trans?.[0]?.title || '—'
+                            });
+                        }
+                    });
+                });
+                upcomingMeetings.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+                upcomingMeetings = upcomingMeetings.slice(0, 5); // top 5
             }
+
             sseWrite(res, {
-                status:      global.server.status,
-                db_status:   global.db.status,
-                uptime:      os.uptime(),
-                launchTime:  global.launchTime,
+                status:                global.server.status,
+                db_status:             global.db.status,
+                uptime:                os.uptime(),
+                launchTime:            global.launchTime,
                 userCount,
-                courseCount
+                courseCount,
+                sessionCount,
+                activeSessionCount,
+                groupCount,
+                assignmentCount,
+                pendingSubmissionCount,
+                upcomingMeetings
             });
         } catch (e) {
             sseWrite(res, { error: e.message });

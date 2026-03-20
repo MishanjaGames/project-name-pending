@@ -11,3 +11,165 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Admin Panel — Global Design Tokens & Component Overrides
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --ap-radius:       10px;
+  --ap-radius-lg:    14px;
+  --ap-shadow:       0 2px 8px rgba(0,0,0,.07);
+  --ap-shadow-hover: 0 4px 18px rgba(0,0,0,.13);
+  --ap-border:       #e8eaed;
+  --ap-bg:           #f5f6fa;
+  --ap-surface:      #ffffff;
+  --ap-text:         #1a1d23;
+  --ap-muted:        #6c757d;
+  --ap-accent:       #3b5bdb;
+}
+
+/* ── Layout ── */
+body { background: var(--ap-bg) !important; color: var(--ap-text); }
+.flex-grow-1 { background: var(--ap-bg); }
+
+/* ── Cards ── */
+.card {
+  border-radius: var(--ap-radius) !important;
+  border: 1px solid var(--ap-border) !important;
+  box-shadow: var(--ap-shadow) !important;
+  transition: box-shadow .18s ease, transform .18s ease;
+}
+.card:hover { box-shadow: var(--ap-shadow-hover) !important; }
+.card-header {
+  border-radius: var(--ap-radius) var(--ap-radius) 0 0 !important;
+  border-bottom: 1px solid var(--ap-border) !important;
+  font-weight: 600;
+  letter-spacing: .01em;
+}
+
+/* ── Tables ── */
+.table thead th {
+  font-size: .72rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ap-muted);
+  font-weight: 700;
+  border-bottom: 2px solid var(--ap-border);
+  background: #f8f9fb;
+  padding-top: .75rem;
+  padding-bottom: .75rem;
+}
+.table-hover tbody tr:hover { background: #f0f4ff !important; }
+.table td { vertical-align: middle; }
+.table-responsive { border-radius: 0 0 var(--ap-radius) var(--ap-radius); overflow: hidden; }
+
+/* ── Buttons ── */
+.btn {
+  border-radius: 8px !important;
+  font-weight: 500;
+  letter-spacing: .01em;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.btn:active { transform: scale(.97); }
+.btn-primary   { background: var(--ap-accent) !important; border-color: var(--ap-accent) !important; }
+.btn-primary:hover { background: #2f4ac0 !important; border-color: #2f4ac0 !important; box-shadow: 0 3px 10px rgba(59,91,219,.35) !important; }
+.btn-success:hover { box-shadow: 0 3px 10px rgba(25,135,84,.3) !important; }
+.btn-danger:hover  { box-shadow: 0 3px 10px rgba(220,53,69,.3) !important; }
+
+/* ── Badges ── */
+.badge { border-radius: 6px !important; font-weight: 600; letter-spacing: .02em; }
+.badge.rounded-pill { border-radius: 999px !important; }
+
+/* ── Form controls ── */
+.form-control, .form-select {
+  border-radius: 8px !important;
+  border-color: var(--ap-border);
+  font-size: .9rem;
+  transition: border-color .15s, box-shadow .15s;
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--ap-accent) !important;
+  box-shadow: 0 0 0 3px rgba(59,91,219,.15) !important;
+}
+.input-group .btn { border-radius: 0 8px 8px 0 !important; }
+.input-group .form-control:first-child,
+.input-group .form-select:first-child { border-radius: 8px 0 0 8px !important; }
+
+/* ── Page headers ── */
+h1.h3 { letter-spacing: -.02em; font-weight: 800; }
+.text-uppercase.fw-semibold { letter-spacing: .06em !important; }
+
+/* ── Navbar (sidebar) overrides ── */
+.sidebar { box-shadow: 4px 0 20px rgba(0,0,0,.12) !important; }
+
+/* ── Full-page loading spinner ── */
+.ap-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 56px);
+  gap: .75rem;
+  color: var(--ap-muted);
+}
+.ap-loading .spinner-border { width: 2.5rem; height: 2.5rem; border-width: 3px; }
+
+/* ── Stat row in dashboard ── */
+.stat-card { transition: transform .15s; cursor: default; }
+.stat-card:hover { transform: translateY(-2px); }
+
+/* ── Filter bar ── */
+.filter-bar { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; padding: .75rem 1rem; background: #fff; border-radius: var(--ap-radius); border: 1px solid var(--ap-border); box-shadow: var(--ap-shadow); margin-bottom: 1rem; }
+.filter-bar .form-control, .filter-bar .form-select { font-size: .85rem; }
+
+/* ── Sort toggle button ── */
+.btn-sort {
+  background: #f8f9fb;
+  border: 1px solid var(--ap-border);
+  color: var(--ap-text);
+  font-weight: 700;
+  min-width: 32px;
+}
+.btn-sort:hover { background: var(--ap-accent); color: #fff; border-color: var(--ap-accent); }
+
+/* ── Row action buttons ── */
+.action-btn { padding: .3rem .5rem; }
+.table .btn-group .btn { border-radius: 6px !important; margin: 0 1px; }
+
+/* ── Status badge colours (keep consistent) ── */
+.badge-status-deployed  { background: #198754 !important; color:#fff; }
+.badge-status-editing   { background: #6c757d !important; color:#fff; }
+.badge-status-reviewing { background: #0d6efd !important; color:#fff; }
+.badge-status-rejected  { background: #dc3545 !important; color:#fff; }
+
+/* ── Access level badge colours ── */
+.badge-root    { background: #212529 !important; color:#fff; }
+.badge-admin   { background: #dc3545 !important; color:#fff; }
+.badge-manage  { background: #ffc107 !important; color:#000; }
+.badge-quality { background: #198754 !important; color:#fff; }
+.badge-tutor   { background: #0dcaf0 !important; color:#000; }
+.badge-create  { background: #0d6efd !important; color:#fff; }
+.badge-default { background: #6c757d !important; color:#fff; }
+
+/* ── ItemModal ── */
+.item-modal-backdrop {
+  position: fixed; inset: 0; z-index: 1040;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: fadeIn .15s ease;
+}
+.item-modal-dialog {
+  border-radius: var(--ap-radius-lg);
+  overflow: hidden;
+  animation: slideUp .2s ease;
+}
+@keyframes fadeIn  { from { opacity: 0; }          to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d0d5dd; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #a0a8b4; }
