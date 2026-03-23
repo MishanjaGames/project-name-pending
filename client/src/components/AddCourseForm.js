@@ -31,8 +31,6 @@ export default function AddCourseForm() {
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
     const [contentFiles, setContentFiles] = useState([]);
 
-    // Нам больше не нужен useEffect с fetch, мы используем захардкоженные списки
-
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -43,11 +41,11 @@ export default function AddCourseForm() {
         const file = e.target.files[0];
         if (file) {
             if (!file.type.startsWith('image/')) {
-                setErrors(prev => ({ ...prev, thumbnail: 'Please select an image file' }));
+                setErrors(prev => ({ ...prev, thumbnail: t('addCourseForm.alertSelectImage') }));
                 return;
             }
             if (file.size > 5 * 1024 * 1024) {
-                setErrors(prev => ({ ...prev, thumbnail: 'Image must be less than 5MB' }));
+                setErrors(prev => ({ ...prev, thumbnail: t('addCourseForm.alertImageSize') }));
                 return;
             }
             setThumbnailFile(file);
@@ -61,7 +59,7 @@ export default function AddCourseForm() {
         const validFiles = [];
         for (const file of files) {
             if (file.size > 50 * 1024 * 1024) {
-                alert(`File ${file.name} is too large. Maximum size is 50MB.`);
+                alert(t('addCourseForm.alertFileSize', { name: file.name }));
                 continue;
             }
             validFiles.push(file);
@@ -99,9 +97,9 @@ export default function AddCourseForm() {
 
     const validateForm = () => {
         const newErrors = {};
-        if (!formData.userId) newErrors.userId = 'Owner ID is missing. Please re-login.';
-        if (!formData.title.trim()) newErrors.title = 'Title is required';
-        if (formData.price && isNaN(parseFloat(formData.price))) newErrors.price = 'Price must be a valid number';
+        if (!formData.userId) newErrors.userId = t('addCourseForm.alertOwnerMissing');
+        if (!formData.title.trim()) newErrors.title = t('addCourseForm.alertTitleReq');
+        if (formData.price && isNaN(parseFloat(formData.price))) newErrors.price = t('addCourseForm.alertPriceInvalid');
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -137,7 +135,7 @@ export default function AddCourseForm() {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                alert(`Failed to create course: ${errorData.message || 'Unknown error'}`);
+                alert(`${t('addCourseForm.alertCreateFailed')} ${errorData.message || 'Unknown error'}`);
                 setSaving(false);
                 return;
             }
@@ -173,11 +171,11 @@ export default function AddCourseForm() {
                 });
             }
 
-            alert('Course created successfully!');
+            alert(t('addCourseForm.alertCreateSuccess'));
             navigate('/account'); 
         } catch (error) {
             console.error('Error creating course:', error);
-            alert('Error creating course. Please try again.');
+            alert(t('addCourseForm.alertCreateError'));
         } finally {
             setSaving(false);
         }
@@ -281,7 +279,7 @@ export default function AddCourseForm() {
 
                 {/* Цена */}
                 <div className="col-12 col-md-4">
-                    <label className="form-label fw-semibold">{t('addCourseForm.price')} (USD)</label>
+                    <label className="form-label fw-semibold">{t('addCourseForm.price')}</label>
                     <div className="input-group">
                         <span className="input-group-text">$</span>
                         <input
@@ -348,7 +346,7 @@ export default function AddCourseForm() {
                 <button type="button" className="btn btn-outline-secondary" onClick={() => navigate(-1)} disabled={saving}>{t('addCourseForm.cancel')}</button>
                 <button type="submit" className="btn btn-success" disabled={saving}>
                     {saving ? (
-                        <><span className="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>{t('addCourseForm.saving')}...</>
+                        <><span className="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>{t('addCourseForm.saving')}</>
                     ) : t('addCourseForm.createCourse')}
                 </button>
             </div>

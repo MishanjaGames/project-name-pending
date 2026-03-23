@@ -7,7 +7,6 @@ function LoginPage() {
   const navigate = useNavigate();
   const { t } = useContext(SettingsContext);
   
-  // ИЗМЕНЕНИЕ 1: Теперь это универсальное поле (логин или email)
   const [loginId, setLoginId] = useState(''); 
   const [password, setPassword] = useState('');
 
@@ -15,12 +14,18 @@ function LoginPage() {
     e.preventDefault();
     
     try {
-      // Отправляем на бэкенд. 
-      // Пока что шлем под ключом email, так как бэкенд Миши, скорее всего, ждет именно его.
+      // Проверяем, есть ли собачка '@' в введенном тексте
+      const isEmail = loginId.includes('@');
+      
+      // Формируем тело запроса динамически
+      const requestBody = isEmail 
+        ? { email: loginId, password: password } 
+        : { username: loginId, password: password };
+
       const response = await fetch('http://localhost:4040/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginId, password }) 
+        body: JSON.stringify(requestBody) 
       });
 
       if (!response.ok) {
@@ -51,31 +56,30 @@ function LoginPage() {
         userRole = jwtPayload.role;
       }
 
-      // ИЗМЕНЕНИЕ 2: Добавили твои данные в "белый список" админов!
       if (userRole === 'default') {
         const lowerLogin = loginId.toLowerCase();
         if (lowerLogin.includes('creator')) userRole = 'create';
         else if (lowerLogin.includes('manager')) userRole = 'manage';
         else if (lowerLogin.includes('admin') || lowerLogin === 'nikita11b' || lowerLogin === 'bond.n@gmail.com') {
-            userRole = 'admin'; // Даем права админа Никите!
+            userRole = 'admin'; 
         }
         else if (lowerLogin.includes('root')) userRole = 'root';
       }
 
       const userData = {
         id: jwtPayload.userId || jwtPayload._id,
-        email: jwtPayload.email || loginId,
+        email: jwtPayload.email || (isEmail ? loginId : ''),
         role: userRole,
         name: jwtPayload.nickname || loginId.split('@')[0], 
         enrolled: []
       };
 
       setUser(userData, token);
-      navigate('/account'); // Пусть после логина сразу кидает в профиль, так удобнее!
+      navigate('/account'); 
       
     } catch (error) {
       console.error('Login error:', error);
-      alert(`Ошибка входа: ${error.message}`);
+      alert(`${t('auth.loginError')} ${error.message}`);
     }
   };
 
@@ -84,26 +88,25 @@ function LoginPage() {
       <div className="card shadow-lg" style={{ width: '100%', maxWidth: '450px', borderRadius: '15px' }}>
         <div className="card-body p-5">
           <div className="text-center mb-4">
-            <h2 className="fw-bold mb-2">Welcome Back</h2>
-            <p className="text-muted">Please login to your account</p>
+            <h2 className="fw-bold mb-2">{t('auth.loginTitle')}</h2>
+            <p className="text-muted">{t('auth.loginSubtitle')}</p>
           </div>
           
           <div className="mb-3">
-            {/* ИЗМЕНЕНИЕ 3: Поменяли текст и type="email" на type="text" */}
-            <label htmlFor="loginId" className="form-label">Email or Nickname</label>
+            <label htmlFor="loginId" className="form-label">{t('auth.emailOrNick')}</label>
             <input
               type="text" 
               className="form-control form-control-lg"
               id="loginId"
               value={loginId}
               onChange={(e) => setLoginId(e.target.value)}
-              placeholder="nikita11B or email@..."
+              placeholder={t('auth.loginPlaceholder')}
               required
             />
           </div>
 
           <div className="mb-3">
-            <label htmlFor="password" className="form-label">Password</label>
+            <label htmlFor="password" className="form-label">{t('auth.password')}</label>
             <input
               type="password"
               className="form-control form-control-lg"
@@ -119,7 +122,7 @@ function LoginPage() {
             className="btn btn-primary btn-lg w-100 mb-3"
             style={{ borderRadius: '10px' }}
           >
-            Login
+            {t('auth.loginBtn')}
           </button>
         </div>
       </div>

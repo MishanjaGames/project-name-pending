@@ -1,4 +1,4 @@
-import React from 'react';
+import { useWishlist } from '../contexts/WishlistContext';
 
 function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t }) {
   const gridImageStyle = {
@@ -33,12 +33,15 @@ function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t })
     }
   };
 
-  // 🔥 ФИКС: Безопасный обработчик ошибки картинки
+  const { toggleWishlist, isInWishlist } = useWishlist();
+
+  // Безопасный обработчик ошибки картинки
   const handleImageError = (e) => {
-    e.target.onerror = null; // Отключаем повторное срабатывание (убивает бесконечный цикл!)
-    e.target.src = 'https://placehold.co/400x250/21262d/e6edf3?text=No+Image'; // Надежная заглушка
+    e.target.onerror = null; 
+    e.target.src = 'https://placehold.co/400x250/21262d/e6edf3?text=No+Image'; 
   };
 
+  // ===================== РЕЖИМ СЕТКИ (GRID) =====================
   if (viewMode === 'grid') {
     return (
       <div 
@@ -46,6 +49,7 @@ function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t })
         onClick={() => onCardClick(course.id)} 
         style={{ cursor: 'pointer' }} 
       >
+        {/* БЛОК С КАРТИНКОЙ И ИКОНКАМИ */}
         <div className="position-relative">
           <img 
             src={course.img} 
@@ -54,9 +58,24 @@ function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t })
             style={gridImageStyle} 
             onError={handleImageError} 
           />
-          <div className="position-absolute top-0 end-0 p-2">
+          {/* Бейджик уровня (слева) */}
+          <div className="position-absolute top-0 start-0 p-2">
              <span className={`badge ${getLevelBadgeClass(course.level)} shadow-sm`}>{course.level}</span>
           </div>
+          
+          {/* КНОПКА ИЗБРАННОГО (справа) */}
+          <button
+            className="btn btn-light rounded-circle shadow-sm position-absolute top-0 end-0 m-2 d-flex justify-content-center align-items-center"
+            onClick={(e) => {
+              e.preventDefault(); 
+              e.stopPropagation(); // Не даем клику провалиться и открыть страницу курса
+              toggleWishlist(course); 
+            }}
+            style={{ zIndex: 10, width: '35px', height: '35px', padding: 0 }}
+            title="Add to Wishlist"
+          >
+            <i className={isInWishlist(course._id || course.id) ? "bi bi-heart-fill text-danger" : "bi bi-heart text-secondary"}></i>
+          </button>
         </div>
         
         <div className="card-body d-flex flex-column">
@@ -94,6 +113,7 @@ function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t })
     );
   }
 
+  // ===================== РЕЖИМ СПИСКА (LIST) =====================
   return (
     <div 
       className="card h-100 course-card border-0 shadow-sm"
@@ -101,6 +121,8 @@ function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t })
       style={{ cursor: 'pointer' }}
     >
       <div className="row g-0 h-100">
+        
+        {/* БЛОК С КАРТИНКОЙ И ИКОНКАМИ */}
         <div className="col-md-4 col-lg-3 position-relative">
            <img 
               src={course.img} 
@@ -109,10 +131,26 @@ function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t })
               className="rounded-start course-img" 
               onError={handleImageError}
            />
+           {/* Бейджик уровня (слева) */}
            <div className="position-absolute top-0 start-0 p-2">
               <span className={`badge ${getLevelBadgeClass(course.level)} shadow-sm`}>{course.level}</span>
            </div>
+
+           {/* КНОПКА ИЗБРАННОГО (справа) */}
+           <button
+             className="btn btn-light rounded-circle shadow-sm position-absolute top-0 end-0 m-2 d-flex justify-content-center align-items-center"
+             onClick={(e) => {
+               e.preventDefault(); 
+               e.stopPropagation();
+               toggleWishlist(course); 
+             }}
+             style={{ zIndex: 10, width: '35px', height: '35px', padding: 0 }}
+             title="Add to Wishlist"
+           >
+             <i className={isInWishlist(course._id || course.id) ? "bi bi-heart-fill text-danger" : "bi bi-heart text-secondary"}></i>
+           </button>
         </div>
+
         <div className="col-md-8 col-lg-9">
           <div className="card-body d-flex flex-column h-100">
             <div className="d-flex justify-content-between align-items-start gap-2">

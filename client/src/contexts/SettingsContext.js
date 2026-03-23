@@ -16,10 +16,16 @@ export function SettingsProvider({ children }) {
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
-    // 1. Твой кастомный класс для App.css
-    document.body.classList.toggle('theme-dark', theme === 'dark');
-    // 2. ВАЖНО: Родной переключатель для Bootstrap 5
-    document.documentElement.setAttribute('data-bs-theme', theme);
+    
+    if (theme === 'dark') {
+      // Если тема темная:
+      document.body.classList.add('theme-dark');
+      document.body.setAttribute('data-bs-theme', 'dark');
+    } else {
+      // Если тема светлая:
+      document.body.classList.remove('theme-dark');
+      document.body.setAttribute('data-bs-theme', 'light');
+    }
   }, [theme]);
 
   const setLang = (lang) => {

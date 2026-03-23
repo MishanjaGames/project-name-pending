@@ -15,42 +15,49 @@ import EditCoursePage from './pages/course/EditCoursePage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { CartProvider } from './contexts/CartContext';
+import OnBoardingTour from './components/OnBoardingTour';
+import { WishlistProvider } from './contexts/WishlistContext';
+import WishlistPage from './pages/wishlist/WishlistPage';
 
 function App() {
   return (
     <SettingsProvider>
       <CartProvider>
-        <BrowserRouter>
-          <NavBar />
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<SignUpPage />} />
-            <Route path="/account" element={<AccountPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/cart" element={<CartPage />} />
-            <Route path="/apply-teacher" element={<TeacherRegisterPage />} />
-            <Route 
-              path="/add-course" 
-              element={
-                <ProtectedRoute allowedRoles={['create', 'manage', 'admin', 'root']}>
-                  <AddCoursePage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route path="/course/:id" element={<CoursePage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-            <Route 
-              path="/instructor/edit-course/:id" 
-              element={
-                <ProtectedRoute roleRequired="teacher">
-                  <EditCoursePage />
-                </ProtectedRoute>
-              } 
-            />
-          </Routes>
-        </BrowserRouter>
+        <WishlistProvider>
+          <BrowserRouter>
+            <OnBoardingTour />
+            <NavBar />
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<SignUpPage />} />
+              <Route path="/account" element={<AccountPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/cart" element={<CartPage />} />
+              <Route path="/wishlist" element={<WishlistPage />} />
+              <Route path="/apply-teacher" element={<TeacherRegisterPage />} />
+              <Route 
+                path="/add-course" 
+                element={
+                  <ProtectedRoute allowedRoles={['create', 'manage', 'admin', 'root']}>
+                    <AddCoursePage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route path="/course/:id" element={<CoursePage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route 
+                path="/instructor/edit-course/:id" 
+                element={
+                  <ProtectedRoute roleRequired="teacher">
+                    <EditCoursePage />
+                  </ProtectedRoute>
+                } 
+              />
+            </Routes>
+          </BrowserRouter>
+        </WishlistProvider>
       </CartProvider>
     </SettingsProvider>
   );
