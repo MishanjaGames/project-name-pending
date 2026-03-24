@@ -118,7 +118,7 @@ function parseTextSyntax(text) {
   html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+  html = html.replace(/`\(([^`]+)\)`/g, '<code class="inline-code">$1</code>');
   html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
   html = html.replace(/^---+$/gm, '<hr>');
@@ -864,7 +864,7 @@ function CoursePreview({ data, onLogout }) {
               <div className="title-price-row">
                 {editMode
                   ? <input type="text" className="form-control course-title-input" value={editableCourse.trans?.[0]?.title || ''} onChange={e => { const t = editableCourse.trans ? [...editableCourse.trans] : [{}]; t[0] = { ...t[0], title: e.target.value }; handleCourseFieldChange('trans', t); }} />
-                  : <h1 className="course-title">{course.trans?.[0]?.title}</h1>}
+                  : <h1 className="course-title">{course.isPrivateCopy && <span className="text-warning me-1">[PRIVATE]</span>}{course.trans?.[0]?.title}</h1>}
                 <div className="mobile-price">
                   {editMode
                     ? <input type="number" className="form-control price-input" value={editableCourse.price} onChange={e => handleCourseFieldChange('price', parseFloat(e.target.value))} step="0.01" min="0" />
@@ -1206,7 +1206,7 @@ function CoursePreview({ data, onLogout }) {
                     <span><code># Heading 1</code></span><span>Large heading</span>
                     <span><code>**bold**</code></span><span>Bold text</span>
                     <span><code>*italic*</code></span><span>Italic text</span>
-                    <span><code>`inline code`</code></span><span>Inline code</span>
+                    <span><code>`(inline code)`</code></span><span>Inline code</span>
                     <span><code>~(js)[code]~</code></span><span>Code block</span>
                     <span><code>- item</code></span><span>Bullet list</span>
                     <span><code>[text](url)</code></span><span>Link</span>
@@ -1216,7 +1216,7 @@ function CoursePreview({ data, onLogout }) {
               {cpCommentPreview
                 ? <div className="cp-comment-preview" dangerouslySetInnerHTML={{ __html: parseTextSyntax(cpCommentText) }} />
                 : <textarea className="cp-comment-textarea" rows={4}
-                    placeholder={"Write a comment…\nSupports: # headings, **bold**, *italic*, `code`, ~(lang)[…]~, etc."}
+                    placeholder={"Write a comment…\nSupports: # headings, **bold**, *italic*, `(code)` or ~(lang)[…]~, etc."}
                     value={cpCommentText} onChange={e => setCpCommentText(e.target.value)} maxLength={4000} />
               }
               <div className="cp-compose-footer">
@@ -1724,6 +1724,7 @@ const SYNTAX_GROUPS = [
       { format: 'Paragraph', syntax: '`{text}`' },
       { format: 'Numbered list', syntax: '1. Item' },
       { format: 'Bullet list', syntax: '- Item  or  • Item' },
+      { format: 'Code Line', syntax: '`(code)`'},
       { format: 'Code Snippet', syntax: '~(language)[code]~', note: 'JS, TS, Python, Java, C, C++, C#, Go, Rust, SQL, Bash, PHP, Swift, CSS, HTML…' },
     ]
   },

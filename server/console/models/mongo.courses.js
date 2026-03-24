@@ -115,7 +115,7 @@ const courseSchema = new Schema({
         type: {
             type: String,
             required: false,
-            enum: ['container', 'image', 'video', 'audio', 'document', 'archive', 'other']
+            enum: ['container', 'text', 'image', 'video', 'audio', 'document', 'archive', 'other']
         },
         url: {
             type: String,
@@ -134,7 +134,7 @@ const courseSchema = new Schema({
             type: {
                 type: String,
                 required: false,
-                enum: ['container', 'image', 'video', 'audio', 'document', 'archive', 'other']
+                enum: ['container', 'text', 'image', 'video', 'audio', 'document', 'archive', 'other']
             },
             url: {
                 type: String,
@@ -153,7 +153,7 @@ const courseSchema = new Schema({
                 type: {
                     type: String,
                     required: false,
-                    enum: ['image', 'video', 'audio', 'document', 'archive', 'other', 'assignment', 'open-answer']
+                    enum: ['text', 'image', 'video', 'audio', 'document', 'archive', 'other', 'assignment', 'open-answer']
                 },
                 // For assignment items: reference to Assignment._id
                 assignmentId: {

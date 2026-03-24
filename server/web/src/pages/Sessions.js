@@ -34,6 +34,8 @@ function Sessions({ data, onLogout }) {
     const showInfo    = (t, m) => setModal({ show: true, type: "info", title: t, message: m, onClose: closeModal });
     const showConfirm = (t, m, fn, d = false) => setModal({ show: true, type: "confirm", danger: d, title: t, message: m, onConfirm: fn, onCancel: closeModal });
 
+    const canManageSessions = ['tutor', 'manage', 'admin', 'root'].includes(data.accessLevel);
+
     useEffect(() => { fetchAll(); }, []);
 
     const fetchAll = async () => {
@@ -121,14 +123,16 @@ function Sessions({ data, onLogout }) {
                             <h1 className="h3 fw-bold mb-1">My Sessions</h1>
                             <p className="text-muted small mb-0">Tutor-led course sessions</p>
                         </div>
+                        {canManageSessions && (
                         <button className="btn btn-primary" onClick={() => setShowForm(p => !p)}>
                             {showForm ? "Cancel" : "+ New Session"}
                         </button>
+                        )}
                     </div>
                 </div>
 
                 {/* Create form */}
-                {showForm && (
+                {showForm && canManageSessions && (
                     <div className="card border-0 shadow-sm mb-4">
                         <div className="card-header bg-white fw-semibold">Create Session</div>
                         <div className="card-body">
@@ -249,7 +253,7 @@ function Sessions({ data, onLogout }) {
                                                 <div className="d-flex gap-2">
                                                     <button className="btn btn-sm btn-primary flex-grow-1"
                                                         onClick={() => navigate(`/manage/session/${sess._id}`)}>
-                                                        <i className="bi bi-gear me-1"></i>Manage
+                                                        <i className="bi bi-eye me-1"></i>View Session
                                                     </button>
                                                     {isHost && sess.status !== "archived" && (
                                                         <button className="btn btn-sm btn-outline-danger"

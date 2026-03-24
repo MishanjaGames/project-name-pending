@@ -34,10 +34,10 @@ const typeColor = (t) => TYPE_COLOR[t] || '#6b7280';
 
 const extractYouTubeId = url => {
   if (!url) return null;
-  const short  = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
-  const watch  = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  const short = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  const watch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
   const shorts = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
-  const embed  = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+  const embed = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
   return (short || watch || shorts || embed)?.[1] || null;
 };
 
@@ -97,7 +97,7 @@ function parseTextSyntax(text) {
   html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/`([^`]+)`/g, '<code class="vc-inline-code">$1</code>');
+  html = html.replace(/`\(([^`]+)\)`/g, '<code class="vc-inline-code">$1</code>');
   html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
   html = html.replace(/^---+$/gm, '<hr>');
@@ -105,10 +105,10 @@ function parseTextSyntax(text) {
   html = html.replace(/`\{([^}]+)\}`/g, '<p>$1</p>');
   html = html.replace(/\{(https?:\/\/[^}]+)\}/g, '<video src="$1" class="vc-video-player" controls></video>');
   html = html.replace(/\((https?:\/\/[^)]+)\)/g, (_, u) => {
-    const short  = u.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
-    const watch  = u.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    const short = u.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    const watch = u.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
     const shorts = u.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
-    const embed  = u.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+    const embed = u.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
     const id = (short || watch || shorts || embed)?.[1];
     const e = id ? `https://www.youtube.com/embed/${id}` : u;
     return `<iframe src="${e}" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
@@ -208,7 +208,7 @@ function ViewCourse({ data, onLogout }) {
   const [loading, setLoading] = useState(true);
   // ── Modal state ──────────────────────────────────────────────────────────
   const [modal, setModal] = useState({ show: false, type: 'confirm', title: '', message: '', onConfirm: null, onCancel: null });
-  const closeModal  = () => setModal(p => ({ ...p, show: false }));
+  const closeModal = () => setModal(p => ({ ...p, show: false }));
   const showConfirm = (title, message, onConfirm) => setModal({ show: true, type: 'confirm', title, message, onConfirm, onCancel: closeModal });
   const showInfo = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
   const [locked, setLocked] = useState(true);
@@ -216,15 +216,15 @@ function ViewCourse({ data, onLogout }) {
   // ── Session / group context (when accessed via ?session=:id) ─────────────
   const location = useLocation();
   const sessionId = new URLSearchParams(location.search).get('session');
-  const [session, setSession]       = useState(null);
+  const [session, setSession] = useState(null);
   const [sessionGroup, setSessionGroup] = useState(null);  // student's group in this session
   const [sessionDeadlines, setSessionDeadlines] = useState([]); // from session.deadlines
 
 
   // ── Comments state ─────────────────────────────────────────────────────────
-  const [comments, setComments]         = useState([]);
+  const [comments, setComments] = useState([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
-  const [commentText, setCommentText]   = useState('');
+  const [commentText, setCommentText] = useState('');
   const [commentPreview, setCommentPreview] = useState(false);
   const [commentPosting, setCommentPosting] = useState(false);
   const [syntaxHelpOpen, setSyntaxHelpOpen] = useState(false);
@@ -244,8 +244,17 @@ function ViewCourse({ data, onLogout }) {
   const [selected, setSelected] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // ── Course completion ──────────────────────────────────────────────────────
+  const [courseFinished, setCourseFinished] = useState(false);
+  const [mainView, setMainView] = useState('course'); // 'course' | 'assignments'
+  const [sessionAssignments, setSessionAssignments] = useState([]);
+
   // ── Bootstrap ──────────────────────────────────────────────────────────────
-  useEffect(() => { fetchData(); fetchComments(); fetchRating(); if (sessionId) fetchSession(); }, [id, sessionId]);
+  useEffect(() => {
+    fetchData(); fetchComments(); fetchRating();
+    if (sessionId) fetchSession();
+    fetchCourseProgress();
+  }, [id, sessionId]);
 
   // ── Session fetch: load session + find student's group ────────────────────
   const fetchSession = async () => {
@@ -272,6 +281,44 @@ function ViewCourse({ data, onLogout }) {
         if (myGroup) setSessionGroup(myGroup);
       }
     } catch (e) { console.error('Session fetch error:', e); }
+  };
+
+  const fetchCourseProgress = async () => {
+    if (!token || !data?._id) return;
+    try {
+      const res = await fetch(`http://localhost:4040/api/users/${data._id}`, {
+        headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` }
+      });
+      if (res.ok) {
+        const { data: u } = await res.json();
+        const entry = u.courses?.find(c => c._id?.toString() === id || c._id === id);
+        if (entry?.process >= 1) setCourseFinished(true);
+      }
+    } catch (e) { console.error('Progress fetch error:', e); }
+  };
+
+  const fetchSessionAssignments = async () => {
+    if (!sessionGroup) return;
+    try {
+      const res = await fetch(`http://localhost:4040/api/assignments?groupId=${sessionGroup._id}`, {
+        headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` }
+      });
+      if (res.ok) { const { data: d } = await res.json(); setSessionAssignments(d || []); }
+    } catch (e) { console.error('Assignments fetch error:', e); }
+  };
+
+  useEffect(() => { if (sessionGroup) fetchSessionAssignments(); }, [sessionGroup]);
+
+  const handleFinishCourse = async () => {
+    if (courseFinished || !token) return;
+    try {
+      const res = await fetch(`http://localhost:4040/api/users/me/courses/${id}/finish`, {
+        method: 'PATCH',
+        headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
+      });
+      if (res.ok) { setCourseFinished(true); showInfo('Course Completed!', 'Congratulations! You have finished this course.'); setSelected(null); }
+      else { const j = await res.json(); showInfo('Error', j.message || 'Could not mark course as finished.'); }
+    } catch (e) { showInfo('Error', 'Network error.'); }
   };
 
   const fetchComments = async () => {
@@ -397,7 +444,7 @@ function ViewCourse({ data, onLogout }) {
       d => d.targetType === targetType && d.targetId === targetId
     );
     if (!dl) return null;
-    const isPast   = new Date() > new Date(dl.dueAt);
+    const isPast = new Date() > new Date(dl.dueAt);
     const isLocked = isPast && dl.lockAfterDue;
     return { deadline: dl, isPast, isLocked };
   };
@@ -652,7 +699,78 @@ function ViewCourse({ data, onLogout }) {
             </button>
           )}
 
-          {selected == null ? (
+          {selected == null && mainView === 'assignments' ? (
+            /* ── Assignments Tab ── */
+            <div className="vc-welcome" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              <div className="d-flex align-items-center gap-3 mb-4">
+                <button className="btn btn-outline-secondary btn-sm" onClick={() => setMainView('course')}>
+                  ← Back to Course
+                </button>
+                <h2 className="h4 fw-bold mb-0"><i className="bi bi-clipboard-check me-2"></i>My Assignments</h2>
+              </div>
+              {sessionAssignments.length === 0 ? (
+                <p className="text-muted">No assignments in this session yet.</p>
+              ) : (
+                <div className="w-100" style={{ maxWidth: 860 }}>
+                  {sessionAssignments.map(a => {
+                    const myEntry = sessionGroup?.assignments?.find(
+                      ae => String(ae.assignmentId?._id || ae.assignmentId) === String(a._id)
+                    );
+                    const mySub = myEntry?.submissions?.find(
+                      s => String(s.studentId?._id || s.studentId) === String(data?._id)
+                    );
+                    const isOverdue = a.dueAt && new Date() > new Date(a.dueAt);
+                    return (
+                      <div key={a._id} className="card border-0 shadow-sm mb-3">
+                        <div className="card-header bg-white d-flex align-items-center justify-content-between">
+                          <span className="fw-semibold">{a.title}</span>
+                          <div className="d-flex gap-2 align-items-center">
+                            <span className="badge bg-light text-dark border">{a.markScale}-pt · max {a.maxMark}</span>
+                            {isOverdue && <span className="badge bg-danger">Overdue</span>}
+                            {mySub?.status === 'approved' && <span className="badge bg-success">Approved</span>}
+                            {mySub?.status === 'declined' && <span className="badge bg-danger">Declined</span>}
+                            {mySub?.status === 'pending' && <span className="badge bg-warning text-dark">Pending</span>}
+                          </div>
+                        </div>
+                        <div className="card-body">
+                          {a.description && <p className="text-muted small mb-2">{a.description}</p>}
+                          <div className="d-flex gap-3 text-muted small mb-3 flex-wrap">
+                            <span><i className="bi bi-calendar me-1"></i>Due: {new Date(a.dueAt).toLocaleString()}</span>
+                            {mySub?.mark != null && <span><i className="bi bi-star me-1"></i>Mark: {mySub.mark}/{a.maxMark}</span>}
+                          </div>
+                          {a.taskFiles?.length > 0 && (
+                            <div className="mb-3">
+                              <strong className="small">Task files:</strong>
+                              {a.taskFiles.map((f, i) => (
+                                <a key={i} href={`http://localhost:4040${f.url}`} className="btn btn-outline-secondary btn-sm ms-2" target="_blank" rel="noopener noreferrer">
+                                  <i className="bi bi-download me-1"></i>{f.originalName || f.filename}
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                          {mySub && (
+                            <div className={`alert alert-${mySub.status === 'approved' ? 'success' : mySub.status === 'declined' ? 'danger' : 'warning'} py-2`}>
+                              {mySub.feedback && <div><strong>Feedback:</strong> {mySub.feedback}</div>}
+                              <small>Submitted: {new Date(mySub.submittedAt).toLocaleString()}</small>
+                            </div>
+                          )}
+                          {(!mySub || mySub.status === 'declined') && (
+                            <AssignmentItemView
+                              item={{ title: a.title, assignmentId: a._id }}
+                              sessionId={sessionId}
+                              sessionGroup={sessionGroup}
+                              studentId={data?._id}
+                              token={token}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : selected == null ? (
             /* ── Welcome / no selection ── */
             <div className="vc-welcome">
               {/* ── Left: course info ── */}
@@ -698,171 +816,192 @@ function ViewCourse({ data, onLogout }) {
                   </div>
                 ) : (
                   flatItems.length > 0 && (
+                    <div className="d-flex gap-2 flex-wrap align-items-center">
+                      {courseFinished ? (
+                      <button className="btn btn-success" onClick={handleFinishCourse} disabled={courseFinished}>
+                        <i className="bi bi-check-circle-fill me-1"></i>Completed!
+                      </button>
+                    ):(
                     <button className="vc-start-btn" onClick={() => goTo(0)}>
-                      Start Learning <i className="bi bi-arrow-right ms-1"></i>
-                    </button>
+                        Start Learning <i className="bi bi-arrow-right ms-1"></i>
+                      </button>
+                    )}
+                      {/* <button className="btn btn-success" onClick={handleFinishCourse} disabled={courseFinished}>
+                        {courseFinished
+                          ? <><i className="bi bi-check-circle-fill me-1"></i>Completed!</>
+                          : <><i className="bi bi-flag-fill me-1"></i>Finish Course</>}
+                      </button> */}
+                      {sessionId && (
+                        <button className={`btn btn-outline-primary`} onClick={() => setMainView(v => v === 'assignments' ? 'course' : 'assignments')}>
+                          <i className="bi bi-clipboard-check me-1"></i>
+                          {mainView === 'assignments' ? 'Back to Course' : 'My Assignments'}
+                        </button>
+                      )}
+                    </div>
                   )
                 )}
               </div>
 
               {/* ── Right: rating + comments ── */}
-              <div className="vc-welcome-right">
+              {!course.isPrivateCopy && (
+                <div className="vc-welcome-right">
 
-              {/* ── Rate this course ── */}
-              {!locked && (
-                <div className="vc-rate-section">
-                  <div className="vc-rate-avg">
-                    <span className="vc-rate-num">{avgRating > 0 ? avgRating.toFixed(1) : '—'}</span>
-                    <div className="vc-rate-stars-display">
-                      {[1,2,3,4,5].map(n => (
-                        <i key={n} className={`bi ${avgRating >= n ? 'bi-star-fill' : avgRating >= n - 0.5 ? 'bi-star-half' : 'bi-star'} vc-star-display`}></i>
-                      ))}
+                  {/* ── Rate this course ── */}
+                  {!locked && (
+                    <div className="vc-rate-section">
+                      <div className="vc-rate-avg">
+                        <span className="vc-rate-num">{avgRating > 0 ? avgRating.toFixed(1) : '—'}</span>
+                        <div className="vc-rate-stars-display">
+                          {[1, 2, 3, 4, 5].map(n => (
+                            <i key={n} className={`bi ${avgRating >= n ? 'bi-star-fill' : avgRating >= n - 0.5 ? 'bi-star-half' : 'bi-star'} vc-star-display`}></i>
+                          ))}
+                        </div>
+                        <span className="vc-rate-count">({totalVotes} {totalVotes === 1 ? 'rating' : 'ratings'})</span>
+                      </div>
+                      <div className="vc-rate-row">
+                        <span className="vc-rate-label">{myRating ? 'Your rating:' : 'Rate this course:'}</span>
+                        <div className="vc-stars-interactive">
+                          {[1, 2, 3, 4, 5].map(n => (
+                            <button key={n}
+                              className={`vc-star-btn${(ratingHover || myRating) >= n ? ' active' : ''}`}
+                              onMouseEnter={() => setRatingHover(n)}
+                              onMouseLeave={() => setRatingHover(null)}
+                              onClick={() => handleRate(n)}
+                              disabled={ratingSubmitting}
+                              title={`${n} star${n > 1 ? 's' : ''}`}
+                            >
+                              <i className={`bi ${(ratingHover || myRating) >= n ? 'bi-star-fill' : 'bi-star'}`}></i>
+                            </button>
+                          ))}
+                        </div>
+                        {myRating && <span className="vc-rated-badge"><i className="bi bi-check-circle-fill me-1"></i>Rated</span>}
+                      </div>
                     </div>
-                    <span className="vc-rate-count">({totalVotes} {totalVotes === 1 ? 'rating' : 'ratings'})</span>
-                  </div>
-                  <div className="vc-rate-row">
-                    <span className="vc-rate-label">{myRating ? 'Your rating:' : 'Rate this course:'}</span>
-                    <div className="vc-stars-interactive">
-                      {[1,2,3,4,5].map(n => (
-                        <button key={n}
-                          className={`vc-star-btn${(ratingHover || myRating) >= n ? ' active' : ''}`}
-                          onMouseEnter={() => setRatingHover(n)}
-                          onMouseLeave={() => setRatingHover(null)}
-                          onClick={() => handleRate(n)}
-                          disabled={ratingSubmitting}
-                          title={`${n} star${n > 1 ? 's' : ''}`}
-                        >
-                          <i className={`bi ${(ratingHover || myRating) >= n ? 'bi-star-fill' : 'bi-star'}`}></i>
-                        </button>
-                      ))}
-                    </div>
-                    {myRating && <span className="vc-rated-badge"><i className="bi bi-check-circle-fill me-1"></i>Rated</span>}
+                  )}
+
+                  {/* ── Comments section ── */}
+                  <div className="vc-comments">
+                    <h3 className="vc-comments-title">
+                      <i className="bi bi-chat-left-text me-2"></i>
+                      Comments {comments.length > 0 && <span className="vc-comments-count">{comments.length}</span>}
+                    </h3>
+
+                    {/* Compose box — only for owners */}
+                    {!locked && (
+                      <div className="vc-comment-compose">
+                        <div className="vc-compose-tabs">
+                          <button
+                            className={`vc-compose-tab${!commentPreview ? ' vc-compose-tab--active' : ''}`}
+                            onClick={() => setCommentPreview(false)}
+                          >Write</button>
+                          <button
+                            className={`vc-compose-tab${commentPreview ? ' vc-compose-tab--active' : ''}`}
+                            onClick={() => setCommentPreview(true)}
+                            disabled={!commentText.trim()}
+                          >Preview</button>
+                          <button
+                            className={`vc-compose-tab vc-compose-tab--help${syntaxHelpOpen ? ' vc-compose-tab--active' : ''}`}
+                            onClick={() => setSyntaxHelpOpen(p => !p)}
+                            title="Formatting syntax reference"
+                          ><i className="bi bi-question-circle me-1"></i>Syntax</button>
+                        </div>
+                        {syntaxHelpOpen && (
+                          <div className="vc-syntax-help">
+                            <div className="vc-syntax-grid">
+                              <span className="vc-syntax-ex"><code># Heading 1</code></span><span className="vc-syntax-desc">Large heading</span>
+                              <span className="vc-syntax-ex"><code>## Heading 2</code></span><span className="vc-syntax-desc">Medium heading</span>
+                              <span className="vc-syntax-ex"><code>**bold**</code></span><span className="vc-syntax-desc">Bold text</span>
+                              <span className="vc-syntax-ex"><code>*italic*</code></span><span className="vc-syntax-desc">Italic text</span>
+                              <span className="vc-syntax-ex"><code>`(inline code)`</code></span><span className="vc-syntax-desc">Inline code</span>
+                              <span className="vc-syntax-ex"><code>~(js)[code here]~</code></span><span className="vc-syntax-desc">Code block with language</span>
+                              <span className="vc-syntax-ex"><code>- item</code></span><span className="vc-syntax-desc">Bullet list item</span>
+                              <span className="vc-syntax-ex"><code>1. item</code></span><span className="vc-syntax-desc">Numbered list item</span>
+                              <span className="vc-syntax-ex"><code>---</code></span><span className="vc-syntax-desc">Horizontal rule</span>
+                              <span className="vc-syntax-ex"><code>[text](url)</code></span><span className="vc-syntax-desc">Link</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {commentPreview ? (
+                          <div
+                            className="vc-comment-preview vc-text-body"
+                            dangerouslySetInnerHTML={{ __html: parseTextSyntax(commentText) }}
+                          />
+                        ) : (
+                          <textarea
+                            className="vc-comment-textarea"
+                            rows={4}
+                            placeholder={`Write a comment…\nSupports the same text syntax as course content: # headings, **bold**, \`(code)\`, ~(lang)[…]~, etc.`}
+                            value={commentText}
+                            onChange={e => setCommentText(e.target.value)}
+                            maxLength={4000}
+                          />
+                        )}
+
+                        <div className="vc-compose-footer">
+                          <span className="vc-char-count">{commentText.length} / 4000</span>
+                          <button
+                            className="vc-btn-primary vc-compose-submit"
+                            onClick={handleAddComment}
+                            disabled={!commentText.trim() || commentPosting}
+                          >
+                            {commentPosting
+                              ? <><span className="vc-spinner-sm"></span> Posting…</>
+                              : <><i className="bi bi-send me-1"></i>Post</>}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Comment list */}
+                    {commentsLoading ? (
+                      <div className="vc-comments-loading"><span className="vc-spinner-sm"></span> Loading…</div>
+                    ) : comments.length === 0 ? (
+                      <p className="vc-comments-empty">No comments yet{locked ? '.' : ' — be the first!'}</p>
+                    ) : (
+                      <div className="vc-comment-list">
+                        {comments.map(comment => (
+                          <div key={comment._id} className="vc-comment">
+                            <div className="vc-comment-header">
+                              <span className="vc-comment-author">
+                                <i className="bi bi-person-circle me-1"></i>
+                                {comment.nickname}
+                              </span>
+                              <span className="vc-comment-date">
+                                {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                              </span>
+                              {/* Delete button: shown to author or manager/admin/root */}
+                              {data?._id && comment.userId && (() => {
+                                const al = data?.role?.accessLevel;
+                                const rn = data?.role?.roleName;
+                                const isElevated = al === 'manage' || al === 'admin' || al === 'root' || rn === 'root';
+                                const isAuthor = String(data._id) === String(comment.userId);
+                                return (isAuthor || isElevated) && (
+                                  <button
+                                    className="vc-comment-delete"
+                                    onClick={() => handleDeleteComment(comment._id)}
+                                    title="Delete comment"
+                                  >
+                                    <i className="bi bi-trash"></i>
+                                  </button>
+                                );
+                              })()}
+                            </div>
+                            <div
+                              className="vc-comment-body vc-text-body"
+                              dangerouslySetInnerHTML={{ __html: parseTextSyntax(comment.text) }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
-
-              {/* ── Comments section ── */}
-              <div className="vc-comments">
-                <h3 className="vc-comments-title">
-                  <i className="bi bi-chat-left-text me-2"></i>
-                  Comments {comments.length > 0 && <span className="vc-comments-count">{comments.length}</span>}
-                </h3>
-
-                {/* Compose box — only for owners */}
-                {!locked && (
-                  <div className="vc-comment-compose">
-                    <div className="vc-compose-tabs">
-                      <button
-                        className={`vc-compose-tab${!commentPreview ? ' vc-compose-tab--active' : ''}`}
-                        onClick={() => setCommentPreview(false)}
-                      >Write</button>
-                      <button
-                        className={`vc-compose-tab${commentPreview ? ' vc-compose-tab--active' : ''}`}
-                        onClick={() => setCommentPreview(true)}
-                        disabled={!commentText.trim()}
-                      >Preview</button>
-                      <button
-                        className={`vc-compose-tab vc-compose-tab--help${syntaxHelpOpen ? ' vc-compose-tab--active' : ''}`}
-                        onClick={() => setSyntaxHelpOpen(p => !p)}
-                        title="Formatting syntax reference"
-                      ><i className="bi bi-question-circle me-1"></i>Syntax</button>
-                    </div>
-                    {syntaxHelpOpen && (
-                      <div className="vc-syntax-help">
-                        <div className="vc-syntax-grid">
-                          <span className="vc-syntax-ex"><code># Heading 1</code></span><span className="vc-syntax-desc">Large heading</span>
-                          <span className="vc-syntax-ex"><code>## Heading 2</code></span><span className="vc-syntax-desc">Medium heading</span>
-                          <span className="vc-syntax-ex"><code>**bold**</code></span><span className="vc-syntax-desc">Bold text</span>
-                          <span className="vc-syntax-ex"><code>*italic*</code></span><span className="vc-syntax-desc">Italic text</span>
-                          <span className="vc-syntax-ex"><code>`inline code`</code></span><span className="vc-syntax-desc">Inline code</span>
-                          <span className="vc-syntax-ex"><code>~(js)[code here]~</code></span><span className="vc-syntax-desc">Code block with language</span>
-                          <span className="vc-syntax-ex"><code>- item</code></span><span className="vc-syntax-desc">Bullet list item</span>
-                          <span className="vc-syntax-ex"><code>1. item</code></span><span className="vc-syntax-desc">Numbered list item</span>
-                          <span className="vc-syntax-ex"><code>---</code></span><span className="vc-syntax-desc">Horizontal rule</span>
-                          <span className="vc-syntax-ex"><code>[text](url)</code></span><span className="vc-syntax-desc">Link</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {commentPreview ? (
-                      <div
-                        className="vc-comment-preview vc-text-body"
-                        dangerouslySetInnerHTML={{ __html: parseTextSyntax(commentText) }}
-                      />
-                    ) : (
-                      <textarea
-                        className="vc-comment-textarea"
-                        rows={4}
-                        placeholder={`Write a comment…\nSupports the same text syntax as course content: # headings, **bold**, \`code\`, ~(lang)[…]~, etc.`}
-                        value={commentText}
-                        onChange={e => setCommentText(e.target.value)}
-                        maxLength={4000}
-                      />
-                    )}
-
-                    <div className="vc-compose-footer">
-                      <span className="vc-char-count">{commentText.length} / 4000</span>
-                      <button
-                        className="vc-btn-primary vc-compose-submit"
-                        onClick={handleAddComment}
-                        disabled={!commentText.trim() || commentPosting}
-                      >
-                        {commentPosting
-                          ? <><span className="vc-spinner-sm"></span> Posting…</>
-                          : <><i className="bi bi-send me-1"></i>Post</>}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Comment list */}
-                {commentsLoading ? (
-                  <div className="vc-comments-loading"><span className="vc-spinner-sm"></span> Loading…</div>
-                ) : comments.length === 0 ? (
-                  <p className="vc-comments-empty">No comments yet{locked ? '.' : ' — be the first!'}</p>
-                ) : (
-                  <div className="vc-comment-list">
-                    {comments.map(comment => (
-                      <div key={comment._id} className="vc-comment">
-                        <div className="vc-comment-header">
-                          <span className="vc-comment-author">
-                            <i className="bi bi-person-circle me-1"></i>
-                            {comment.nickname}
-                          </span>
-                          <span className="vc-comment-date">
-                            {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                          </span>
-                          {/* Delete button: shown to author or manager/admin/root */}
-                          {data?._id && comment.userId && (() => {
-                            const al = data?.role?.accessLevel;
-                            const rn = data?.role?.roleName;
-                            const isElevated = al === 'manage' || al === 'admin' || al === 'root' || rn === 'root';
-                            const isAuthor = String(data._id) === String(comment.userId);
-                            return (isAuthor || isElevated) && (
-                              <button
-                                className="vc-comment-delete"
-                                onClick={() => handleDeleteComment(comment._id)}
-                                title="Delete comment"
-                              >
-                                <i className="bi bi-trash"></i>
-                              </button>
-                            );
-                          })()}
-                        </div>
-                        <div
-                          className="vc-comment-body vc-text-body"
-                          dangerouslySetInnerHTML={{ __html: parseTextSyntax(comment.text) }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              </div>{/* end vc-welcome-right */}
             </div>
           ) : (
             /* ── Item Content ── */
-            <ContentPane
+            <ContentPanel
               key={`${selected.vi}-${selected.ci}-${selected.ii}`}
               selected={selected}
               volumes={volumes}
@@ -875,6 +1014,7 @@ function ViewCourse({ data, onLogout }) {
               onNext={() => goTo(currentFlatIdx + 1)}
               setOpenVolumes={setOpenVolumes}
               setOpenChapters={setOpenChapters}
+              finish={handleFinishCourse}
               sessionId={sessionId}
               sessionGroup={sessionGroup}
               studentId={data?._id}
@@ -896,7 +1036,7 @@ function ViewCourse({ data, onLogout }) {
 }
 
 // ─── Content Pane ─────────────────────────────────────────────────────────────
-function ContentPane({ selected, volumes, locked, token, onSelectItem, hasPrev, hasNext, onPrev, onNext, setOpenVolumes, setOpenChapters, sessionId, sessionGroup, studentId }) {
+function ContentPanel({ selected, volumes, locked, token, onSelectItem, hasPrev, hasNext, onPrev, onNext, setOpenVolumes, setOpenChapters, finish, sessionId, sessionGroup, studentId }) {
   const { vi, ci, ii } = selected;
   const vol = volumes[vi];
   const ch = ci != null ? vol?.chapters[ci] : null;
@@ -974,13 +1114,19 @@ function ContentPane({ selected, volumes, locked, token, onSelectItem, hasPrev, 
         >
           <i className="bi bi-arrow-left"></i> Previous
         </button>
-        <button
+        {!hasNext ? (<button
+          className="btn btn-success"
+          onClick={finish}
+        >
+          Finish <i className="bi bi-flag-fill me-1"></i>
+        </button>) : (<button
           className="vc-pane-nav-btn vc-pane-nav-btn--next"
           onClick={onNext}
           disabled={!hasNext}
         >
           Next <i className="bi bi-arrow-right"></i>
-        </button>
+        </button>)}
+
       </div>
     </div>
   );
@@ -1148,7 +1294,7 @@ function FormViewer({ url, token: tok }) {
   const [error, setError] = useState(null);
   const shuffles = useRef({});
   const [modal, setModal] = useState({ show: false, type: 'confirm', title: '', message: '', onConfirm: null, onCancel: null });
-  const closeModal  = () => setModal(p => ({ ...p, show: false }));
+  const closeModal = () => setModal(p => ({ ...p, show: false }));
   const showConfirm = (title, message, onConfirm) => setModal({ show: true, type: 'confirm', title, message, onConfirm, onCancel: closeModal });
 
   const getShuffled = (id, arr) => {
@@ -1315,10 +1461,10 @@ function FormViewer({ url, token: tok }) {
 function AssignmentItemView({ item, sessionId, sessionGroup, studentId, token }) {
   const [assignment, setAssignment] = useState(null);
   const [submission, setSubmission] = useState(null);
-  const [file, setFile]             = useState(null);
-  const [uploading, setUploading]   = useState(false);
-  const [message, setMessage]       = useState('');
-  const [error, setError]           = useState('');
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!item?.assignmentId || !sessionGroup) return;
@@ -1410,7 +1556,7 @@ function AssignmentItemView({ item, sessionId, sessionGroup, studentId, token })
               <strong>Task files:</strong>
               {assignment.taskFiles.map((f, i) => (
                 <a key={i} href={`http://localhost:4040${f.url}`}
-                   className="vc-dl-link ms-2" target="_blank" rel="noopener noreferrer">
+                  className="vc-dl-link ms-2" target="_blank" rel="noopener noreferrer">
                   <i className="bi bi-download me-1"></i>{f.originalName || f.filename}
                 </a>
               ))}
@@ -1425,15 +1571,14 @@ function AssignmentItemView({ item, sessionId, sessionGroup, studentId, token })
       {submission && (
         <div className={`vc-submission-status vc-submission-status--${submission.status}`}>
           <div className="d-flex align-items-center gap-2 mb-1">
-            <i className={`bi ${
-              submission.status === 'approved' ? 'bi-check-circle-fill text-success' :
+            <i className={`bi ${submission.status === 'approved' ? 'bi-check-circle-fill text-success' :
               submission.status === 'declined' ? 'bi-x-circle-fill text-danger' :
-              'bi-hourglass-split text-warning'
-            }`}></i>
+                'bi-hourglass-split text-warning'
+              }`}></i>
             <strong>
               {submission.status === 'approved' ? 'Approved' :
-               submission.status === 'declined' ? 'Declined — resubmission required' :
-               'Pending review'}
+                submission.status === 'declined' ? 'Declined — resubmission required' :
+                  'Pending review'}
             </strong>
             {submission.isOverdue && <span className="badge bg-warning text-dark">Was overdue</span>}
           </div>
@@ -1455,12 +1600,12 @@ function AssignmentItemView({ item, sessionId, sessionGroup, studentId, token })
       {sessionGroup && canResubmit && (
         <div className="vc-submission-upload">
           <label className="form-label fw-semibold">
-            {submission ? 'Re-submit' : 'Submit your work'} (.zip file)
+            {submission ? 'Re-submit' : 'Submit your work'} (.zip or .txt file)
           </label>
           <div className="d-flex gap-2 align-items-center flex-wrap">
             <input
               type="file"
-              accept=".zip"
+              accept=".zip, .txt"
               className="form-control"
               style={{ maxWidth: 340 }}
               onChange={e => { setFile(e.target.files[0]); setError(''); setMessage(''); }}
@@ -1480,7 +1625,7 @@ function AssignmentItemView({ item, sessionId, sessionGroup, studentId, token })
               ⚠ Submitting after deadline — mark may be reduced by {assignment?.overdueDeduction || 1} point(s).
             </small>
           )}
-          {error   && <div className="text-danger small mt-1">{error}</div>}
+          {error && <div className="text-danger small mt-1">{error}</div>}
           {message && <div className="text-success small mt-1">{message}</div>}
         </div>
       )}

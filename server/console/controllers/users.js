@@ -51,7 +51,20 @@ module.exports.getAll = async (req, res) => {
             }
         }
 
-        const users = await Users.find({}).populate('role');
+        // Build search query
+        const mongoQuery = {};
+        const { search, tutorOnly } = req.query;
+        if (search && search.trim()) {
+            mongoQuery.$or = [
+                { nickname: { $regex: search.trim(), $options: 'i' } },
+                { email: { $regex: search.trim(), $options: 'i' } }
+            ];
+        }
+        if (tutorOnly === 'true') {
+            mongoQuery.tutorRank = { $ne: null, $exists: true };
+        }
+
+        const users = await Users.find(mongoQuery).populate('role');
         const filteredUsers = linkFilter.filterUsersData(users, requesterAccessLevel).filter((d) => {
             const userId = d._id ? d._id.toString() : null;
             // A root user always sees themselves in the list
@@ -409,6 +422,29 @@ module.exports.deleteProfilePicture = async (req, res) => {
             });
         }
 
+    } catch (e) {
+        errorHandler(res, 500, e);
+    }
+};
+// PATCH /api/users/me/courses/:courseId/finish
+// Sets the authenticated user's progress for a course to 1 (complete)
+module.exports.finishCourse = async (req, res) => {
+    try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decoded = await utils.parseToken(token);
+        const user = await Users.findById(decoded._id);
+        if (!user) return errorHandler(res, 404, 'User not found');
+
+        const courseId = req.params.courseId;
+        const existing = user.courses?.find(c => c._id && c._id.toString() === courseId);
+        if (existing) {
+            existing.process = 1;
+        } else {
+            user.courses.push({ _id: courseId, process: 1 });
+        }
+        user.updatedAt = new Date();
+        await user.save();
+        res.status(200).json({ message: 'Course marked as finished', data: { process: 1 } });
     } catch (e) {
         errorHandler(res, 500, e);
     }

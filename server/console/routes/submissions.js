@@ -16,10 +16,8 @@ const upload = multer({
     dest: tmpDir,
     limits: { fileSize: 200 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-        const isZip = file.mimetype === 'application/zip' ||
-                      file.mimetype === 'application/x-zip-compressed' ||
-                      file.originalname.endsWith('.zip');
-        cb(isZip ? null : new Error('Only .zip files allowed'), isZip);
+        const isAllowed = file.originalname.match(/\.(zip|txt)$/i);
+        cb(isAllowed ? null : new Error('Only .zip files allowed'), isAllowed);
     }
 });
 

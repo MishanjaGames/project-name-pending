@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import { UtilityModal } from "../components/UtilityModal";
 
 function Keys({ data, onLogout }) {
-    const navigate = useNavigate();
     const token = localStorage.getItem("token");
     const ah = token
         ? { Authorization: `${token.split(" ")[0]} ${token.split(" ")[1]}`, "Content-Type": "application/json" }
@@ -163,7 +161,7 @@ function Keys({ data, onLogout }) {
                                         <div className="border rounded p-2" style={{ maxHeight: 240, overflowY: "auto" }}>
                                             {courses.length === 0 ? (
                                                 <p className="text-muted small mb-0">No courses available</p>
-                                            ) : courses.map(c => (
+                                            ) : courses.filter(c=>c.isPrivateCopy === false).map(c => (
                                                 <div key={c._id} className="form-check">
                                                     <input className="form-check-input" type="checkbox"
                                                         id={`c-${c._id}`} checked={genCourseIds.includes(c._id)}

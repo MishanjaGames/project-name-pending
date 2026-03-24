@@ -38,7 +38,9 @@ function App() {
     id: '',
     nickname: '',
     email: '',
-    role: ''
+    role: '',
+    tutorRank: null,
+    accessLevel: 'default'
   });
 
   useEffect(() => {
@@ -65,7 +67,9 @@ function App() {
               _id: data.user._id,
               nickname: data.user.nickname,
               email: data.user.email,
-              role: data.user.role
+              role: data.user.role,
+              tutorRank: data.user.tutorRank || null,
+              accessLevel: data.user.role?.accessLevel || 'default'
             });
             setIsLoggedIn(true);
           } else {
@@ -156,7 +160,7 @@ function App() {
             <EditCourse data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
         } />
-        <Route path="/manage/course/preview/:id" element={
+        <Route path="/course/preview/:id" element={
           isLoggedIn ?
             <CoursePreview data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
