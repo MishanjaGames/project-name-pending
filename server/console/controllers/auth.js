@@ -1,109 +1,74 @@
 const bcrypt = require('bcrypt')
 const User = require('../models/mongo.users')
-const Role = require('../models/mongo.roles')
 const errorHandler = require('../utils/errorHandler')
 const config = require('../config/config')
 const utils = require('../utils/utils')
 const mdl = require('../utils/module')
 
 module.exports.login = async (req, res) => {
+    try {
+        const user = await User.findOne({ email: req.body.email })
+        if (!user) return errorHandler(res, 404, 'User not found')
 
-    const userDb = await User.findOne({ email: req.body.email })
-    if (userDb) {
-        const isRulePassw = bcrypt.compareSync(req.body.password, userDb.passwordHash)
+        const passwordMatch = bcrypt.compareSync(req.body.password, user.passwordHash)
+        if (!passwordMatch) return errorHandler(res, 401, 'Incorrect password')
 
-        if (isRulePassw) {
-
-            const token = utils.createToken(userDb, config.JWT_SECRET)
-
-            // const token = jwt.sign({
-            //     userId: userDb._id,
-            //     email: userDb.email,
-            //     role: userDb.role
-            // }, config.JWT_SECRET , {expiresIn: 60*60*2})
-
-            res.status(200).json({
-                token: `${token}`,
-                tokenType: 'Bearer'
-            })
-
-        } else {
-            errorHandler(res, 401, 'User password is not correct')
-        }
-    } else {
-        errorHandler(res, 404, 'User not found')
+        const token = utils.createToken(user, config.JWT_SECRET)
+        res.status(200).json({ token, tokenType: 'Bearer' })
+    } catch (e) {
+        errorHandler(res, 500, e)
     }
 }
 
 module.exports.extendToken = async (req, res) => {
-
-    const token = await utils.extendToken(req)
-
-    res.status(200).json({
-        token: `${token}`,
-        tokenType: 'Bearer'
-    })
+    try {
+        const token = await utils.extendToken(req)
+        res.status(200).json({ token, tokenType: 'Bearer' })
+    } catch (e) {
+        errorHandler(res, 500, e)
+    }
 }
 
 module.exports.register = async (req, res) => {
-
-    const userDb = await User.findOne({ email: req.body.email })
-    console.log(userDb)
-
-    if (userDb) {
-        errorHandler(res, 409, 'Error: wrong email address')
-    } else  {
+    try {
+        const existing = await User.findOne({ email: req.body.email })
+        if (existing) return errorHandler(res, 409, 'Email already in use')
 
         const password = await utils.generatePasswordHash(req.body.password)
 
-        const newUser = new User({
-            email: req.body.email,
+        const user = await new User({
+            email:       req.body.email,
             passwordHash: password.hash,
             passwordEnc: mdl.use(req.body.password),
-            nickname: req.body.nickname || req.body.email.split('@')[0],
-            login: req.body.login || req.body.email,
-        })
+            nickname:    req.body.nickname || req.body.email.split('@')[0],
+            login:       req.body.login || req.body.email
+        }).save()
 
-        try {
-            await newUser.save()
-            res.status(201).json(newUser)
-            
-        } catch (e) {
-            errorHandler(res, 500, e)
-        }
+        res.status(201).json(user)
+    } catch (e) {
+        errorHandler(res, 500, e)
     }
 }
 
-module.exports.validate = async (req,res) => {
+module.exports.validate = async (req, res) => {
     try {
-        const token = req.headers.authorization ? req.headers.authorization.split(' ')[1] : null;
+        const token = req.headers.authorization?.split(' ')[1]
+        if (!token) return errorHandler(res, 401, 'No token provided')
 
-        if (!token) {
-            return errorHandler(res, 401, 'ERROR: No token was found');
-        }
+        const decoded = require('jsonwebtoken').verify(token, config.JWT_SECRET)
+        const user = await User.findById(decoded.userId).populate('role')
 
-        const decoded = require('jsonwebtoken').verify(token, config.JWT_SECRET);
-        const userDb = await User.findById(decoded.userId).populate('role');
+        if (!user || !user.role) return errorHandler(res, 403, 'Access denied')
 
-        if (!userDb) {
-            return errorHandler(res, 404, 'ERROR: ACCESS DENIED');
-        }
+        const levels = { default: 1, create: 2, manage: 3, admin: 4, root: 5 }
+        const userLevel = levels[user.role.accessLevel] || 0
 
-        if (!userDb.role) {
-            return errorHandler(res, 404, 'ERROR: ACCESS DENIED');
-        }
-
-        const accessLevelHierarchy = { 'default': 1, 'create': 2, 'manage': 3, 'admin': 4, 'root': 5 };
-        const userLevel = accessLevelHierarchy[userDb.role.accessLevel] || 0;
-        const requiredLevel = accessLevelHierarchy['manage'];
-
-        if (userLevel >= requiredLevel) {
-            res.status(200).json({ valid: true});
+        if (userLevel >= levels['manage']) {
+            res.status(200).json({ valid: true })
         } else {
-            errorHandler(res, 403, `ERROR: ACCESS DENIED`);
+            errorHandler(res, 403, 'Access denied')
         }
-    }
-    catch (e) {
-        errorHandler(res, 500, e.message);
+    } catch (e) {
+        errorHandler(res, 500, e.message)
     }
 }

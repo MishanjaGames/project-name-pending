@@ -1,17 +1,15 @@
 const router     = require('express').Router()
 const passport   = require('passport')
-const { validate } = require('../utils/utils')
 const controller = require('../controllers/keys')
+const { validate } = require('../utils/utils')
 
-const jwtAuth = passport.authenticate('jwt', { session: false })
+const auth = passport.authenticate('jwt', { session: false })
 
-// ── Any authenticated user ────────────────────────────────────────────────────
-router.post('/redeem', jwtAuth, controller.redeem)
-router.get('/mine',   jwtAuth, controller.getMyKeys)
+router.post('/redeem', auth, controller.redeem)
+router.get('/mine',    auth, controller.getMyKeys)
 
-// ── manage+ only ──────────────────────────────────────────────────────────────
-router.get('/',    jwtAuth, validate('manage'), controller.listAll)
-router.post('/',   jwtAuth, validate('manage'), controller.generate)
-router.delete('/:id', jwtAuth, validate('manage'), controller.deleteKey)
+router.get('/',       auth, validate('manage'), controller.listAll)
+router.post('/',      auth, validate('manage'), controller.generate)
+router.delete('/:id', auth, validate('manage'), controller.deleteKey)
 
 module.exports = router

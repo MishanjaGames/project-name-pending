@@ -1,19 +1,18 @@
 const router     = require('express').Router()
 const passport   = require('passport')
-const { validate } = require('../utils/utils')
 const controller = require('../controllers/groups')
+const { validate } = require('../utils/utils')
 
-const jwtAuth  = passport.authenticate('jwt', { session: false })
+const auth     = passport.authenticate('jwt', { session: false })
 const tutorVal = validate('tutor')
 
-router.get('/',    jwtAuth, tutorVal,  controller.getBySession)
-router.get('/:id', jwtAuth, jwtAuth,   controller.getById)   // members can also view
-router.post('/',   jwtAuth, tutorVal,  controller.create)
-router.delete('/:id', jwtAuth, tutorVal, controller.remove)
+router.get('/',    auth, tutorVal, controller.getBySession)
+router.get('/:id', auth, controller.getById)
+router.post('/',   auth, tutorVal, controller.create)
+router.delete('/:id', auth, tutorVal, controller.remove)
 
-// Member management
-router.post('/:id/members',                 jwtAuth, tutorVal, controller.addMember)
-router.patch('/:id/members/:userId/status', jwtAuth, tutorVal, controller.updateMemberStatus)
-router.delete('/:id/members/:userId',       jwtAuth, tutorVal, controller.removeMember)
+router.post('/:id/members',                 auth, tutorVal, controller.addMember)
+router.patch('/:id/members/:userId/status', auth, tutorVal, controller.updateMemberStatus)
+router.delete('/:id/members/:userId',       auth, tutorVal, controller.removeMember)
 
 module.exports = router

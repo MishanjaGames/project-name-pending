@@ -1,18 +1,16 @@
 const router     = require('express').Router()
 const passport   = require('passport')
-const { validate } = require('../utils/utils')
 const controller = require('../controllers/promos')
+const { validate } = require('../utils/utils')
 
-const jwtAuth = passport.authenticate('jwt', { session: false })
+const auth = passport.authenticate('jwt', { session: false })
 
-// Any authenticated user — validate/apply promos during purchase
-router.post('/validate', jwtAuth, controller.validate)
-router.post('/apply',    jwtAuth, controller.apply)
+router.post('/validate', auth, controller.validate)
+router.post('/apply',    auth, controller.apply)
 
-// create+ — creators and above can list/create/toggle/delete their own promos
-router.get('/',          jwtAuth, validate('create'), controller.listAll)
-router.post('/',         jwtAuth, validate('create'), controller.create)
-router.patch('/:id/toggle', jwtAuth, validate('create'), controller.toggle)
-router.delete('/:id',    jwtAuth, validate('create'), controller.deletePromo)
+router.get('/',          auth, validate('create'), controller.listAll)
+router.post('/',         auth, validate('create'), controller.create)
+router.patch('/:id/toggle', auth, validate('create'), controller.toggle)
+router.delete('/:id',    auth, validate('create'), controller.deletePromo)
 
 module.exports = router

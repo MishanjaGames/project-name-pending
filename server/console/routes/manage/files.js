@@ -1,175 +1,70 @@
-const router = require('express').Router();
-const fs = require('fs');
-const path = require('path');
-const fileHandler = require('../../utils/fileHandler');
-const errorHandler = require('../../utils/errorHandler');
+const router      = require('express').Router()
+const fs          = require('fs')
+const path        = require('path')
+const fileHandler = require('../../utils/fileHandler')
+const errorHandler = require('../../utils/errorHandler')
 
-// ============================================================================
-// AUTHENTICATED FILE MANAGEMENT (under /api/manage/files)
-// ============================================================================
+function listDir(dirPath, idKey, idValue, urlPrefix) {
+    if (!fs.existsSync(dirPath)) {
+        return { [idKey]: idValue, count: 0, files: [] }
+    }
+    const files = fs.readdirSync(dirPath).map(filename => {
+        const stats = fs.statSync(path.join(dirPath, filename))
+        return {
+            filename,
+            size:          stats.size,
+            sizeFormatted: `${(stats.size / 1024).toFixed(2)} KB`,
+            created:       stats.birthtime,
+            modified:      stats.mtime,
+            url:           `${urlPrefix}/${filename}`
+        }
+    })
+    return { [idKey]: idValue, count: files.length, files }
+}
 
-/**
- * GET /api/manage/files/users/:userId/list
- * List all files in user directory (requires authentication)
- */
+function deleteFile(basePath, idValue, filename, res) {
+    const filePath = path.join(basePath, idValue, filename)
+    const realPath = path.resolve(filePath)
+    const base     = path.resolve(basePath, idValue)
+
+    if (!realPath.startsWith(base)) return res.status(403).json({ message: 'Access denied' })
+    if (!fs.existsSync(filePath))   return res.status(404).json({ message: 'File not found' })
+
+    fs.unlinkSync(filePath)
+    res.status(200).json({ message: 'File deleted successfully', data: { filename } })
+}
+
 router.get('/users/:userId/list', (req, res) => {
     try {
-        const userId = req.params.userId;
-        const userDir = path.join(fileHandler.paths.userProfiles, userId);
-        
-        if (!fs.existsSync(userDir)) {
-            return res.status(200).json({
-                success: true,
-                userId: userId,
-                files: []
-            });
-        }
-        
-        const files = fs.readdirSync(userDir).map(filename => {
-            const filePath = path.join(userDir, filename);
-            const stats = fs.statSync(filePath);
-            return {
-                filename: filename,
-                size: stats.size,
-                sizeFormatted: `${(stats.size / 1024).toFixed(2)} KB`,
-                created: stats.birthtime,
-                modified: stats.mtime,
-                url: `/api/files/users/${userId}/${filename}`
-            };
-        });
-        
-        res.status(200).json({
-            success: true,
-            userId: userId,
-            count: files.length,
-            files: files
-        });
-    } catch (error) {
-        errorHandler(res, 500, error);
-    }
-});
+        const dir = path.join(fileHandler.paths.userProfiles, req.params.userId)
+        res.status(200).json(listDir(dir, 'userId', req.params.userId, `/api/files/users/${req.params.userId}`))
+    } catch (e) { errorHandler(res, 500, e) }
+})
 
-/**
- * DELETE /api/manage/files/users/:userId/:filename
- * Delete specific file from user directory
- */
 router.delete('/users/:userId/:filename', (req, res) => {
     try {
-        const { userId, filename } = req.params;
-        const filePath = path.join(fileHandler.paths.userProfiles, userId, filename);
-        
-        // Security: prevent directory traversal
-        const realPath = path.resolve(filePath);
-        const basePath = path.resolve(fileHandler.paths.userProfiles, userId);
-        
-        if (!realPath.startsWith(basePath)) {
-            return res.status(403).json({
-                success: false,
-                message: 'Access denied'
-            });
-        }
-        
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({
-                success: false,
-                message: 'File not found'
-            });
-        }
-        
-        fs.unlinkSync(filePath);
-        
-        res.status(200).json({
-            success: true,
-            message: 'File deleted successfully',
-            data: { userId, filename }
-        });
-    } catch (error) {
-        errorHandler(res, 500, error);
-    }
-});
+        deleteFile(fileHandler.paths.userProfiles, req.params.userId, req.params.filename, res)
+    } catch (e) { errorHandler(res, 500, e) }
+})
 
-/**
- * GET /api/manage/files/courses/:courseId/list
- * List all files in course directory (requires authentication)
- */
 router.get('/courses/:courseId/list', (req, res) => {
     try {
-        const courseId = req.params.courseId;
-        const courseDir = path.join(fileHandler.paths.courseFiles, courseId);
-        
-        if (!fs.existsSync(courseDir)) {
-            return res.status(200).json({
-                success: true,
-                courseId: courseId,
-                files: []
-            });
-        }
-        
-        const files = fs.readdirSync(courseDir).map(filename => {
-            const filePath = path.join(courseDir, filename);
-            const stats = fs.statSync(filePath);
-            const isThumbnail = filename.startsWith('thumbnail');
-            
-            return {
-                filename: filename,
-                size: stats.size,
-                sizeFormatted: `${(stats.size / 1024 / 1024).toFixed(2)} MB`,
-                created: stats.birthtime,
-                modified: stats.mtime,
-                isThumbnail: isThumbnail,
-                type: isThumbnail ? 'thumbnail' : 'file',
-                url: `/api/files/courses/${courseId}/${filename}`
-            };
-        });
-        
-        res.status(200).json({
-            success: true,
-            courseId: courseId,
-            count: files.length,
-            files: files
-        });
-    } catch (error) {
-        errorHandler(res, 500, error);
-    }
-});
+        const dir = path.join(fileHandler.paths.courseFiles, req.params.courseId)
+        const result = listDir(dir, 'courseId', req.params.courseId, `/api/files/courses/${req.params.courseId}`)
+        result.files = result.files.map(f => ({
+            ...f,
+            sizeFormatted: `${(f.size / 1024 / 1024).toFixed(2)} MB`,
+            isThumbnail:   f.filename.startsWith('thumbnail'),
+            type:          f.filename.startsWith('thumbnail') ? 'thumbnail' : 'file'
+        }))
+        res.status(200).json(result)
+    } catch (e) { errorHandler(res, 500, e) }
+})
 
-/**
- * DELETE /api/manage/files/courses/:courseId/:filename
- * Delete specific file from course directory
- */
 router.delete('/courses/:courseId/:filename', (req, res) => {
     try {
-        const { courseId, filename } = req.params;
-        const filePath = path.join(fileHandler.paths.courseFiles, courseId, filename);
-        
-        // Security: prevent directory traversal
-        const realPath = path.resolve(filePath);
-        const basePath = path.resolve(fileHandler.paths.courseFiles, courseId);
-        
-        if (!realPath.startsWith(basePath)) {
-            return res.status(403).json({
-                success: false,
-                message: 'Access denied'
-            });
-        }
-        
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({
-                success: false,
-                message: 'File not found'
-            });
-        }
-        
-        fs.unlinkSync(filePath);
-        
-        res.status(200).json({
-            success: true,
-            message: 'File deleted successfully',
-            data: { courseId, filename }
-        });
-    } catch (error) {
-        errorHandler(res, 500, error);
-    }
-});
+        deleteFile(fileHandler.paths.courseFiles, req.params.courseId, req.params.filename, res)
+    } catch (e) { errorHandler(res, 500, e) }
+})
 
-module.exports = router;
+module.exports = router
