@@ -5,7 +5,26 @@ import LanguageDetector from "i18next-browser-languagedetector";
 const resources = {
   en: {
     translation: {
-      // --- GLOBAL ---
+      "nav": {
+        "redeem": "Redeem Key",
+        "manageKeys": "Key Generator",
+        "manageSessions": "My Sessions",
+        "management": "Management"
+      },
+      "redeem": {
+        "title": "Redeem a Product Key",
+        "subtitle": "Enter your key code to unlock courses in your library.",
+        "keyCode": "Key Code",
+        "hint": "Keys are case-insensitive. Dashes are added automatically.",
+        "btnDefault": "Redeem Key",
+        "btnLoading": "Verifying...",
+        "successTitle": "Activation Successful!",
+        "unlockedText": "Successfully unlocked",
+        "newCourses": "new course(s).",
+        "alreadyOwned": "were already in your library.",
+        "goToCourses": "Go to My Courses",
+        "lookingForLibrary": "Looking for your course library?"
+      },
       "theme": "Theme",
       "light": "Light",
       "dark": "Dark",
@@ -31,9 +50,6 @@ const resources = {
       "results": "results",
       "min": "Min",
       "max": "Max",
-      "searchResults": "Search results",
-      "showing": "Showing",
-      "all": "All",
       "heroTitle": "Learn real skills, build real projects",
       "heroLead": "Interactive courses, mentorship and career support — everything you need to grow.",
       "getStarted": "Get Started",
@@ -55,8 +71,6 @@ const resources = {
       "defaultCourseDesc": "Comprehensive course to upgrade your skills.",
       "unknownAuthor": "Unknown",
       "addToCartBtn": "Add",
-
-      // --- AUTH & REGISTER ---
       "auth": {
         "loginTitle": "Welcome Back",
         "loginSubtitle": "Please login to your account",
@@ -84,8 +98,6 @@ const resources = {
         "regSuccess": "Registration successful!",
         "regError": "Registration error:"
       },
-
-      // --- ACCOUNT PAGE ---
       "accountPage": {
         "title": "Account",
         "welcome": "Welcome back",
@@ -107,10 +119,10 @@ const resources = {
         "deleteFailed": "Failed to delete:",
         "accessDenied": "Access denied",
         "serverErrorDelete": "Server error while deleting course",
-        "deleteCourse": "Delete Course"
+        "deleteCourse": "Delete Course",
+        "manage": "Manage",
+        "redeem": "Redeem Course"
       },
-
-      // --- CART PAGE ---
       "cartTitle": "Shopping Cart",
       "yourCartIsEmpty": "Your cart is empty",
       "cart": {
@@ -142,8 +154,6 @@ const resources = {
         "paymentPrompt": "Enter your payment details for $",
         "paymentSuccess": "Payment successful! (Simulated)"
       },
-
-      // --- SETTINGS PAGE ---
       "settingsPage": {
         "nickname": "Nickname",
         "email": "Email",
@@ -154,8 +164,6 @@ const resources = {
         "cancel": "Cancel",
         "save": "Save Changes"
       },
-
-      // --- TEACHER FORM ---
       "teacher": {
         "applyButton": "Apply as Teacher",
         "formTitle": "Teacher application",
@@ -208,8 +216,6 @@ const resources = {
         "alertSuccess": "Application submitted successfully!",
         "alertError": "Error sending application."
       },
-
-      // --- ADD COURSE FORM ---
       "addCourseForm": {
         "uploadCover": "Upload Cover Image",
         "changeCover": "Change",
@@ -239,8 +245,6 @@ const resources = {
         "alertCreateSuccess": "Course created successfully!",
         "alertCreateError": "Error creating course. Please try again."
       },
-
-      // --- COURSE PAGE ---
       "coursePage": {
         "createdBy": "Created by",
         "updated": "Last updated",
@@ -296,8 +300,6 @@ const resources = {
         "addedToCart": "Added to cart:",
         "enrolledIn": "Enrolled in:"
       },
-
-      // --- EDIT COURSE PAGE ---
       "editCourse": {
         "title": "Edit Course",
         "subtitle": "Update course information and files",
@@ -315,7 +317,7 @@ const resources = {
         "skills": "Skills",
         "skillPlaceholder": "Type a skill and press Enter",
         "add": "Add",
-        "courseFiles": "Course Files (Videos/Docs)",
+        "courseFiles": "Course Materials (Videos/Docs)",
         "uploadedFiles": "Uploaded Files",
         "uploadMore": "Upload More Files",
         "newFiles": "New files to upload:",
@@ -353,7 +355,26 @@ const resources = {
   },
   uk: {
     translation: {
-      // --- GLOBAL ---
+      "nav": {
+        "redeem": "Активувати ключ",
+        "manageKeys": "Генератор ключів",
+        "manageSessions": "Мої сесії",
+        "management": "Управління"
+      },
+      "redeem": {
+        "title": "Активація ключа",
+        "subtitle": "Введіть ваш ключ для розблокування курсів у бібліотеці.",
+        "keyCode": "Ключ активації",
+        "hint": "Регістр не має значення. Тире додаються автоматично.",
+        "btnDefault": "Активувати",
+        "btnLoading": "Перевірка...",
+        "successTitle": "Успішна активація!",
+        "unlockedText": "Успішно розблоковано",
+        "newCourses": "нових курсів.",
+        "alreadyOwned": "вже були у вашій бібліотеці.",
+        "goToCourses": "Перейти до курсів",
+        "lookingForLibrary": "Шукаєте свою бібліотеку курсів?"
+      },
       "theme": "Тема",
       "light": "Світла",
       "dark": "Темна",
@@ -403,8 +424,6 @@ const resources = {
       "defaultCourseDesc": "Комплексний курс для покращення ваших навичок.",
       "unknownAuthor": "Невідомий",
       "addToCartBtn": "Додати",
-
-      // --- AUTH & REGISTER ---
       "auth": {
         "loginTitle": "З поверненням",
         "loginSubtitle": "Будь ласка, увійдіть у свій акаунт",
@@ -432,8 +451,6 @@ const resources = {
         "regSuccess": "Реєстрація успішна!",
         "regError": "Помилка реєстрації:"
       },
-
-      // --- ACCOUNT PAGE ---
       "accountPage": {
         "title": "Особистий кабінет",
         "welcome": "З поверненням",
@@ -455,10 +472,10 @@ const resources = {
         "deleteFailed": "Не вдалося видалити:",
         "accessDenied": "Доступ заборонено",
         "serverErrorDelete": "Помилка сервера під час видалення курсу",
-        "deleteCourse": "Видалити курс"
+        "deleteCourse": "Видалити курс",
+        "manage": "Керувати",
+        "redeem": "Активувати курс"
       },
-
-      // --- CART PAGE ---
       "cartTitle": "Кошик",
       "yourCartIsEmpty": "Ваш кошик порожній",
       "cart": {
@@ -490,8 +507,6 @@ const resources = {
         "paymentPrompt": "Введіть платіжні дані для оплати $",
         "paymentSuccess": "Оплата пройшла успішно! (Симуляція)"
       },
-
-      // --- SETTINGS PAGE ---
       "settingsPage": {
         "nickname": "Нікнейм",
         "email": "Email",
@@ -502,8 +517,6 @@ const resources = {
         "cancel": "Скасувати",
         "save": "Зберегти зміни"
       },
-
-      // --- TEACHER FORM ---
       "teacher": {
         "applyButton": "Стати викладачем",
         "formTitle": "Заявка викладача",
@@ -556,8 +569,6 @@ const resources = {
         "alertSuccess": "Заявку успішно надіслано!",
         "alertError": "Помилка відправки заявки."
       },
-
-      // --- ADD COURSE FORM ---
       "addCourseForm": {
         "uploadCover": "Завантажити обкладинку",
         "changeCover": "Змінити",
@@ -587,8 +598,6 @@ const resources = {
         "alertCreateSuccess": "Курс успішно створено!",
         "alertCreateError": "Помилка при створенні курсу. Спробуйте ще раз."
       },
-
-      // --- COURSE PAGE ---
       "coursePage": {
         "createdBy": "Створено",
         "updated": "Останнє оновлення",
@@ -644,8 +653,6 @@ const resources = {
         "addedToCart": "Додано до кошика:",
         "enrolledIn": "Ви записалися на:"
       },
-
-      // --- EDIT COURSE PAGE ---
       "editCourse": {
         "title": "Редагування курсу",
         "subtitle": "Оновіть інформацію про курс та файли",
@@ -696,12 +703,31 @@ const resources = {
         "step3Desc": "Всі обрані вами курси будуть зберігатися тут.",
         "step4Title": "Особистий кабінет",
         "step4Desc": "Увійдіть, щоб відстежувати прогрес, або зареєструйтесь!"
-      },
+      }
     }
   },
   de: {
     translation: {
-      // --- GLOBAL ---
+      "nav": {
+        "redeem": "Schlüssel einlösen",
+        "manageKeys": "Schlüssel-Generator",
+        "manageSessions": "Meine Sitzungen",
+        "management": "VERWALTUNG"
+      },
+      "redeem": {
+        "title": "Produkt-Schlüssel einlösen",
+        "subtitle": "Geben Sie Ihren Schlüsselcode ein, um Kurse freizuschalten.",
+        "keyCode": "Schlüsselcode",
+        "hint": "Die Groß-/Kleinschreibung wird nicht beachtet. Bindestriche werden automatisch hinzugefügt.",
+        "btnDefault": "Einlösen",
+        "btnLoading": "Überprüfung...",
+        "successTitle": "Aktivierung erfolgreich!",
+        "unlockedText": "Erfolgreich freigeschaltet:",
+        "newCourses": "neue(r) Kurs(e).",
+        "alreadyOwned": "waren bereits in Ihrer Bibliothek.",
+        "goToCourses": "Zu meinen Kursen",
+        "lookingForLibrary": "Suchen Sie Ihre Kursbibliothek?"
+      },
       "theme": "Thema",
       "light": "Hell",
       "dark": "Dunkel",
@@ -748,8 +774,6 @@ const resources = {
       "defaultCourseDesc": "Umfassender Kurs zur Verbesserung Ihrer Fähigkeiten.",
       "unknownAuthor": "Unbekannt",
       "addToCartBtn": "Hinzufügen",
-
-      // --- AUTH & REGISTER ---
       "auth": {
         "loginTitle": "Willkommen zurück",
         "loginSubtitle": "Bitte melden Sie sich an",
@@ -772,13 +796,11 @@ const resources = {
         "loginError": "Anmeldefehler:",
         "passwordsNotMatch": "Passwörter stimmen nicht überein!",
         "regFailed": "Registrierung fehlgeschlagen",
-        "autoLoginFailed": "Erfolgreich registriert, aber automatisches Anmelden fehlgeschlagen. Bitte gehen Sie zur Anmeldeseite.",
+        "autoLoginFailed": "Erfolgreich registriert, aber automatisches Anmelden fehlgeschlagen.",
         "noToken": "Kein Token vom Server erhalten",
         "regSuccess": "Registrierung erfolgreich!",
         "regError": "Registrierungsfehler:"
       },
-
-      // --- ACCOUNT PAGE ---
       "accountPage": {
         "title": "Konto",
         "welcome": "Willkommen zurück",
@@ -800,10 +822,10 @@ const resources = {
         "deleteFailed": "Löschen fehlgeschlagen:",
         "accessDenied": "Zugriff verweigert",
         "serverErrorDelete": "Serverfehler beim Löschen des Kurses",
-        "deleteCourse": "Kurs löschen"
+        "deleteCourse": "Kurs löschen",
+        "manage": "Verwalten",
+        "redeem": "Kurs aktivieren"
       },
-
-      // --- CART PAGE ---
       "cartTitle": "Warenkorb",
       "yourCartIsEmpty": "Ihr Warenkorb ist leer",
       "cart": {
@@ -811,7 +833,7 @@ const resources = {
         "itemsInCart": "Sie haben {{count}} Kurse in Ihrem Warenkorb",
         "clearCart": "Warenkorb leeren",
         "emptyTitle": "Ihr Warenkorb ist leer",
-        "emptyDesc": "Sieht so aus, als hätten Sie noch keine Kurse hinzugefügt. Durchsuchen Sie unseren Katalog, um etwas Interessantes zu finden!",
+        "emptyDesc": "Sieht so aus, als hätten Sie noch keine Kurse hinzugefügt.",
         "startShopping": "Mit dem Einkaufen beginnen",
         "lifetimeAccess": "Lebenslanger Zugriff",
         "remove": "Entfernen",
@@ -835,8 +857,6 @@ const resources = {
         "paymentPrompt": "Geben Sie Ihre Zahlungsdaten ein für $",
         "paymentSuccess": "Zahlung erfolgreich! (Simuliert)"
       },
-
-      // --- SETTINGS PAGE ---
       "settingsPage": {
         "nickname": "Nickname",
         "email": "E-Mail",
@@ -847,12 +867,10 @@ const resources = {
         "cancel": "Abbrechen",
         "save": "Änderungen speichern"
       },
-
-      // --- TEACHER FORM ---
       "teacher": {
         "applyButton": "Als Lehrer bewerben",
         "formTitle": "Lehrerbewerbung",
-        "formDesc": "Füllen Sie das Formular aus, um sich als Lehrer zu bewerben. Ein Administrator wird Sie nach der Prüfung kontaktieren.",
+        "formDesc": "Füllen Sie das Formular aus, um sich als Lehrer zu bewerben.",
         "firstName": "Vorname",
         "lastName": "Nachname",
         "bio": "Erzählen Sie uns von sich",
@@ -901,8 +919,6 @@ const resources = {
         "alertSuccess": "Bewerbung erfolgreich eingereicht!",
         "alertError": "Fehler beim Senden der Bewerbung."
       },
-
-      // --- ADD COURSE FORM ---
       "addCourseForm": {
         "uploadCover": "Titelbild hochladen",
         "changeCover": "Ändern",
@@ -921,7 +937,7 @@ const resources = {
         "createCourse": "Kurs erstellen",
         "saving": "Kurs wird erstellt...",
         "addTitle": "Kurs erstellen",
-        "addLead": "Füllen Sie die Kurs-Metadaten aus. Das Material kann auf GitHub gespeichert werden — geben Sie die URL an.",
+        "addLead": "Füllen Sie die Kurs-Metadaten aus. Das Material kann auf GitHub gespeichert werden.",
         "alertSelectImage": "Bitte wählen Sie eine Bilddatei aus",
         "alertImageSize": "Das Bild muss kleiner als 5MB sein",
         "alertFileSize": "Die Datei {{name}} ist zu groß. Maximal 50MB.",
@@ -932,8 +948,6 @@ const resources = {
         "alertCreateSuccess": "Kurs erfolgreich erstellt!",
         "alertCreateError": "Fehler beim Erstellen des Kurses. Bitte erneut versuchen."
       },
-
-      // --- COURSE PAGE ---
       "coursePage": {
         "createdBy": "Erstellt von",
         "updated": "Zuletzt aktualisiert",
@@ -989,8 +1003,6 @@ const resources = {
         "addedToCart": "Zum Warenkorb hinzugefügt:",
         "enrolledIn": "Eingeschrieben in:"
       },
-
-      // --- EDIT COURSE PAGE ---
       "editCourse": {
         "title": "Kurs bearbeiten",
         "subtitle": "Kursinformationen und Dateien aktualisieren",
@@ -1027,12 +1039,37 @@ const resources = {
         "alertTitleReq": "Titel ist erforderlich",
         "alertSuccess": "Kurs erfolgreich aktualisiert!",
         "alertError": "Fehler beim Aktualisieren des Kurses. Bitte erneut versuchen."
+      },
+      "tour": {
+        "next": "Weiter",
+        "back": "Zurück",
+        "skip": "Überspringen",
+        "last": "Fertig"
       }
     }
   },
   fr: {
     translation: {
-      // --- GLOBAL ---
+      "nav": {
+        "redeem": "Utiliser la clé",
+        "manageKeys": "Générateur de clés",
+        "manageSessions": "Mes sessions",
+        "management": "GESTION"
+      },
+      "redeem": {
+        "title": "Utiliser une clé de produit",
+        "subtitle": "Entrez votre code pour débloquer des cours.",
+        "keyCode": "Code de la clé",
+        "hint": "Insensible à la casse. Les tirets sont ajoutés automatiquement.",
+        "btnDefault": "Activer la clé",
+        "btnLoading": "Vérification...",
+        "successTitle": "Activation réussie !",
+        "unlockedText": "Débloqué avec succès",
+        "newCourses": "nouveau(x) cours.",
+        "alreadyOwned": "étaient déjà dans votre bibliothèque.",
+        "goToCourses": "Aller à mes cours",
+        "lookingForLibrary": "Vous cherchez votre bibliothèque de cours ?"
+      },
       "theme": "Thème",
       "light": "Clair",
       "dark": "Sombre",
@@ -1079,8 +1116,6 @@ const resources = {
       "defaultCourseDesc": "Cours complet pour améliorer vos compétences.",
       "unknownAuthor": "Inconnu",
       "addToCartBtn": "Ajouter",
-
-      // --- AUTH & REGISTER ---
       "auth": {
         "loginTitle": "Bon retour",
         "loginSubtitle": "Veuillez vous connecter à votre compte",
@@ -1108,8 +1143,6 @@ const resources = {
         "regSuccess": "Inscription réussie !",
         "regError": "Erreur d'inscription :"
       },
-
-      // --- ACCOUNT PAGE ---
       "accountPage": {
         "title": "Compte",
         "welcome": "Bon retour",
@@ -1131,10 +1164,10 @@ const resources = {
         "deleteFailed": "Échec de la suppression :",
         "accessDenied": "Accès refusé",
         "serverErrorDelete": "Erreur du serveur lors de la suppression du cours",
-        "deleteCourse": "Supprimer le cours"
+        "deleteCourse": "Supprimer le cours",
+        "manage": "Gérer",
+        "redeem": "Activer le cours"
       },
-
-      // --- CART PAGE ---
       "cartTitle": "Panier",
       "yourCartIsEmpty": "Votre panier est vide",
       "cart": {
@@ -1142,7 +1175,7 @@ const resources = {
         "itemsInCart": "Vous avez {{count}} cours dans votre panier",
         "clearCart": "Vider le panier",
         "emptyTitle": "Votre panier est vide",
-        "emptyDesc": "Il semble que vous n'ayez encore ajouté aucun cours. Parcourez notre catalogue pour trouver quelque chose d'intéressant !",
+        "emptyDesc": "Il semble que vous n'ayez encore ajouté aucun cours.",
         "startShopping": "Commencer les achats",
         "lifetimeAccess": "Accès à vie",
         "remove": "Retirer",
@@ -1166,8 +1199,6 @@ const resources = {
         "paymentPrompt": "Entrez vos détails de paiement pour $",
         "paymentSuccess": "Paiement réussi ! (Simulé)"
       },
-
-      // --- SETTINGS PAGE ---
       "settingsPage": {
         "nickname": "Pseudo",
         "email": "E-mail",
@@ -1178,12 +1209,10 @@ const resources = {
         "cancel": "Annuler",
         "save": "Enregistrer les modifications"
       },
-
-      // --- TEACHER FORM ---
       "teacher": {
         "applyButton": "Postuler comme professeur",
         "formTitle": "Candidature de professeur",
-        "formDesc": "Remplissez le formulaire pour postuler à un poste de professeur. Un administrateur vous contactera après examen.",
+        "formDesc": "Remplissez le formulaire pour postuler à un poste de professeur.",
         "firstName": "Prénom",
         "lastName": "Nom de famille",
         "bio": "Parlez-nous de vous",
@@ -1199,13 +1228,13 @@ const resources = {
         "subject": "Sujet",
         "experience": "Expérience (en années)",
         "source": "Source de connaissances",
-        "certs": "Certificat / Diplôme (avec notes)",
+        "certs": "Certificat / Diplôme",
         "examples": "Exemples de travaux",
-        "addFiles": "Ajouter des fichiers (PDF ou Image)",
-        "addArchive": "Ajouter une archive ou coller un lien",
+        "addFiles": "Ajouter des fichiers",
+        "addArchive": "Ajouter une archive",
         "addLink": "Ajouter",
         "saveSkill": "Enregistrer la compétence",
-        "noSkills": "Aucune compétence ajoutée pour le moment.",
+        "noSkills": "Aucune compétence ajoutée.",
         "editSkill": "Modifier la compétence",
         "addSkillModal": "Ajouter une compétence",
         "selectType": "Sélectionner le type...",
@@ -1232,8 +1261,6 @@ const resources = {
         "alertSuccess": "Candidature soumise avec succès !",
         "alertError": "Erreur lors de l'envoi de la candidature."
       },
-
-      // --- ADD COURSE FORM ---
       "addCourseForm": {
         "uploadCover": "Télécharger la couverture",
         "changeCover": "Changer",
@@ -1246,45 +1273,43 @@ const resources = {
         "skills": "Ce que vous apprendrez",
         "skillsPlaceholder": "Tapez une compétence et appuyez sur Entrée",
         "addBtn": "Ajouter",
-        "courseMaterials": "Supports de cours (Vidéos/Docs)",
+        "courseMaterials": "Supports de cours",
         "uploadMaterials": "Télécharger des supports",
         "cancel": "Annuler",
         "createCourse": "Créer le cours",
         "saving": "Création du cours...",
         "addTitle": "Créer un cours",
-        "addLead": "Remplissez les métadonnées du cours. Le matériel de cours peut être stocké sur GitHub — fournissez l'URL.",
+        "addLead": "Remplissez les métadonnées du cours.",
         "alertSelectImage": "Veuillez sélectionner un fichier image",
         "alertImageSize": "L'image doit faire moins de 5 Mo",
-        "alertFileSize": "Le fichier {{name}} est trop volumineux. Maximum 50 Mo.",
-        "alertOwnerMissing": "ID du propriétaire manquant. Veuillez vous reconnecter.",
+        "alertFileSize": "Le fichier {{name}} est trop volumineux.",
+        "alertOwnerMissing": "ID du propriétaire manquant.",
         "alertTitleReq": "Le titre est requis",
         "alertPriceInvalid": "Le prix doit être un nombre valide",
         "alertCreateFailed": "Échec de la création du cours :",
         "alertCreateSuccess": "Cours créé avec succès !",
-        "alertCreateError": "Erreur lors de la création du cours. Veuillez réessayer."
+        "alertCreateError": "Erreur lors de la création du cours."
       },
-
-      // --- COURSE PAGE ---
       "coursePage": {
         "createdBy": "Créé par",
         "updated": "Dernière mise à jour",
         "whatYouLearn": "Ce que vous apprendrez",
         "editcourse": "Modifier le cours",
         "courseContent": "Contenu du cours",
-        "noContent": "Le contenu du cours n'a pas encore été téléchargé. Veuillez ajouter du matériel.",
+        "noContent": "Le contenu du cours n'a pas encore été téléchargé.",
         "backToAccount": "Retour au compte",
-        "notFound": "Cours introuvable ou vous n'y avez pas accès.",
+        "notFound": "Cours introuvable.",
         "back": "Retour",
         "changePhoto": "Changer la photo",
         "addChapter": "Ajouter un chapitre",
         "text": "Texte",
         "video": "Vidéo",
         "document": "Document",
-        "selectFromUploaded": "Sélectionner parmi les fichiers téléchargés :",
-        "uploadNewFile": "Télécharger un nouveau fichier",
+        "selectFromUploaded": "Sélectionner parmi les fichiers :",
+        "uploadNewFile": "Nouveau fichier",
         "cancel": "Annuler",
         "save": "Enregistrer",
-        "loadingContent": "Chargement du contenu...",
+        "loadingContent": "Chargement...",
         "addToCart": "Ajouter au panier",
         "enrollNow": "S'inscrire maintenant",
         "guaranteeText": "Garantie de remboursement de 30 jours.",
@@ -1296,8 +1321,8 @@ const resources = {
         "saveChanges": "Enregistrer les modifications",
         "title": "Titre",
         "content": "Contenu",
-        "noContentInChapter": "Aucun contenu dans ce chapitre pour le moment. Ajoutez des éléments.",
-        "saving": "Enregistrement des modifications...",
+        "noContentInChapter": "Aucun contenu dans ce chapitre.",
+        "saving": "Enregistrement...",
         "editCourse": "Modifier le cours",
         "exitEditMode": "Quitter le mode édition",
         "deleteVolumePrompt": "Pour supprimer ce volume, veuillez taper son titre",
@@ -1314,35 +1339,33 @@ const resources = {
         "modalEdit": "Modifier",
         "modalAdd": "Ajouter",
         "alertNoTitle": "Veuillez entrer un titre",
-        "alertUploadFailed": "Échec du téléchargement de certains fichiers.",
-        "alertSaveSuccess": "Modifications enregistrées avec succès !",
-        "alertSaveFailed": "Échec de l'enregistrement. Modifications annulées.",
+        "alertUploadFailed": "Échec du téléchargement.",
+        "alertSaveSuccess": "Modifications enregistrées !",
+        "alertSaveFailed": "Échec de l'enregistrement.",
         "addedToCart": "Ajouté au panier :",
         "enrolledIn": "Inscrit à :"
       },
-
-      // --- EDIT COURSE PAGE ---
       "editCourse": {
         "title": "Modifier le cours",
-        "subtitle": "Mettre à jour les informations et les fichiers du cours",
+        "subtitle": "Mettre à jour les informations",
         "backToAccount": "Retour au compte",
-        "courseThumbnail": "Miniature du cours",
+        "courseThumbnail": "Miniature",
         "change": "Changer",
-        "courseOwner": "Propriétaire du cours",
+        "courseOwner": "Propriétaire",
         "selectOwner": "Sélectionner le propriétaire",
         "status": "Statut",
-        "statusDraft": "Édition (Brouillon)",
+        "statusDraft": "Édition",
         "statusCheck": "En vérification",
-        "statusDeployed": "Déployé (Publié !)",
+        "statusDeployed": "Publié",
         "courseTitle": "Titre du cours",
         "description": "Description",
         "skills": "Compétences",
-        "skillPlaceholder": "Tapez une compétence et appuyez sur Entrée",
+        "skillPlaceholder": "Tapez une compétence",
         "add": "Ajouter",
-        "courseFiles": "Fichiers du cours (Vidéos/Docs)",
+        "courseFiles": "Fichiers du cours",
         "uploadedFiles": "Fichiers téléchargés",
-        "uploadMore": "Télécharger plus de fichiers",
-        "newFiles": "Nouveaux fichiers à télécharger :",
+        "uploadMore": "Télécharger plus",
+        "newFiles": "Nouveaux fichiers :",
         "direction": "Direction",
         "selectDirection": "Sélectionner la direction",
         "level": "Niveau",
@@ -1352,18 +1375,43 @@ const resources = {
         "saving": "Enregistrement...",
         "savePublish": "Enregistrer et publier",
         "confirmDeleteFile": "Êtes-vous sûr de vouloir supprimer :",
-        "alertDeleteFailed": "Échec de la suppression du fichier",
+        "alertDeleteFailed": "Échec de la suppression",
         "alertOwnerReq": "Le propriétaire est requis",
         "alertStatusReq": "Le statut est requis",
         "alertTitleReq": "Le titre est requis",
-        "alertSuccess": "Cours mis à jour avec succès !",
-        "alertError": "Erreur lors de la mise à jour du cours. Veuillez réessayer."
+        "alertSuccess": "Cours mis à jour !",
+        "alertError": "Erreur lors de la mise à jour."
+      },
+      "tour": {
+        "next": "Suivant",
+        "back": "Retour",
+        "skip": "Passer",
+        "last": "Terminer"
       }
     }
   },
   it: {
     translation: {
-      // --- GLOBAL ---
+      "nav": {
+        "redeem": "Riscatta codice",
+        "manageKeys": "Generatore di chiavi",
+        "manageSessions": "Le mie sessioni",
+        "management": "GESTIONE"
+      },
+      "redeem": {
+        "title": "Riscatta un codice prodotto",
+        "subtitle": "Inserisci il tuo codice per sbloccare i corsi.",
+        "keyCode": "Codice prodotto",
+        "hint": "Non fa distinzione tra maiuscole e minuscole. I trattini vengono aggiunti automaticamente.",
+        "btnDefault": "Riscatta codice",
+        "btnLoading": "Verifica in corso...",
+        "successTitle": "Attivazione completata!",
+        "unlockedText": "Sbloccato con successo",
+        "newCourses": "nuovo/i corso/i.",
+        "alreadyOwned": "erano già nella tua libreria.",
+        "goToCourses": "Vai ai miei corsi",
+        "lookingForLibrary": "Cerchi la tua libreria di corsi?"
+      },
       "theme": "Tema",
       "light": "Chiaro",
       "dark": "Scuro",
@@ -1390,7 +1438,7 @@ const resources = {
       "min": "Min",
       "max": "Max",
       "heroTitle": "Impara vere competenze, realizza veri progetti",
-      "heroLead": "Corsi interattivi, tutoraggio e supporto alla carriera — tutto ciò di cui hai bisogno per crescere.",
+      "heroLead": "Corsi interattivi, tutoraggio e supporto alla carriera.",
       "getStarted": "Inizia",
       "learnMore": "Scopri di più",
       "popularCourses": "Corsi popolari",
@@ -1410,8 +1458,6 @@ const resources = {
       "defaultCourseDesc": "Corso completo per migliorare le tue competenze.",
       "unknownAuthor": "Sconosciuto",
       "addToCartBtn": "Aggiungi",
-
-      // --- AUTH & REGISTER ---
       "auth": {
         "loginTitle": "Bentornato",
         "loginSubtitle": "Accedi al tuo account",
@@ -1434,13 +1480,11 @@ const resources = {
         "loginError": "Errore di accesso:",
         "passwordsNotMatch": "Le password non corrispondono!",
         "regFailed": "Registrazione fallita",
-        "autoLoginFailed": "Registrazione completata, ma l'accesso automatico è fallito. Vai alla pagina di accesso.",
+        "autoLoginFailed": "Registrazione completata, ma l'accesso automatico è fallito.",
         "noToken": "Nessun token ricevuto dal server",
         "regSuccess": "Registrazione completata con successo!",
         "regError": "Errore di registrazione:"
       },
-
-      // --- ACCOUNT PAGE ---
       "accountPage": {
         "title": "Account",
         "welcome": "Bentornato",
@@ -1461,11 +1505,11 @@ const resources = {
         "deleteConfirm": "Sei sicuro di voler eliminare DEFINITIVAMENTE questo corso?",
         "deleteFailed": "Eliminazione fallita:",
         "accessDenied": "Accesso negato",
-        "serverErrorDelete": "Errore del server durante l'eliminazione del corso",
-        "deleteCourse": "Elimina corso"
+        "serverErrorDelete": "Errore del server durante l'eliminazione",
+        "deleteCourse": "Elimina corso",
+        "manage": "Gestisci",
+        "redeem": "Attiva corso"
       },
-
-      // --- CART PAGE ---
       "cartTitle": "Carrello",
       "yourCartIsEmpty": "Il tuo carrello è vuoto",
       "cart": {
@@ -1473,7 +1517,7 @@ const resources = {
         "itemsInCart": "Hai {{count}} corsi nel tuo carrello",
         "clearCart": "Svuota carrello",
         "emptyTitle": "Il tuo carrello è vuoto",
-        "emptyDesc": "Sembra che tu non abbia ancora aggiunto alcun corso. Esplora il nostro catalogo per trovare qualcosa di interessante!",
+        "emptyDesc": "Sembra che tu non abbia ancora aggiunto alcun corso.",
         "startShopping": "Inizia gli acquisti",
         "lifetimeAccess": "Accesso a vita",
         "remove": "Rimuovi",
@@ -1497,8 +1541,6 @@ const resources = {
         "paymentPrompt": "Inserisci i dettagli di pagamento per $",
         "paymentSuccess": "Pagamento completato! (Simulato)"
       },
-
-      // --- SETTINGS PAGE ---
       "settingsPage": {
         "nickname": "Nickname",
         "email": "Email",
@@ -1509,12 +1551,10 @@ const resources = {
         "cancel": "Annulla",
         "save": "Salva modifiche"
       },
-
-      // --- TEACHER FORM ---
       "teacher": {
         "applyButton": "Candidati come insegnante",
         "formTitle": "Candidatura insegnante",
-        "formDesc": "Compila il modulo per candidarti al ruolo di insegnante. Un amministratore ti contatterà dopo la revisione.",
+        "formDesc": "Compila il modulo per candidarti al ruolo di insegnante.",
         "firstName": "Nome",
         "lastName": "Cognome",
         "bio": "Parlaci di te",
@@ -1530,13 +1570,13 @@ const resources = {
         "subject": "Materia",
         "experience": "Esperienza (in anni compiuti)",
         "source": "Fonte della conoscenza",
-        "certs": "Certificato / Diploma (con voti)",
+        "certs": "Certificato / Diploma",
         "examples": "Esempi di lavoro",
-        "addFiles": "Aggiungi file (PDF o Immagine)",
-        "addArchive": "Aggiungi archivio o incolla link",
+        "addFiles": "Aggiungi file",
+        "addArchive": "Aggiungi archivio",
         "addLink": "Aggiungi",
         "saveSkill": "Salva competenza",
-        "noSkills": "Nessuna competenza aggiunta finora.",
+        "noSkills": "Nessuna competenza aggiunta.",
         "editSkill": "Modifica competenza",
         "addSkillModal": "Aggiungi competenza",
         "selectType": "Seleziona tipo...",
@@ -1563,8 +1603,6 @@ const resources = {
         "alertSuccess": "Candidatura inviata con successo!",
         "alertError": "Errore durante l'invio della candidatura."
       },
-
-      // --- ADD COURSE FORM ---
       "addCourseForm": {
         "uploadCover": "Carica copertina",
         "changeCover": "Cambia",
@@ -1577,34 +1615,32 @@ const resources = {
         "skills": "Cosa imparerai",
         "skillsPlaceholder": "Digita una competenza e premi Invio",
         "addBtn": "Aggiungi",
-        "courseMaterials": "Materiali del corso (Video/Doc)",
+        "courseMaterials": "Materiali del corso",
         "uploadMaterials": "Carica materiali",
         "cancel": "Annulla",
         "createCourse": "Crea corso",
-        "saving": "Creazione del corso in corso...",
+        "saving": "Creazione in corso...",
         "addTitle": "Crea un corso",
-        "addLead": "Compila i metadati del corso. Il materiale può essere archiviato su GitHub — fornisci l'URL.",
+        "addLead": "Compila i metadati del corso.",
         "alertSelectImage": "Seleziona un file immagine",
         "alertImageSize": "L'immagine deve essere inferiore a 5MB",
-        "alertFileSize": "Il file {{name}} è troppo grande. Massimo 50MB.",
-        "alertOwnerMissing": "ID del proprietario mancante. Effettua nuovamente l'accesso.",
+        "alertFileSize": "Il file {{name}} è troppo grande.",
+        "alertOwnerMissing": "ID del proprietario mancante.",
         "alertTitleReq": "Il titolo è obbligatorio",
         "alertPriceInvalid": "Il prezzo deve essere un numero valido",
-        "alertCreateFailed": "Creazione del corso fallita:",
+        "alertCreateFailed": "Creazione fallita:",
         "alertCreateSuccess": "Corso creato con successo!",
-        "alertCreateError": "Errore durante la creazione del corso. Riprova."
+        "alertCreateError": "Errore durante la creazione."
       },
-
-      // --- COURSE PAGE ---
       "coursePage": {
         "createdBy": "Creato da",
         "updated": "Ultimo aggiornamento",
         "whatYouLearn": "Cosa imparerai",
         "editcourse": "Modifica corso",
         "courseContent": "Contenuto del corso",
-        "noContent": "Il contenuto del corso non è ancora stato caricato. Aggiungi i materiali.",
+        "noContent": "Il contenuto non è ancora stato caricato.",
         "backToAccount": "Torna all'account",
-        "notFound": "Corso non trovato o non hai accesso ad esso.",
+        "notFound": "Corso non trovato.",
         "back": "Indietro",
         "changePhoto": "Cambia foto",
         "addChapter": "Aggiungi capitolo",
@@ -1615,20 +1651,20 @@ const resources = {
         "uploadNewFile": "Carica un nuovo file",
         "cancel": "Annulla",
         "save": "Salva",
-        "loadingContent": "Caricamento del contenuto...",
+        "loadingContent": "Caricamento...",
         "addToCart": "Aggiungi al carrello",
         "enrollNow": "Iscriviti ora",
         "guaranteeText": "Garanzia di rimborso di 30 giorni.",
-        "selectDirection": "Seleziona la direzione",
-        "selectLevel": "Seleziona il livello",
+        "selectDirection": "Seleziona direzione",
+        "selectLevel": "Seleziona livello",
         "addFirstVolume": "Aggiungi il primo modulo",
         "addSkill": "Aggiungi competenza",
         "addVolume": "Nuovo modulo",
         "saveChanges": "Salva modifiche",
         "title": "Titolo",
         "content": "Contenuto",
-        "noContentInChapter": "Nessun contenuto in questo capitolo per ora. Aggiungi elementi.",
-        "saving": "Salvataggio delle modifiche in corso...",
+        "noContentInChapter": "Nessun contenuto in questo capitolo.",
+        "saving": "Salvataggio...",
         "editCourse": "Modifica corso",
         "exitEditMode": "Esci dalla modalità di modifica",
         "deleteVolumePrompt": "Per eliminare questo modulo, digita il suo titolo",
@@ -1647,54 +1683,77 @@ const resources = {
         "alertNoTitle": "Inserisci un titolo",
         "alertUploadFailed": "Impossibile caricare alcuni file.",
         "alertSaveSuccess": "Modifiche salvate con successo!",
-        "alertSaveFailed": "Salvataggio non riuscito. Modifiche annullate.",
+        "alertSaveFailed": "Salvataggio non riuscito.",
         "addedToCart": "Aggiunto al carrello:",
         "enrolledIn": "Iscritto a:"
       },
-
-      // --- EDIT COURSE PAGE ---
       "editCourse": {
         "title": "Modifica corso",
-        "subtitle": "Aggiorna le informazioni e i file del corso",
+        "subtitle": "Aggiorna informazioni",
         "backToAccount": "Torna all'account",
-        "courseThumbnail": "Miniatura del corso",
+        "courseThumbnail": "Miniatura",
         "change": "Cambia",
         "courseOwner": "Proprietario del corso",
-        "selectOwner": "Seleziona il proprietario",
+        "selectOwner": "Seleziona proprietario",
         "status": "Stato",
-        "statusDraft": "Modifica (Bozza)",
+        "statusDraft": "Bozza",
         "statusCheck": "In revisione",
-        "statusDeployed": "Distribuito (Pubblicato!)",
+        "statusDeployed": "Pubblicato",
         "courseTitle": "Titolo del corso",
         "description": "Descrizione",
         "skills": "Competenze",
-        "skillPlaceholder": "Digita una competenza e premi Invio",
+        "skillPlaceholder": "Digita una competenza",
         "add": "Aggiungi",
-        "courseFiles": "Materiali del corso (Video/Doc)",
+        "courseFiles": "Materiali del corso",
         "uploadedFiles": "File caricati",
         "uploadMore": "Carica altri file",
-        "newFiles": "Nuovi file da caricare:",
+        "newFiles": "Nuovi file:",
         "direction": "Direzione",
-        "selectDirection": "Seleziona la direzione",
+        "selectDirection": "Seleziona direzione",
         "level": "Livello",
-        "selectLevel": "Seleziona il livello",
+        "selectLevel": "Seleziona livello",
         "price": "Prezzo ($)",
         "cancel": "Annulla",
         "saving": "Salvataggio in corso...",
         "savePublish": "Salva e pubblica",
         "confirmDeleteFile": "Sei sicuro di voler eliminare:",
-        "alertDeleteFailed": "Impossibile eliminare il file",
+        "alertDeleteFailed": "Impossibile eliminare",
         "alertOwnerReq": "Il proprietario è obbligatorio",
         "alertStatusReq": "Lo stato è obbligatorio",
         "alertTitleReq": "Il titolo è obbligatorio",
         "alertSuccess": "Corso aggiornato con successo!",
-        "alertError": "Errore durante l'aggiornamento del corso. Riprova."
+        "alertError": "Errore durante l'aggiornamento."
+      },
+      "tour": {
+        "next": "Avanti",
+        "back": "Indietro",
+        "skip": "Salta",
+        "last": "Fine"
       }
     }
   },
   sv: {
     translation: {
-      // --- GLOBAL ---
+      "nav": {
+        "redeem": "Lös in nyckel",
+        "manageKeys": "Nyckelgenerator",
+        "manageSessions": "Mina sessioner",
+        "management": "HANTERING"
+      },
+      "redeem": {
+        "title": "Lös in en produktnyckel",
+        "subtitle": "Ange din nyckelkod för att låsa upp kurser.",
+        "keyCode": "Nyckelkod",
+        "hint": "Inte skiftlägeskänslig. Streck läggs till automatiskt.",
+        "btnDefault": "Lös in nyckel",
+        "btnLoading": "Verifierar...",
+        "successTitle": "Aktivering lyckades!",
+        "unlockedText": "Låste upp",
+        "newCourses": "nya kurser.",
+        "alreadyOwned": "fanns redan i ditt bibliotek.",
+        "goToCourses": "Gå till mina kurser",
+        "lookingForLibrary": "Letar du efter ditt kursbibliotek?"
+      },
       "theme": "Tema",
       "light": "Ljus",
       "dark": "Mörk",
@@ -1741,8 +1800,6 @@ const resources = {
       "defaultCourseDesc": "Omfattande kurs för att uppgradera dina färdigheter.",
       "unknownAuthor": "Okänd",
       "addToCartBtn": "Lägg till",
-
-      // --- AUTH & REGISTER ---
       "auth": {
         "loginTitle": "Välkommen tillbaka",
         "loginSubtitle": "Vänligen logga in på ditt konto",
@@ -1770,8 +1827,6 @@ const resources = {
         "regSuccess": "Registreringen lyckades!",
         "regError": "Registreringsfel:"
       },
-
-      // --- ACCOUNT PAGE ---
       "accountPage": {
         "title": "Konto",
         "welcome": "Välkommen tillbaka",
@@ -1793,10 +1848,10 @@ const resources = {
         "deleteFailed": "Radering misslyckades:",
         "accessDenied": "Åtkomst nekad",
         "serverErrorDelete": "Serverfel vid radering av kurs",
-        "deleteCourse": "Radera kurs"
+        "deleteCourse": "Radera kurs",
+        "manage": "Hantera",
+        "redeem": "Aktivera kurs"
       },
-
-      // --- CART PAGE ---
       "cartTitle": "Kundvagn",
       "yourCartIsEmpty": "Din kundvagn är tom",
       "cart": {
@@ -1804,7 +1859,7 @@ const resources = {
         "itemsInCart": "Du har {{count}} kurser i din kundvagn",
         "clearCart": "Rensa kundvagn",
         "emptyTitle": "Din kundvagn är tom",
-        "emptyDesc": "Det verkar som om du inte har lagt till några kurser ännu. Utforska vår katalog!",
+        "emptyDesc": "Det verkar som om du inte har lagt till några kurser ännu.",
         "startShopping": "Börja handla",
         "lifetimeAccess": "Livstidsåtkomst",
         "remove": "Ta bort",
@@ -1828,8 +1883,6 @@ const resources = {
         "paymentPrompt": "Ange dina betalningsuppgifter för $",
         "paymentSuccess": "Betalning genomförd! (Simulerad)"
       },
-
-      // --- SETTINGS PAGE ---
       "settingsPage": {
         "nickname": "Smeknamn",
         "email": "E-post",
@@ -1840,12 +1893,10 @@ const resources = {
         "cancel": "Avbryt",
         "save": "Spara ändringar"
       },
-
-      // --- TEACHER FORM ---
       "teacher": {
         "applyButton": "Ansök som lärare",
         "formTitle": "Läraransökan",
-        "formDesc": "Fyll i formuläret för att ansöka om en lärarroll. En administratör kommer att kontakta dig.",
+        "formDesc": "Fyll i formuläret för att ansöka om en lärarroll.",
         "firstName": "Förnamn",
         "lastName": "Efternamn",
         "bio": "Berätta om dig själv",
@@ -1861,13 +1912,13 @@ const resources = {
         "subject": "Ämne",
         "experience": "Erfarenhet (i hela år)",
         "source": "Kunskapskälla",
-        "certs": "Certifikat / Diplom (med betyg)",
+        "certs": "Certifikat / Diplom",
         "examples": "Arbetsprover",
-        "addFiles": "Lägg till filer (PDF eller bild)",
-        "addArchive": "Lägg till arkiv eller klistra in länk",
+        "addFiles": "Lägg till filer",
+        "addArchive": "Lägg till arkiv",
         "addLink": "Lägg till",
         "saveSkill": "Spara färdighet",
-        "noSkills": "Inga färdigheter tillagda ännu.",
+        "noSkills": "Inga färdigheter tillagda.",
         "editSkill": "Redigera färdighet",
         "addSkillModal": "Lägg till färdighet",
         "selectType": "Välj typ...",
@@ -1894,8 +1945,6 @@ const resources = {
         "alertSuccess": "Ansökan skickades framgångsrikt!",
         "alertError": "Fel vid sändning av ansökan."
       },
-
-      // --- ADD COURSE FORM ---
       "addCourseForm": {
         "uploadCover": "Ladda upp omslagsbild",
         "changeCover": "Ändra",
@@ -1908,41 +1957,39 @@ const resources = {
         "skills": "Vad du kommer att lära dig",
         "skillsPlaceholder": "Skriv en färdighet och tryck Enter",
         "addBtn": "Lägg till",
-        "courseMaterials": "Kursmaterial (Videor/Dokument)",
+        "courseMaterials": "Kursmaterial",
         "uploadMaterials": "Ladda upp material",
         "cancel": "Avbryt",
         "createCourse": "Skapa kurs",
         "saving": "Skapar kurs...",
         "addTitle": "Skapa en kurs",
-        "addLead": "Fyll i kursens metadata. Materialet kan lagras på GitHub — ange URL:en.",
+        "addLead": "Fyll i kursens metadata.",
         "alertSelectImage": "Vänligen välj en bildfil",
         "alertImageSize": "Bilden måste vara mindre än 5MB",
-        "alertFileSize": "Filen {{name}} är för stor. Max 50MB.",
-        "alertOwnerMissing": "Ägar-ID saknas. Vänligen logga in igen.",
+        "alertFileSize": "Filen {{name}} är för stor.",
+        "alertOwnerMissing": "Ägar-ID saknas.",
         "alertTitleReq": "Titel krävs",
         "alertPriceInvalid": "Priset måste vara ett giltigt nummer",
         "alertCreateFailed": "Misslyckades med att skapa kurs:",
         "alertCreateSuccess": "Kursen skapades framgångsrikt!",
-        "alertCreateError": "Fel vid skapande av kurs. Försök igen."
+        "alertCreateError": "Fel vid skapande av kurs."
       },
-
-      // --- COURSE PAGE ---
       "coursePage": {
         "createdBy": "Skapad av",
         "updated": "Senast uppdaterad",
         "whatYouLearn": "Vad du kommer att lära dig",
         "editcourse": "Redigera kurs",
         "courseContent": "Kursinnehåll",
-        "noContent": "Kursinnehåll har inte laddats upp ännu. Lägg till material.",
+        "noContent": "Kursinnehåll har inte laddats upp ännu.",
         "backToAccount": "Tillbaka till konto",
-        "notFound": "Kursen hittades inte eller så har du inte åtkomst till den.",
+        "notFound": "Kursen hittades inte.",
         "back": "Tillbaka",
         "changePhoto": "Ändra foto",
         "addChapter": "Lägg till kapitel",
         "text": "Text",
         "video": "Video",
         "document": "Dokument",
-        "selectFromUploaded": "Välj bland uppladdade filer:",
+        "selectFromUploaded": "Välj från uppladdade:",
         "uploadNewFile": "Ladda upp ny fil",
         "cancel": "Avbryt",
         "save": "Spara",
@@ -1958,8 +2005,8 @@ const resources = {
         "saveChanges": "Spara ändringar",
         "title": "Titel",
         "content": "Innehåll",
-        "noContentInChapter": "Inget innehåll i detta kapitel ännu. Lägg till objekt.",
-        "saving": "Sparar ändringar...",
+        "noContentInChapter": "Inget innehåll i detta kapitel.",
+        "saving": "Sparar...",
         "editCourse": "Redigera kurs",
         "exitEditMode": "Avsluta redigeringsläge",
         "deleteVolumePrompt": "För att radera denna modul, skriv in dess titel",
@@ -1978,33 +2025,31 @@ const resources = {
         "alertNoTitle": "Vänligen ange en titel",
         "alertUploadFailed": "Vissa filer kunde inte laddas upp.",
         "alertSaveSuccess": "Ändringarna sparades!",
-        "alertSaveFailed": "Kunde inte spara. Ändringarna kastas.",
+        "alertSaveFailed": "Kunde inte spara.",
         "addedToCart": "Tillagd i kundvagnen:",
         "enrolledIn": "Registrerad i:"
       },
-
-      // --- EDIT COURSE PAGE ---
       "editCourse": {
         "title": "Redigera kurs",
-        "subtitle": "Uppdatera kursinformation och filer",
+        "subtitle": "Uppdatera kursinformation",
         "backToAccount": "Tillbaka till konto",
-        "courseThumbnail": "Kursens miniatyrbild",
+        "courseThumbnail": "Miniatyrbild",
         "change": "Ändra",
         "courseOwner": "Kursägare",
         "selectOwner": "Välj ägare",
         "status": "Status",
-        "statusDraft": "Redigering (Utkast)",
+        "statusDraft": "Utkast",
         "statusCheck": "Granskas",
-        "statusDeployed": "Distribuerad (Publicerad!)",
+        "statusDeployed": "Publicerad",
         "courseTitle": "Kurstitel",
         "description": "Beskrivning",
         "skills": "Färdigheter",
-        "skillPlaceholder": "Skriv en färdighet och tryck Enter",
+        "skillPlaceholder": "Skriv en färdighet",
         "add": "Lägg till",
-        "courseFiles": "Kursmaterial (Videor/Dokument)",
+        "courseFiles": "Kursmaterial",
         "uploadedFiles": "Uppladdade filer",
-        "uploadMore": "Ladda upp fler filer",
-        "newFiles": "Nya filer att ladda upp:",
+        "uploadMore": "Ladda upp fler",
+        "newFiles": "Nya filer:",
         "direction": "Riktning",
         "selectDirection": "Välj riktning",
         "level": "Nivå",
@@ -2014,12 +2059,18 @@ const resources = {
         "saving": "Sparar...",
         "savePublish": "Spara & Publicera",
         "confirmDeleteFile": "Är du säker på att du vill radera:",
-        "alertDeleteFailed": "Misslyckades med att radera filen",
+        "alertDeleteFailed": "Misslyckades med att radera",
         "alertOwnerReq": "Ägare krävs",
         "alertStatusReq": "Status krävs",
         "alertTitleReq": "Titel krävs",
-        "alertSuccess": "Kursen uppdaterades framgångsrikt!",
-        "alertError": "Fel vid uppdatering av kurs. Försök igen."
+        "alertSuccess": "Kursen uppdaterades!",
+        "alertError": "Fel vid uppdatering av kurs."
+      },
+      "tour": {
+        "next": "Nästa",
+        "back": "Tillbaka",
+        "skip": "Hoppa över",
+        "last": "Klar"
       }
     }
   }

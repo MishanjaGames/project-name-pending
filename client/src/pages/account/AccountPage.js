@@ -171,6 +171,18 @@ function AccountPage() {
                               </div>
                             </div>
                             <div className="d-flex gap-2">
+                              {/* КНОПКА MANAGE */}
+                              <button 
+                                className="btn btn-sm btn-primary shadow-sm fw-bold" 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  navigate(`/manage/session/${c._id || c.id}`);
+                                }}
+                                title="Manage Session"
+                              >
+                                 <i className="bi bi-kanban me-1"></i> {t('accountPage.manage')}
+                              </button>
+
                               <button 
                                 className="btn btn-sm btn-outline-secondary" 
                                 onClick={(e) => { 
@@ -184,7 +196,7 @@ function AccountPage() {
                                 className="btn btn-sm btn-outline-danger" 
                                 onClick={async (e) => { 
                                   e.stopPropagation();
-                                  if(window.confirm('Are you sure you want to PERMANENTLY delete this course?')) {
+                                  if(window.confirm(t('accountPage.deleteConfirm'))) {
                                     try {
                                       const token = localStorage.getItem('token');
                                       const response = await fetch(`http://localhost:4040/api/manage/courses/${c._id || c.id}`, {
@@ -196,15 +208,15 @@ function AccountPage() {
                                         setCreatedCourses(prev => prev.filter(item => (item._id || item.id) !== (c._id || c.id)));
                                       } else {
                                         const errorData = await response.json();
-                                        alert(`Failed to delete: ${errorData.message || 'Access denied'}`);
+                                        alert(`${t('accountPage.deleteFailed')} ${errorData.message || t('accountPage.accessDenied')}`);
                                       }
                                     } catch (error) {
                                       console.error('Delete error:', error);
-                                      alert('Server error while deleting course');
+                                      alert(t('accountPage.serverErrorDelete'));
                                     }
                                   }
                                 }}
-                                title="Delete Course"
+                                title={t('accountPage.deleteCourse')}
                               >
                                 <i className="bi bi-trash"></i>
                               </button> 
@@ -221,7 +233,16 @@ function AccountPage() {
 
           <div className="card border-0 shadow-sm">
              <div className="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
-                <h5 className="fw-bold mb-0">{t('accountPage.myLearning')}</h5>
+                <div className="d-flex align-items-center gap-3">
+                   <h5 className="fw-bold mb-0">{t('accountPage.myLearning')}</h5>
+                   {/* КНОПКА REDEEM */}
+                   <button 
+                     className="btn btn-sm btn-outline-primary fw-bold px-3 rounded-pill" 
+                     onClick={() => navigate('/redeem')}
+                   >
+                     <i className="bi bi-key-fill me-1"></i> {t('accountPage.redeem')}
+                   </button>
+                </div>
                 <button className="btn btn-link text-decoration-none small" onClick={() => navigate('/search')}>{t('accountPage.browseMore')}</button>
              </div>
              <div className="card-body p-4">

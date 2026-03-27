@@ -18,6 +18,10 @@ import { CartProvider } from './contexts/CartContext';
 import OnBoardingTour from './components/OnBoardingTour';
 import { WishlistProvider } from './contexts/WishlistContext';
 import WishlistPage from './pages/wishlist/WishlistPage';
+import RedeemPage from './pages/redeem/RedeemPage';
+import CreatorKeysPage from './pages/key_page/CreatorKeysPage';
+import ManageSessionPage from './pages/manage_page/ManageSessionPage';
+import LiveSessionPage from './pages/live_session/LiveSessionPage';
 
 function App() {
   return (
@@ -55,6 +59,20 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
+              <Route path="/redeem" element={<RedeemPage />} />
+              <Route path="/manage/keys" element={
+                <ProtectedRoute allowedRoles={['create', 'manage', 'admin', 'root']}>
+                  <CreatorKeysPage />
+                </ProtectedRoute>
+                } 
+              />
+              <Route path="/manage/session/:id" element={
+                <ProtectedRoute allowedRoles={['create', 'manage', 'admin', 'root']}>
+                  <ManageSessionPage />
+                </ProtectedRoute>
+                } 
+              />
+              <Route path="/live/:id" element={<LiveSessionPage />} />
             </Routes>
           </BrowserRouter>
         </WishlistProvider>
