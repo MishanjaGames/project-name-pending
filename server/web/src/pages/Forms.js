@@ -54,7 +54,7 @@ const getEmail = (sub) => {
 
 const viewPath = (id) => `/manage/forms/detail/${id}`;
 
-const API_BASE = "http://localhost:4040/api";
+const API_BASE = process.env.REACT_APP_API_URL + "";
 
 // ─── ConfirmModal ─────────────────────────────────────────────────────────────
 
@@ -104,10 +104,15 @@ function Forms({ data, onLogout }) {
         "Content-Type": "application/json",
     };
 
-    const fetchSubmissions = async () => {
+    const fetchSubmissions = async (opts = {}) => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/manage/forms`, {
+            const params = new URLSearchParams();
+            if (opts.formType) params.set('formType', opts.formType);
+            if (opts.status)   params.set('status',   opts.status);
+            if (opts.search)   params.set('search',   opts.search);
+            const qs = params.toString() ? `?${params.toString()}` : '';
+            const res = await fetch(`${API_BASE}/manage/forms${qs}`, {
                 method: "GET", headers: authHeaders,
             });
             if (res.status === 401) await extendSession(data);

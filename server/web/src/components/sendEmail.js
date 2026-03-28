@@ -41,7 +41,7 @@ import { FORM_CONFIGS } from "../config/config.forms";
 
 const EMAILJS_CONFIG = {
     serviceId:  "service_qkrj62k",   // EmailJS → Email Services → Service ID
-    publicKey:  "Nvm4o7f3CGBjRYtZ5",   // EmailJS → Account → Public Key
+    publicKey:  process.env.REACT_APP_EMAILJS_PUBLIC_KEY || '',   // Set via REACT_APP_EMAILJS_PUBLIC_KEY in .env
     appName:    "project-name-pending Automtic Response System",     // Shown inside email body as {{app_name}}
 };
 

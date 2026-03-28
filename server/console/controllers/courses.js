@@ -441,3 +441,64 @@ module.exports.deleteComment = async (req, res) => {
         errorHandler(res, 500, e)
     }
 }
+// ── Purchase ──────────────────────────────────────────────────────────────────
+
+module.exports.purchase = async (req, res) => {
+    try {
+        const requester = await getRequester(req)
+        if (!requester) return errorHandler(res, 401, 'Authentication required')
+
+        const course = await Courses.findById(req.params.id)
+        if (!course) return errorHandler(res, 404, 'Course not found')
+
+        if (course.courseType === 'HOSTED')
+            return errorHandler(res, 400, 'HOSTED courses do not require purchase')
+
+        const alreadyOwns = (requester.courses || []).some(
+            c => c._id?.toString() === course._id.toString()
+        )
+        if (alreadyOwns)
+            return res.status(200).json({ message: 'Already owned', data: { courseId: course._id } })
+
+        // Apply promo if provided (reuse validate logic, but don't mark used here — apply does that)
+        const { promoCode } = req.body
+        let finalPrice = course.price || 0
+
+        if (promoCode) {
+            const Promos = require('../models/mongo.promos')
+            const promo = await Promos.findOne({ code: promoCode.trim().toUpperCase() })
+            if (promo && promo.active) {
+                const appliesToCourse = promo.courseIds.length === 0 ||
+                    promo.courseIds.some(id => id.toString() === course._id.toString())
+                if (appliesToCourse) {
+                    const discount = promo.discountType === 'percent'
+                        ? parseFloat((finalPrice * promo.discountValue / 100).toFixed(2))
+                        : Math.min(promo.discountValue, finalPrice)
+                    finalPrice = Math.max(0, parseFloat((finalPrice - discount).toFixed(2)))
+                    // Mark promo used
+                    await Promos.findByIdAndUpdate(promo._id, {
+                        $inc: { usedCount: 1 },
+                        $push: { usages: { userId: requester._id, courseId: course._id, usedAt: new Date() } }
+                    })
+                }
+            }
+        }
+
+        // Add course to user's library
+        await Users.findByIdAndUpdate(requester._id, {
+            $push: { courses: { _id: course._id, process: 0 } }
+        })
+
+        // Increment followers count
+        await Courses.findByIdAndUpdate(course._id, {
+            $inc: { followers: 1 }
+        })
+
+        res.status(200).json({
+            message: 'Course purchased successfully',
+            data: { courseId: course._id, finalPrice }
+        })
+    } catch (e) {
+        errorHandler(res, 500, e)
+    }
+}

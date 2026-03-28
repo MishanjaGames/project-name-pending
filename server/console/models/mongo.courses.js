@@ -34,7 +34,7 @@ const courseSchema = new Schema({
     status: {
         type: String,
         required: false,
-        default: 'editing'
+        default: 'hidden'
     },
     direction: {
         type: String,

@@ -530,49 +530,100 @@ function ManageSession({ data, onLogout }) {
 
                 {/* ══ TAB: OVERVIEW ══ */}
                 {tab === "overview" && (
-                    <div className="row g-3">
-                        <div className="col-md-6">
-                            <div className="card border-0 shadow-sm">
-                                <div className="card-header bg-white fw-semibold">Session Info</div>
-                                <div className="card-body">
-                                    <table className="table table-sm table-borderless mb-0">
-                                        <tbody>
-                                            <tr><td className="text-muted">Course</td><td>{courseTitle(course)}</td></tr>
-                                            <tr><td className="text-muted">Level</td><td>{course?.level}</td></tr>
-                                            <tr><td className="text-muted">Type</td><td>{session.courseType}</td></tr>
-                                            <tr><td className="text-muted">Status</td><td><span className={`badge bg-${statusColors[session.status]}`}>{session.status}</span></td></tr>
-                                            <tr><td className="text-muted">Host</td><td>{session.hostTutor?.nickname || "—"} <span className="text-muted small">({session.hostTutor?.tutorRank || "n/a"})</span></td></tr>
-                                            <tr><td className="text-muted">Private copy</td><td>{session.privateCopyId ? <span className="text-success">✓ Created</span> : <span className="text-muted">None</span>}</td></tr>
-                                            <tr><td className="text-muted">Groups</td><td>{groups.length}</td></tr>
-                                            <tr><td className="text-muted">Total students</td><td>{groups.reduce((s, g) => s + (g.members?.filter(m => m.status === 'active').length || 0), 0)}</td></tr>
-                                            <tr><td className="text-muted">Schedule entries</td><td>{session.schedule?.length || 0}</td></tr>
-                                            <tr><td className="text-muted">Deadlines</td><td>{session.deadlines?.length || 0}</td></tr>
-                                        </tbody>
-                                    </table>
+                    <div>
+                        {/* ── Stat cards ── */}
+                        <div className="row g-3 mb-4">
+                            {[
+                                { label: 'Groups',          value: groups.length,                                                                                    icon: 'bi-people',           color: '#3b5bdb' },
+                                { label: 'Active students', value: groups.reduce((s,g) => s + (g.members?.filter(m=>m.status==='active').length||0), 0),             icon: 'bi-person-check',     color: '#2f9e44' },
+                                { label: 'Schedule entries',value: session.schedule?.length || 0,                                                                    icon: 'bi-calendar-event',   color: '#f08c00' },
+                                { label: 'Deadlines',       value: session.deadlines?.length || 0,                                                                   icon: 'bi-clock',            color: '#e03131' },
+                                { label: 'Assignments',     value: assignments.length,                                                                               icon: 'bi-clipboard-check',  color: '#7048e8' },
+                                { label: 'Pending reviews', value: Object.values(submissions).flat().filter(s=>s.status==='pending').length,                         icon: 'bi-hourglass-split',  color: '#c2255c' },
+                            ].map(c => (
+                                <div key={c.label} className="col-6 col-md-4 col-lg-2">
+                                    <div className="card border-0 shadow-sm h-100">
+                                        <div className="card-body p-3">
+                                            <div className="d-flex justify-content-between align-items-start mb-1">
+                                                <small className="text-muted text-uppercase fw-semibold" style={{ fontSize: '.68rem', letterSpacing: '.05em' }}>{c.label}</small>
+                                                <i className={`bi ${c.icon}`} style={{ color: c.color, fontSize: '1.1rem', opacity: .8 }}></i>
+                                            </div>
+                                            <div className="fw-bold" style={{ fontSize: '1.6rem', color: c.color, lineHeight: 1.1 }}>{c.value}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="row g-3">
+                            {/* Session info */}
+                            <div className="col-md-5">
+                                <div className="card border-0 shadow-sm h-100">
+                                    <div className="card-header bg-white fw-semibold">
+                                        <i className="bi bi-info-circle me-2 text-primary"></i>Session info
+                                    </div>
+                                    <div className="card-body p-0">
+                                        <table className="table table-sm table-borderless mb-0">
+                                            <tbody>
+                                                <tr><td className="text-muted ps-3">Course</td><td className="fw-semibold pe-3">{courseTitle(course)}</td></tr>
+                                                <tr><td className="text-muted ps-3">Level</td><td className="pe-3">{course?.level || '—'}</td></tr>
+                                                <tr><td className="text-muted ps-3">Type</td><td className="pe-3"><span className="badge bg-light text-dark border">{session.courseType}</span></td></tr>
+                                                <tr><td className="text-muted ps-3">Status</td><td className="pe-3"><span className={`badge bg-${statusColors[session.status]}`}>{session.status}</span></td></tr>
+                                                <tr><td className="text-muted ps-3">Host</td><td className="pe-3">{session.hostTutor?.nickname || '—'} <small className="text-muted">({session.hostTutor?.tutorRank || 'n/a'})</small></td></tr>
+                                                <tr><td className="text-muted ps-3">Private copy</td><td className="pe-3">{session.privateCopyId ? <span className="text-success"><i className="bi bi-check-circle-fill me-1"></i>Created</span> : <span className="text-muted">None</span>}</td></tr>
+                                                <tr><td className="text-muted ps-3">Rank override</td><td className="pe-3">{session.restrictionIgnored ? <span className="badge bg-warning text-dark">Active</span> : <span className="text-muted">—</span>}</td></tr>
+                                                <tr><td className="text-muted ps-3">Copy editable</td><td className="pe-3">{session.copyEditAllowed ? <span className="text-success">Yes</span> : <span className="text-muted">No</span>}</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div className="col-md-6">
-                            <div className="card border-0 shadow-sm">
-                                <div className="card-header bg-white fw-semibold">Upcoming Schedule</div>
-                                <div className="card-body p-0">
-                                    {!session.schedule?.length ? (
-                                        <p className="text-muted p-3 mb-0">No scheduled sessions yet.</p>
-                                    ) : (
-                                        <ul className="list-group list-group-flush">
-                                            {session.schedule.slice(0, 5).map((s, i) => (
-                                                <li key={i} className="list-group-item">
-                                                    <div className="fw-semibold small">{s.title}</div>
-                                                    <div className="text-muted small">{new Date(s.datetime).toLocaleString()} · {s.durationMin} min</div>
-                                                    {s.meetingLink && (
-                                                        <a href={s.meetingLink} target="_blank" rel="noopener noreferrer" className="small">
-                                                            <i className="bi bi-camera-video me-1"></i>Join
-                                                        </a>
-                                                    )}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
+
+                            {/* Upcoming schedule */}
+                            <div className="col-md-7">
+                                <div className="card border-0 shadow-sm h-100">
+                                    <div className="card-header bg-white fw-semibold">
+                                        <i className="bi bi-calendar-event me-2 text-warning"></i>Upcoming meetings
+                                    </div>
+                                    <div className="card-body p-0" style={{ maxHeight: 280, overflowY: 'auto' }}>
+                                        {(() => {
+                                            const now = new Date();
+                                            const upcoming = (session.schedule || [])
+                                                .filter(s => new Date(s.datetime) > now)
+                                                .sort((a,b) => new Date(a.datetime) - new Date(b.datetime))
+                                                .slice(0, 6);
+                                            if (!upcoming.length) return <p className="text-muted p-3 mb-0">No upcoming meetings.</p>;
+                                            return upcoming.map((s, i) => {
+                                                const dt = new Date(s.datetime);
+                                                const diffDays = Math.ceil((dt - now) / 86400000);
+                                                return (
+                                                    <div key={i} className="d-flex align-items-center gap-3 px-3 py-2 border-bottom">
+                                                        <div className="text-center" style={{ minWidth: 40 }}>
+                                                            <div className="fw-bold" style={{ fontSize: '.9rem', color: '#3b5bdb' }}>{dt.getDate()}</div>
+                                                            <div style={{ fontSize: '.65rem', color: '#868e96' }}>{dt.toLocaleString('en', {month:'short'})}</div>
+                                                        </div>
+                                                        <div className="flex-grow-1 overflow-hidden">
+                                                            <div className="fw-semibold text-truncate small">{s.title}</div>
+                                                            <div style={{ fontSize: '.75rem', color: '#868e96' }}>
+                                                                {dt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} · {s.durationMin}min
+                                                                {s.isRecurring && <span className="badge bg-info text-dark ms-1" style={{fontSize:'.6rem'}}>{s.recurrence?.frequency}</span>}
+                                                            </div>
+                                                        </div>
+                                                        <div className="d-flex align-items-center gap-2">
+                                                            {diffDays <= 1 && <span className="badge bg-danger" style={{fontSize:'.65rem'}}>Today</span>}
+                                                            {diffDays > 1 && diffDays <= 3 && <span className="badge bg-warning text-dark" style={{fontSize:'.65rem'}}>Soon</span>}
+                                                            {s.meetingLink && (
+                                                                <a href={s.meetingLink} target="_blank" rel="noopener noreferrer"
+                                                                    className="btn btn-sm btn-outline-primary" style={{padding:'2px 8px', fontSize:'.75rem'}}>
+                                                                    <i className="bi bi-camera-video me-1"></i>Join
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            });
+                                        })()}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -685,31 +736,49 @@ function ManageSession({ data, onLogout }) {
                         {!session.schedule?.length ? (
                             <p className="text-muted">No schedule entries yet.</p>
                         ) : (
-                            <div className="table-responsive">
-                                <table className="table table-hover align-middle">
-                                    <thead className="table-light">
-                                        <tr><th>Title</th><th>Date & Time</th><th>Duration</th><th>Meeting</th><th>Notes</th><th></th></tr>
-                                    </thead>
-                                    <tbody>
-                                        {session.schedule.map((s, i) => (
-                                            <tr key={i}>
-                                                <td className="fw-semibold">
-                                                    {s.title}
-                                                    {s.isRecurring && <span className="badge bg-info text-dark ms-2 small"><i className="bi bi-arrow-repeat me-1"></i>{s.recurrence?.frequency}</span>}
-                                                </td>
-                                                <td>{new Date(s.datetime).toLocaleString()}</td>
-                                                <td>{s.durationMin} min</td>
-                                                <td>{s.meetingLink ? <a href={s.meetingLink} target="_blank" rel="noopener noreferrer"><i className="bi bi-camera-video"></i> Join</a> : "—"}</td>
-                                                <td><small className="text-muted">{s.notes || "—"}</small></td>
-                                                <td>
-                                                    {canEditSession && (
-                                                        <button className="btn btn-sm btn-outline-danger" onClick={() => removeScheduleEntry(i)}><i className="bi bi-trash"></i></button>
+                            <div className="d-flex flex-column gap-2">
+                                {session.schedule.map((s, i) => {
+                                    const dt = new Date(s.datetime);
+                                    const isPast = dt < new Date();
+                                    return (
+                                        <div key={i} className={`card border-0 shadow-sm ${isPast ? 'opacity-75' : ''}`}>
+                                            <div className="card-body py-2 px-3 d-flex align-items-center gap-3">
+                                                {/* Date block */}
+                                                <div className="text-center border-end pe-3" style={{ minWidth: 48 }}>
+                                                    <div className="fw-bold" style={{ fontSize: '1.1rem', color: isPast ? '#868e96' : '#3b5bdb', lineHeight: 1 }}>{dt.getDate()}</div>
+                                                    <div style={{ fontSize: '.65rem', color: '#868e96' }}>{dt.toLocaleString('en',{month:'short'})} '{String(dt.getFullYear()).slice(2)}</div>
+                                                </div>
+                                                {/* Info */}
+                                                <div className="flex-grow-1 overflow-hidden">
+                                                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                                                        <span className="fw-semibold small">{s.title}</span>
+                                                        {isPast && <span className="badge bg-secondary" style={{fontSize:'.65rem'}}>Past</span>}
+                                                        {s.isRecurring && <span className="badge bg-info text-dark" style={{fontSize:'.65rem'}}><i className="bi bi-arrow-repeat me-1"></i>{s.recurrence?.frequency}</span>}
+                                                    </div>
+                                                    <div style={{ fontSize: '.75rem', color: '#868e96' }}>
+                                                        {dt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+                                                        <span className="mx-1">·</span>{s.durationMin} min
+                                                        {s.notes && <><span className="mx-1">·</span><span className="fst-italic">{s.notes}</span></>}
+                                                    </div>
+                                                </div>
+                                                {/* Actions */}
+                                                <div className="d-flex gap-2 align-items-center">
+                                                    {s.meetingLink && (
+                                                        <a href={s.meetingLink} target="_blank" rel="noopener noreferrer"
+                                                            className="btn btn-sm btn-outline-primary" style={{fontSize:'.78rem'}}>
+                                                            <i className="bi bi-camera-video me-1"></i>Join
+                                                        </a>
                                                     )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                                    {canEditSession && (
+                                                        <button className="btn btn-sm btn-outline-danger" onClick={() => removeScheduleEntry(i)}>
+                                                            <i className="bi bi-trash"></i>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -802,32 +871,61 @@ function ManageSession({ data, onLogout }) {
                         {!session.deadlines?.length ? (
                             <p className="text-muted">No deadlines set.</p>
                         ) : (
-                            <div className="table-responsive">
-                                <table className="table table-hover align-middle">
-                                    <thead className="table-light">
-                                        <tr><th>Type</th><th>Target ID</th><th>Due At</th><th>Lock?</th><th>Description</th><th>Status</th><th></th></tr>
-                                    </thead>
-                                    <tbody>
-                                        {session.deadlines.map((dl, i) => {
-                                            const isPast = new Date() > new Date(dl.dueAt);
-                                            return (
-                                                <tr key={i}>
-                                                    <td><span className="badge bg-light text-dark border">{dl.targetType}</span></td>
-                                                    <td><code>{dl.targetId}</code></td>
-                                                    <td className={isPast ? "text-danger" : ""}>{new Date(dl.dueAt).toLocaleString()}</td>
-                                                    <td>{dl.lockAfterDue ? <i className="bi bi-lock-fill text-danger"></i> : <i className="bi bi-unlock text-muted"></i>}</td>
-                                                    <td><small>{dl.description || "—"}</small></td>
-                                                    <td>{isPast ? <span className="badge bg-danger">Past</span> : <span className="badge bg-success">Active</span>}</td>
-                                                    <td>
-                                                        {canEditSession && (
-                                                            <button className="btn btn-sm btn-outline-danger" onClick={() => removeDeadline(i)}><i className="bi bi-trash"></i></button>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                            <div className="d-flex flex-column gap-2">
+                                {session.deadlines.map((dl, i) => {
+                                    const isPast = new Date() > new Date(dl.dueAt);
+                                    const typeColors = { volume:'#3b5bdb', chapter:'#f08c00', item:'#2f9e44', assignment:'#e03131' };
+                                    const typeIcons = { volume:'bi-collection', chapter:'bi-journal', item:'bi-file-text', assignment:'bi-clipboard-check' };
+                                    // Try to resolve human-readable target label from course structure
+                                    const courseVols = session.courseId?.volumes || [];
+                                    let targetLabel = dl.targetId;
+                                    if (dl.targetType === 'volume') {
+                                        const v = courseVols.find(v => v.vid === dl.targetId);
+                                        if (v) targetLabel = v.title || dl.targetId;
+                                    } else if (dl.targetType === 'chapter') {
+                                        for (const v of courseVols) {
+                                            const c = (v.chapters||[]).find(c => c.cid === dl.targetId);
+                                            if (c) { targetLabel = `${v.title} → ${c.title}`; break; }
+                                        }
+                                    } else if (dl.targetType === 'item') {
+                                        for (const v of courseVols) {
+                                            for (const c of (v.chapters||[])) {
+                                                const it = (c.items||[]).find(it => it.iid === dl.targetId);
+                                                if (it) { targetLabel = `${v.title} → ${c.title} → ${it.title}`; break; }
+                                            }
+                                        }
+                                    } else if (dl.targetType === 'assignment') {
+                                        const a = assignments.find(a => a._id === dl.targetId);
+                                        if (a) targetLabel = a.title;
+                                    }
+                                    return (
+                                        <div key={i} className={`card border-0 shadow-sm ${isPast ? 'opacity-75' : ''}`}>
+                                            <div className="card-body py-2 px-3 d-flex align-items-center gap-3">
+                                                <div className="text-center border-end pe-3" style={{ minWidth: 52 }}>
+                                                    <i className={`bi ${typeIcons[dl.targetType] || 'bi-clock'}`}
+                                                        style={{ fontSize: '1.3rem', color: typeColors[dl.targetType] || '#6c757d' }}></i>
+                                                    <div style={{ fontSize: '.63rem', color: '#868e96', marginTop: 2 }}>{dl.targetType}</div>
+                                                </div>
+                                                <div className="flex-grow-1 overflow-hidden">
+                                                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                                                        <span className="fw-semibold small text-truncate" title={targetLabel}>{targetLabel}</span>
+                                                        {isPast ? <span className="badge bg-danger" style={{fontSize:'.65rem'}}>Past</span> : <span className="badge bg-success" style={{fontSize:'.65rem'}}>Active</span>}
+                                                        {dl.lockAfterDue && <span className="badge bg-warning text-dark" style={{fontSize:'.65rem'}}><i className="bi bi-lock-fill me-1"></i>Locks content</span>}
+                                                    </div>
+                                                    <div style={{ fontSize: '.75rem', color: isPast ? '#dc3545' : '#868e96' }}>
+                                                        Due: {new Date(dl.dueAt).toLocaleString()}
+                                                        {dl.description && <><span className="mx-1">·</span>{dl.description}</>}
+                                                    </div>
+                                                </div>
+                                                {canEditSession && (
+                                                    <button className="btn btn-sm btn-outline-danger" onClick={() => removeDeadline(i)}>
+                                                        <i className="bi bi-trash"></i>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -835,124 +933,138 @@ function ManageSession({ data, onLogout }) {
 
                 {/* ══ TAB: GROUPS ══ */}
                 {tab === "groups" && (
-                    <div className="row g-3">
-                        {/* Left: group list */}
-                        <div className="col-md-4">
-                            <div className="card border-0 shadow-sm">
-                                <div className="card-header bg-white fw-semibold">Groups ({groups.length})</div>
-                                <div className="card-body p-0">
-                                    {groups.map(g => (
-                                        <div key={g._id}
-                                            className={`p-3 border-bottom cursor-pointer d-flex justify-content-between align-items-center ${selectedGroup?._id === g._id ? "bg-primary bg-opacity-10" : ""}`}
-                                            style={{ cursor: "pointer" }}
-                                            onClick={() => setSelectedGroup(g)}>
-                                            <div>
-                                                <div className="fw-semibold">{g.name}</div>
-                                                <small className="text-muted">{g.members?.filter(m => m.status === "active").length || 0} active members</small>
+                    <div>
+                        {/* Create group */}
+                        {canEditSession && (
+                            <div className="card border-0 shadow-sm mb-4">
+                                <div className="card-body py-2 px-3">
+                                    <form onSubmit={createGroup} className="d-flex gap-2 align-items-center">
+                                        <i className="bi bi-plus-circle text-primary"></i>
+                                        <input type="text" className="form-control form-control-sm"
+                                            placeholder="New group name…" value={newGroupName}
+                                            onChange={e => setNewGroupName(e.target.value)} style={{ maxWidth: 280 }} />
+                                        <button type="submit" className="btn btn-sm btn-primary">Create group</button>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+
+                        {groups.length === 0 && <p className="text-muted">No groups yet. Create one above.</p>}
+
+                        {/* Accordion: one card per group */}
+                        <div className="d-flex flex-column gap-3">
+                            {groups.map(g => {
+                                const isOpen = selectedGroup?._id === g._id;
+                                const activeMembers = g.members?.filter(m => m.status === 'active') || [];
+                                const groupAssignmentCount = assignments.filter(a => String(a.groupId?._id || a.groupId) === String(g._id)).length;
+                                return (
+                                    <div key={g._id} className="card border-0 shadow-sm">
+                                        {/* Group header */}
+                                        <div className="card-header bg-white d-flex align-items-center gap-3"
+                                            style={{ cursor: 'pointer' }}
+                                            onClick={() => setSelectedGroup(isOpen ? null : g)}>
+                                            <i className={`bi bi-chevron-${isOpen ? 'down' : 'right'} text-muted`}></i>
+                                            <div className="flex-grow-1">
+                                                <span className="fw-semibold">{g.name}</span>
                                             </div>
+                                            <span className="badge bg-light text-dark border">
+                                                <i className="bi bi-people me-1"></i>{activeMembers.length} members
+                                            </span>
+                                            <span className="badge bg-light text-dark border">
+                                                <i className="bi bi-clipboard-check me-1"></i>{groupAssignmentCount} assignments
+                                            </span>
                                             {isHost && (
-                                                <button className="btn btn-sm btn-outline-danger" onClick={e => { e.stopPropagation(); deleteGroup(g); }}>
+                                                <button className="btn btn-sm btn-outline-danger"
+                                                    onClick={e => { e.stopPropagation(); deleteGroup(g); }}>
                                                     <i className="bi bi-trash"></i>
                                                 </button>
                                             )}
                                         </div>
-                                    ))}
-                                    {groups.length === 0 && <p className="text-muted p-3 mb-0">No groups yet.</p>}
-                                </div>
-                                <div className="card-footer bg-white">
-                                    <form onSubmit={createGroup} className="d-flex gap-2">
-                                        <input type="text" className="form-control form-control-sm"
-                                            placeholder="New group name" value={newGroupName}
-                                            onChange={e => setNewGroupName(e.target.value)} />
-                                        <button type="submit" className="btn btn-sm btn-primary">+</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
 
-                        {/* Right: selected group members */}
-                        <div className="col-md-8">
-                            {!selectedGroup ? (
-                                <div className="text-muted text-center py-5">Select a group to manage members</div>
-                            ) : (
-                                <div className="card border-0 shadow-sm">
-                                    <div className="card-header bg-white d-flex justify-content-between align-items-center">
-                                        <span className="fw-semibold">{selectedGroup.name} — Members</span>
-                                        <span className="badge bg-primary">{selectedGroup.members?.length || 0}</span>
-                                    </div>
-                                    <div className="card-body">
-                                        {/* Add member — live search */}
-                                        <div className="position-relative mb-3">
-                                            <div className="input-group">
-                                                <input type="text" className="form-control"
-                                                    placeholder="Type email or nickname to search…"
-                                                    value={memberSearch} onChange={e => { setMemberSearch(e.target.value); }}
-                                                    autoComplete="off" />
-                                                <button className="btn btn-primary" disabled={addingMember || !memberSearch.trim()}
-                                                    onClick={() => addMember(selectedGroup._id)}>
-                                                    {addingMember ? <span className="spinner-border spinner-border-sm" /> : "Add"}
-                                                </button>
-                                            </div>
-                                            {memberResults.length > 0 && (
-                                                <div className="border rounded bg-white shadow-sm position-absolute w-100 z-3" style={{ top: "100%", maxHeight: 200, overflowY: "auto", zIndex: 1000 }}>
-                                                    {memberResults.map(u => (
-                                                        <div key={u._id} className="d-flex justify-content-between align-items-center px-3 py-2 border-bottom"
-                                                            style={{ cursor: "pointer" }}
-                                                            onMouseDown={e => e.preventDefault()}>
-                                                            <div>
-                                                                <span className="fw-semibold">{u.nickname}</span>
-                                                                <small className="text-muted ms-2">{u.email}</small>
-                                                            </div>
-                                                            <button className="btn btn-sm btn-outline-primary"
-                                                                onClick={() => { setMemberSearch(u.email); addMember(selectedGroup._id, u.email); setMemberResults([]); }}>
-                                                                Add
-                                                            </button>
+                                        {/* Group body — only when open */}
+                                        {isOpen && (
+                                            <div className="card-body pt-3">
+                                                {session.courseType !== 'HOSTED' && (
+                                                    <div className="alert alert-info small py-2 mb-3">
+                                                        <i className="bi bi-info-circle me-1"></i>
+                                                        <strong>{session.courseType}</strong> — students must own the course before being added.
+                                                    </div>
+                                                )}
+
+                                                {/* Add member search */}
+                                                <div className="position-relative mb-3">
+                                                    <div className="input-group">
+                                                        <span className="input-group-text"><i className="bi bi-search"></i></span>
+                                                        <input type="text" className="form-control"
+                                                            placeholder="Search by email or nickname…"
+                                                            value={memberSearch}
+                                                            onChange={e => setMemberSearch(e.target.value)}
+                                                            autoComplete="off" />
+                                                        <button className="btn btn-primary" disabled={addingMember || !memberSearch.trim()}
+                                                            onClick={() => addMember(g._id)}>
+                                                            {addingMember ? <span className="spinner-border spinner-border-sm" /> : 'Add'}
+                                                        </button>
+                                                    </div>
+                                                    {memberResults.length > 0 && (
+                                                        <div className="border rounded bg-white shadow-sm position-absolute w-100"
+                                                            style={{ top: '100%', maxHeight: 200, overflowY: 'auto', zIndex: 1000 }}>
+                                                            {memberResults.map(u => (
+                                                                <div key={u._id} className="d-flex justify-content-between align-items-center px-3 py-2 border-bottom"
+                                                                    style={{ cursor: 'pointer' }}
+                                                                    onMouseDown={e => e.preventDefault()}>
+                                                                    <div>
+                                                                        <span className="fw-semibold small">{u.nickname}</span>
+                                                                        <small className="text-muted ms-2">{u.email}</small>
+                                                                    </div>
+                                                                    <button className="btn btn-sm btn-outline-primary"
+                                                                        onClick={() => { setMemberSearch(u.email); addMember(g._id, u.email); setMemberResults([]); }}>
+                                                                        Add
+                                                                    </button>
+                                                                </div>
+                                                            ))}
                                                         </div>
-                                                    ))}
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
-                                        {session.courseType !== "HOSTED" && (
-                                            <div className="alert alert-info small py-2 mb-3">
-                                                <i className="bi bi-info-circle me-1"></i>
-                                                <strong>{session.courseType}</strong> — students must own the course before being added.
+
+                                                {/* Members table */}
+                                                {!g.members?.length ? (
+                                                    <p className="text-muted small">No members yet.</p>
+                                                ) : (
+                                                    <div className="table-responsive">
+                                                        <table className="table table-sm align-middle mb-0">
+                                                            <thead className="table-light">
+                                                                <tr><th>Student</th><th>Status</th><th>Joined</th><th></th></tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {g.members.map(m => (
+                                                                    <tr key={m._id}>
+                                                                        <td>
+                                                                            <div className="fw-semibold small">{m.userId?.nickname || '—'}</div>
+                                                                            <div className="text-muted" style={{ fontSize: '.75rem' }}>{m.userId?.email}</div>
+                                                                        </td>
+                                                                        <td>
+                                                                            <span className={`badge ${m.status === 'active' ? 'bg-success' : m.status === 'dropped' ? 'bg-danger' : 'bg-secondary'}`}>
+                                                                                {m.status}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td><small className="text-muted">{new Date(m.joinedAt).toLocaleDateString()}</small></td>
+                                                                        <td>
+                                                                            <button className="btn btn-sm btn-outline-danger"
+                                                                                onClick={() => removeMember(g._id, m.userId?._id || m.userId, m.userId?.nickname)}>
+                                                                                <i className="bi bi-x-lg"></i>
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
-                                        {/* Member table */}
-                                        {!selectedGroup.members?.length ? (
-                                            <p className="text-muted">No members yet.</p>
-                                        ) : (
-                                            <table className="table table-sm align-middle">
-                                                <thead className="table-light">
-                                                    <tr><th>Nickname</th><th>Status</th><th>Joined</th><th></th></tr>
-                                                </thead>
-                                                <tbody>
-                                                    {selectedGroup.members.map(m => (
-                                                        <tr key={m._id}>
-                                                            <td>
-                                                                <div className="fw-semibold">{m.userId?.nickname || "—"}</div>
-                                                                <small className="text-muted">{m.userId?.email}</small>
-                                                            </td>
-                                                            <td>
-                                                                <span className={`badge ${m.status === "active" ? "bg-success" : m.status === "dropped" ? "bg-danger" : "bg-secondary"}`}>
-                                                                    {m.status}
-                                                                </span>
-                                                            </td>
-                                                            <td><small>{new Date(m.joinedAt).toLocaleDateString()}</small></td>
-                                                            <td>
-                                                                <button className="btn btn-sm btn-outline-danger"
-                                                                    onClick={() => removeMember(selectedGroup._id, m.userId?._id || m.userId, m.userId?.nickname)}>
-                                                                    <i className="bi bi-x-lg"></i>
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        )}
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })}
                         </div>
                     </div>
                 )}
@@ -960,9 +1072,10 @@ function ManageSession({ data, onLogout }) {
                 {/* ══ TAB: ASSIGNMENTS ══ */}
                 {tab === "assignments" && (
                     <div>
-                        {/* Create assignment */}
                         <div className="card border-0 shadow-sm mb-4">
-                            <div className="card-header bg-white fw-semibold">Create Assignment</div>
+                            <div className="card-header bg-white fw-semibold">
+                                <i className="bi bi-plus-circle me-2 text-primary"></i>Create Assignment
+                            </div>
                             <div className="card-body">
                                 <form onSubmit={createAssignment}>
                                     <div className="row g-3">
@@ -972,7 +1085,7 @@ function ManageSession({ data, onLogout }) {
                                                 onChange={e => setAssignmentForm(p => ({ ...p, title: e.target.value }))} />
                                         </div>
                                         <div className="col-md-2">
-                                            <label className="form-label fw-semibold">Due Date <span className="text-danger">*</span></label>
+                                            <label className="form-label fw-semibold">Due date <span className="text-danger">*</span></label>
                                             <input type="datetime-local" className="form-control" value={assignmentForm.dueAt}
                                                 onChange={e => setAssignmentForm(p => ({ ...p, dueAt: e.target.value }))} />
                                         </div>
@@ -984,7 +1097,7 @@ function ManageSession({ data, onLogout }) {
                                             </select>
                                         </div>
                                         <div className="col-md-2">
-                                            <label className="form-label fw-semibold">Max Mark</label>
+                                            <label className="form-label fw-semibold">Max mark</label>
                                             <input type="number" className="form-control" value={assignmentForm.maxMark} min={1}
                                                 disabled={assignmentForm.markScale !== "custom"}
                                                 onChange={e => setAssignmentForm(p => ({ ...p, maxMark: e.target.value }))} />
@@ -1013,16 +1126,14 @@ function ManageSession({ data, onLogout }) {
                                                 onChange={e => setAssignmentForm(p => ({ ...p, description: e.target.value }))} />
                                         </div>
                                         <div className="col-12">
-                                            <label className="form-label fw-semibold">Task files <span className="text-muted small">(optional, .pdf/.zip/.txt)</span></label>
+                                            <label className="form-label fw-semibold">Task files <span className="text-muted small">(optional — .pdf, .zip, .txt)</span></label>
                                             <input type="file" className="form-control" multiple accept=".pdf,.zip,.txt"
                                                 onChange={e => setAssignmentForm(p => ({ ...p, files: Array.from(e.target.files) }))} />
-                                            {assignmentForm.files?.length > 0 && (
-                                                <small className="text-muted">{assignmentForm.files.length} file(s) selected</small>
-                                            )}
+                                            {assignmentForm.files?.length > 0 && <small className="text-muted">{assignmentForm.files.length} file(s) selected</small>}
                                         </div>
                                         <div className="col-12 d-flex justify-content-end">
                                             <button type="submit" className="btn btn-primary" disabled={savingAssignment}>
-                                                {savingAssignment ? <span className="spinner-border spinner-border-sm me-2" /> : null}Create Assignment
+                                                {savingAssignment ? <span className="spinner-border spinner-border-sm me-2" /> : null}Create assignment
                                             </button>
                                         </div>
                                     </div>
@@ -1030,47 +1141,44 @@ function ManageSession({ data, onLogout }) {
                             </div>
                         </div>
 
-                        {/* All assignments across all groups */}
-                        {assignments.length === 0 && (
-                            <p className="text-muted">No assignments yet. Create one above.</p>
-                        )}
+                        {assignments.length === 0 && <p className="text-muted">No assignments yet.</p>}
 
                         {assignments.map(a => {
                             const subs = submissions[a._id] || [];
                             const isOverdue = new Date() > new Date(a.dueAt);
-                            const assignmentGroup = groups.find(g => g._id === (a.groupId?._id || a.groupId));
+                            const assignmentGroup = groups.find(g => String(g._id) === String(a.groupId?._id || a.groupId));
+                            const pendingCount  = subs.filter(s => s.status === 'pending').length;
+                            const approvedCount = subs.filter(s => s.status === 'approved').length;
                             return (
                                 <div key={a._id} className="card border-0 shadow-sm mb-3">
-                                    <div className="card-header bg-white d-flex align-items-center justify-content-between">
-                                        <div>
+                                    <div className="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                        <div className="d-flex align-items-center gap-2 flex-wrap">
                                             <span className="fw-semibold">{a.title}</span>
-                                            <span className="badge bg-light text-dark border ms-2">{a.markScale}-pt scale</span>
-                                            <span className="badge bg-light text-dark border ms-1">max {a.maxMark}</span>
-                                            {assignmentGroup && <span className="badge bg-secondary ms-1"><i className="bi bi-people me-1"></i>{assignmentGroup.name}</span>}
-                                            {isOverdue && <span className="badge bg-danger ms-1">Overdue</span>}
+                                            <span className="badge bg-light text-dark border">{a.markScale}-pt</span>
+                                            <span className="badge bg-light text-dark border">max {a.maxMark}</span>
+                                            {assignmentGroup && <span className="badge bg-secondary"><i className="bi bi-people me-1"></i>{assignmentGroup.name}</span>}
+                                            {isOverdue && <span className="badge bg-danger">Overdue</span>}
+                                            {pendingCount > 0 && <span className="badge bg-warning text-dark"><i className="bi bi-hourglass-split me-1"></i>{pendingCount} pending</span>}
+                                            {approvedCount > 0 && <span className="badge bg-success"><i className="bi bi-check-circle me-1"></i>{approvedCount} approved</span>}
                                         </div>
                                         <div className="d-flex gap-2 align-items-center">
                                             <small className="text-muted">Due: {new Date(a.dueAt).toLocaleString()}</small>
                                             <button className="btn btn-sm btn-outline-secondary"
-                                                onClick={() => { loadSubmissions(selectedGroup?._id || groups[0]?._id, a._id); }}>
+                                                onClick={() => loadSubmissions(assignmentGroup?._id || groups[0]?._id, a._id)}>
                                                 <i className="bi bi-arrow-clockwise me-1"></i>Submissions
                                             </button>
-                                            {canGrade && (
-                                                <>
-                                                    <button className="btn btn-sm btn-outline-warning"
-                                                        onClick={() => editingAssignment === a._id ? setEditingAssignment(null) : startEditAssignment(a)}>
-                                                        <i className="bi bi-pencil"></i>
-                                                    </button>
-                                                    <button className="btn btn-sm btn-outline-danger"
-                                                        onClick={() => deleteAssignment(a)}>
-                                                        <i className="bi bi-trash"></i>
-                                                    </button>
-                                                </>
-                                            )}
+                                            {canGrade && <>
+                                                <button className="btn btn-sm btn-outline-warning"
+                                                    onClick={() => editingAssignment === a._id ? setEditingAssignment(null) : startEditAssignment(a)}>
+                                                    <i className="bi bi-pencil"></i>
+                                                </button>
+                                                <button className="btn btn-sm btn-outline-danger" onClick={() => deleteAssignment(a)}>
+                                                    <i className="bi bi-trash"></i>
+                                                </button>
+                                            </>}
                                         </div>
                                     </div>
 
-                                    {/* Inline edit form */}
                                     {editingAssignment === a._id && editForm && (
                                         <div className="card-body bg-light border-bottom">
                                             <div className="row g-2">
@@ -1080,7 +1188,7 @@ function ManageSession({ data, onLogout }) {
                                                         onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))} />
                                                 </div>
                                                 <div className="col-md-2">
-                                                    <label className="form-label small fw-semibold">Due Date</label>
+                                                    <label className="form-label small fw-semibold">Due date</label>
                                                     <input type="datetime-local" className="form-control form-control-sm" value={editForm.dueAt}
                                                         onChange={e => setEditForm(p => ({ ...p, dueAt: e.target.value }))} />
                                                 </div>
@@ -1092,7 +1200,7 @@ function ManageSession({ data, onLogout }) {
                                                     </select>
                                                 </div>
                                                 <div className="col-md-1">
-                                                    <label className="form-label small fw-semibold">Max Mark</label>
+                                                    <label className="form-label small fw-semibold">Max mark</label>
                                                     <input type="number" className="form-control form-control-sm" value={editForm.maxMark} min={1}
                                                         disabled={editForm.markScale !== "custom"}
                                                         onChange={e => setEditForm(p => ({ ...p, maxMark: e.target.value }))} />
@@ -1102,7 +1210,6 @@ function ManageSession({ data, onLogout }) {
                                                     <textarea className="form-control form-control-sm" rows={2} value={editForm.description}
                                                         onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} />
                                                 </div>
-                                                {/* Existing task files */}
                                                 {a.taskFiles?.length > 0 && (
                                                     <div className="col-12">
                                                         <label className="form-label small fw-semibold">Current files</label>
@@ -1110,7 +1217,7 @@ function ManageSession({ data, onLogout }) {
                                                             {a.taskFiles.filter(f => !editForm.removedFiles?.includes(f.filename)).map((f, fi) => (
                                                                 <span key={fi} className="badge bg-light text-dark border d-flex align-items-center gap-1">
                                                                     <i className="bi bi-file-earmark"></i>{f.originalName || f.filename}
-                                                                    <button type="button" className="btn-close btn-close-sm ms-1" style={{ fontSize: 8 }}
+                                                                    <button type="button" className="btn-close ms-1" style={{ fontSize: 8 }}
                                                                         onClick={() => setEditForm(p => ({ ...p, removedFiles: [...(p.removedFiles||[]), f.filename] }))} />
                                                                 </span>
                                                             ))}
@@ -1132,79 +1239,93 @@ function ManageSession({ data, onLogout }) {
                                         </div>
                                     )}
 
-                                    {a.description && !editingAssignment !== a._id && <div className="card-body pt-2 pb-2 text-muted small">{a.description}</div>}
+                                    {a.description && editingAssignment !== a._id && (
+                                        <div className="card-body pt-2 pb-2 border-bottom">
+                                            <small className="text-muted">{a.description}</small>
+                                        </div>
+                                    )}
 
-                                    {/* Submissions */}
                                     {subs.length > 0 && (
-                                        <div className="card-body pt-0">
-                                            <table className="table table-sm align-middle mb-0">
-                                                <thead className="table-light">
-                                                    <tr><th>Student</th><th>Submitted</th><th>Overdue?</th><th>Status</th><th>Mark</th><th>Actions</th></tr>
-                                                </thead>
-                                                <tbody>
-                                                    {subs.map(s => {
-                                                        const studentId = String(s.studentId?._id || s.studentId);
-                                                        const isGrading = gradingId === `${a._id}-${studentId}`;
-                                                        // console.log(`${API}/submissions/${selectedGroup._id}/${a._id}/${studentId}/file`)
-                                                        // console.log(`${selectedGroup}`)
-                                                        return (
-                                                            <tr key={studentId}>
-                                                                <td><small>{s.studentId?.nickname || studentId}</small></td>
-                                                                <td><small>{new Date(s.submittedAt).toLocaleString()}</small></td>
-                                                                <td>{s.isOverdue ? <span className="badge bg-warning text-dark">Yes</span> : <span className="text-muted">No</span>}</td>
-                                                                <td>
-                                                                    <span className={`badge ${s.status === "approved" ? "bg-success" : s.status === "declined" ? "bg-danger" : "bg-secondary"}`}>
-                                                                        {s.status}
-                                                                    </span>
-                                                                </td>
-                                                                <td>{s.mark !== null && s.mark !== undefined ? `${s.mark}/${a.maxMark}` : "—"}</td>
-                                                                <td>
-                                                                    <div className="d-flex gap-1 flex-wrap">
-                                                                        <button className="btn btn-sm btn-outline-info" onClick={console.log(selectedGroup)} ><i className="bi bi-download"></i> Download</button>
-                                                                        {/* <a className="btn btn-sm btn-outline-info"
-                                                                            href={`${API}/submissions/${selectedGroup._id}/${a._id}/${studentId}/file`}
-                                                                            target="_blank" rel="noopener noreferrer" title="Download">
-                                                                            <i className="bi bi-download"></i>
-                                                                        </a> */}
-                                                                        {canGrade && s.status !== "approved" && (
-                                                                            <button className="btn btn-sm btn-outline-primary"
-                                                                                onClick={() => { setGradingId(`${a._id}-${studentId}`); setGradeForm({ mark: s.mark || "", feedback: s.feedback || "", status: "approved" }); }}>
-                                                                                <i className="bi bi-pencil"></i>
-                                                                            </button>
-                                                                        )}
-                                                                    </div>
-                                                                    {isGrading && (
-                                                                        <div className="mt-2 p-2 border rounded bg-light">
-                                                                            <div className="d-flex gap-2 mb-2">
-                                                                                <input type="number" className="form-control form-control-sm" placeholder="Mark"
-                                                                                    style={{ width: 80 }} value={gradeForm.mark}
-                                                                                    onChange={e => setGradeForm(p => ({ ...p, mark: e.target.value }))}
-                                                                                    min={0} max={a.maxMark} />
-                                                                                <select className="form-select form-select-sm" style={{ width: 120 }}
-                                                                                    value={gradeForm.status} onChange={e => setGradeForm(p => ({ ...p, status: e.target.value }))}>
-                                                                                    <option value="approved">Approve</option>
-                                                                                    <option value="declined">Decline</option>
-                                                                                </select>
-                                                                            </div>
-                                                                            <textarea className="form-control form-control-sm mb-2" rows={2} placeholder="Feedback (optional)"
-                                                                                value={gradeForm.feedback} onChange={e => setGradeForm(p => ({ ...p, feedback: e.target.value }))} />
-                                                                            <div className="d-flex gap-2">
-                                                                                <button className="btn btn-sm btn-primary" onClick={() => submitGrade(selectedGroup._id, a._id, studentId)}>Save</button>
-                                                                                <button className="btn btn-sm btn-outline-secondary" onClick={() => setGradingId(null)}>Cancel</button>
-                                                                            </div>
-                                                                            {s.isOverdue && (
-                                                                                <small className="text-warning d-block mt-1">
-                                                                                    ⚠ Overdue — {a.overdueDeduction} point(s) will be deducted from entered mark.
-                                                                                </small>
+                                        <div className="card-body pt-2 pb-1">
+                                            <div className="table-responsive">
+                                                <table className="table table-sm align-middle mb-0">
+                                                    <thead className="table-light">
+                                                        <tr><th>Student</th><th>Submitted</th><th>Status</th><th>Mark</th><th>Actions</th></tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {subs.map(s => {
+                                                            const studentId = String(s.studentId?._id || s.studentId);
+                                                            const isGrading = gradingId === `${a._id}-${studentId}`;
+                                                            const groupForDl = assignmentGroup || groups.find(g =>
+                                                                g.assignments?.some(ga => String(ga.assignmentId) === String(a._id))
+                                                            );
+                                                            return (
+                                                                <tr key={studentId}>
+                                                                    <td>
+                                                                        <div className="fw-semibold small">{s.studentId?.nickname || '—'}</div>
+                                                                        {s.isOverdue && <span className="badge bg-warning text-dark" style={{fontSize:'.65rem'}}>overdue</span>}
+                                                                    </td>
+                                                                    <td><small className="text-muted">{new Date(s.submittedAt).toLocaleString()}</small></td>
+                                                                    <td>
+                                                                        <span className={`badge ${s.status === "approved" ? "bg-success" : s.status === "declined" ? "bg-danger" : "bg-warning text-dark"}`}>
+                                                                            {s.status}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td>{s.mark != null ? <span className="fw-semibold">{s.mark}/{a.maxMark}</span> : <span className="text-muted">—</span>}</td>
+                                                                    <td>
+                                                                        <div className="d-flex gap-1 flex-wrap align-items-start">
+                                                                            {groupForDl && (
+                                                                                <a className="btn btn-sm btn-outline-info"
+                                                                                    href={`${API}/submissions/${groupForDl._id}/${a._id}/${studentId}/file`}
+                                                                                    target="_blank" rel="noopener noreferrer" title="Download">
+                                                                                    <i className="bi bi-download"></i>
+                                                                                </a>
+                                                                            )}
+                                                                            {canGrade && s.status !== "approved" && (
+                                                                                <button className="btn btn-sm btn-outline-primary"
+                                                                                    onClick={() => { setGradingId(`${a._id}-${studentId}`); setGradeForm({ mark: s.mark || "", feedback: s.feedback || "", status: "approved" }); }}>
+                                                                                    <i className="bi bi-pencil-square me-1"></i>Grade
+                                                                                </button>
                                                                             )}
                                                                         </div>
-                                                                    )}
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
+                                                                        {isGrading && (
+                                                                            <div className="mt-2 p-2 border rounded bg-light">
+                                                                                <div className="d-flex gap-2 mb-2 flex-wrap">
+                                                                                    <input type="number" className="form-control form-control-sm" placeholder="Mark"
+                                                                                        style={{ width: 80 }} value={gradeForm.mark}
+                                                                                        onChange={e => setGradeForm(p => ({ ...p, mark: e.target.value }))}
+                                                                                        min={0} max={a.maxMark} />
+                                                                                    <select className="form-select form-select-sm" style={{ width: 120 }}
+                                                                                        value={gradeForm.status} onChange={e => setGradeForm(p => ({ ...p, status: e.target.value }))}>
+                                                                                        <option value="approved">Approved</option>
+                                                                                        <option value="declined">Declined</option>
+                                                                                    </select>
+                                                                                </div>
+                                                                                <textarea className="form-control form-control-sm mb-2" rows={2}
+                                                                                    placeholder="Feedback (optional)"
+                                                                                    value={gradeForm.feedback}
+                                                                                    onChange={e => setGradeForm(p => ({ ...p, feedback: e.target.value }))} />
+                                                                                {s.isOverdue && (
+                                                                                    <small className="text-warning d-block mb-1">
+                                                                                        ⚠ Overdue — {a.overdueDeduction} point(s) will be deducted.
+                                                                                    </small>
+                                                                                )}
+                                                                                <div className="d-flex gap-2 justify-content-end">
+                                                                                    <button className="btn btn-sm btn-outline-secondary" onClick={() => setGradingId(null)}>Cancel</button>
+                                                                                    <button className="btn btn-sm btn-primary"
+                                                                                        onClick={() => submitGrade(assignmentGroup?._id || groups[0]?._id, a._id, studentId)}>
+                                                                                        Submit grade
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -1218,14 +1339,21 @@ function ManageSession({ data, onLogout }) {
                     <div>
                         {isHost && (
                             <div className="card border-0 shadow-sm mb-4">
-                                <div className="card-header bg-white fw-semibold">Add Co-tutor</div>
+                                <div className="card-header bg-white fw-semibold">
+                                    <i className="bi bi-person-plus me-2 text-primary"></i>Add Co-tutor
+                                </div>
                                 <div className="card-body">
                                     <div className="position-relative mb-2">
-                                        <input type="text" className="form-control" placeholder="Type tutor email or nickname to search…"
-                                            value={coTutorSearch} onChange={e => setCoTutorSearch(e.target.value)}
-                                            autoComplete="off" />
+                                        <div className="input-group">
+                                            <span className="input-group-text"><i className="bi bi-search"></i></span>
+                                            <input type="text" className="form-control"
+                                                placeholder="Search by email or nickname…"
+                                                value={coTutorSearch}
+                                                onChange={e => setCoTutorSearch(e.target.value)}
+                                                autoComplete="off" />
+                                        </div>
                                         {coTutorSearch.trim().length >= 2 && coTutorResults.length === 0 && (
-                                            <small className="text-muted ms-1">No tutors found</small>
+                                            <small className="text-muted ms-1 mt-1 d-block">No tutors found</small>
                                         )}
                                     </div>
                                     {coTutorResults.length > 0 && (
@@ -1233,11 +1361,14 @@ function ManageSession({ data, onLogout }) {
                                             {coTutorResults.map(u => (
                                                 <div key={u._id} className="d-flex justify-content-between align-items-center p-2 border-bottom">
                                                     <div>
-                                                        <span className="fw-semibold">{u.nickname}</span>
+                                                        <span className="fw-semibold small">{u.nickname}</span>
                                                         <small className="text-muted ms-2">{u.email}</small>
                                                         {u.tutorRank && <span className="badge bg-light text-dark border ms-2">{u.tutorRank}</span>}
                                                     </div>
-                                                    <button className="btn btn-sm btn-primary" onClick={() => { addCoTutor(u._id); setCoTutorSearch(""); setCoTutorResults([]); }}>Add</button>
+                                                    <button className="btn btn-sm btn-primary"
+                                                        onClick={() => { addCoTutor(u._id); setCoTutorSearch(""); setCoTutorResults([]); }}>
+                                                        Add
+                                                    </button>
                                                 </div>
                                             ))}
                                         </div>
@@ -1249,61 +1380,58 @@ function ManageSession({ data, onLogout }) {
                         {!session.coTutors?.length ? (
                             <p className="text-muted">No co-tutors yet.</p>
                         ) : (
-                            <div className="table-responsive">
-                                <table className="table table-hover align-middle">
-                                    <thead className="table-light">
-                                        <tr><th>Name</th><th>Sub-rank</th><th>Can Grade</th><th>Can Schedule</th><th>Can Edit Copy</th><th></th></tr>
-                                    </thead>
-                                    <tbody>
-                                        {session.coTutors.map(ct => {
-                                            const u = ct.userId;
-                                            const uid = String(u?._id || u);
-                                            return (
-                                                <tr key={uid}>
-                                                    <td>
-                                                        <div className="fw-semibold">{u?.nickname || uid}</div>
-                                                        <small className="text-muted">{u?.email}</small>
-                                                    </td>
-                                                    <td>{u?.tutorRank ? <span className="badge bg-light text-dark border">{u.tutorRank}</span> : "—"}</td>
-                                                    {isHost ? (
-                                                        <>
-                                                            <td>
-                                                                <div className="form-check form-switch m-0">
-                                                                    <input className="form-check-input" type="checkbox" checked={ct.canGrade}
-                                                                        onChange={() => toggleCoTutorPerm(uid, "canGrade")} />
-                                                                </div>
-                                                            </td>
-                                                            <td>
-                                                                <div className="form-check form-switch m-0">
-                                                                    <input className="form-check-input" type="checkbox" checked={ct.canSchedule}
-                                                                        onChange={() => toggleCoTutorPerm(uid, "canSchedule")} />
-                                                                </div>
-                                                            </td>
-                                                            <td>
-                                                                <div className="form-check form-switch m-0">
-                                                                    <input className="form-check-input" type="checkbox" checked={ct.canEditCopy}
-                                                                        onChange={() => toggleCoTutorPerm(uid, "canEditCopy")} />
-                                                                </div>
-                                                            </td>
-                                                            <td>
-                                                                <button className="btn btn-sm btn-outline-danger" onClick={() => removeCoTutor(uid)}>
-                                                                    <i className="bi bi-x-lg"></i>
-                                                                </button>
-                                                            </td>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <td>{ct.canGrade ? "✓" : "—"}</td>
-                                                            <td>{ct.canSchedule ? "✓" : "—"}</td>
-                                                            <td>{ct.canEditCopy ? "✓" : "—"}</td>
-                                                            <td></td>
-                                                        </>
-                                                    )}
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                            <div className="card border-0 shadow-sm">
+                                <div className="card-body p-0">
+                                    {session.coTutors.map(ct => {
+                                        const u = ct.userId;
+                                        const uid = String(u?._id || u);
+                                        return (
+                                            <div key={uid} className="d-flex align-items-center gap-3 px-3 py-2 border-bottom">
+                                                <div className="flex-grow-1">
+                                                    <div className="fw-semibold small">{u?.nickname || uid}</div>
+                                                    <div style={{ fontSize: '.75rem', color: '#868e96' }}>
+                                                        {u?.email}
+                                                        {u?.tutorRank && <span className="badge bg-light text-dark border ms-2">{u.tutorRank}</span>}
+                                                    </div>
+                                                </div>
+                                                {isHost ? (
+                                                    <div className="d-flex align-items-center gap-3">
+                                                        <label className="d-flex flex-column align-items-center gap-1" style={{ fontSize: '.7rem', color: '#6c757d', cursor: 'pointer' }}>
+                                                            <div className="form-check form-switch m-0">
+                                                                <input className="form-check-input" type="checkbox" checked={ct.canGrade}
+                                                                    onChange={() => toggleCoTutorPerm(uid, "canGrade")} />
+                                                            </div>
+                                                            Grade
+                                                        </label>
+                                                        <label className="d-flex flex-column align-items-center gap-1" style={{ fontSize: '.7rem', color: '#6c757d', cursor: 'pointer' }}>
+                                                            <div className="form-check form-switch m-0">
+                                                                <input className="form-check-input" type="checkbox" checked={ct.canSchedule}
+                                                                    onChange={() => toggleCoTutorPerm(uid, "canSchedule")} />
+                                                            </div>
+                                                            Schedule
+                                                        </label>
+                                                        <label className="d-flex flex-column align-items-center gap-1" style={{ fontSize: '.7rem', color: '#6c757d', cursor: 'pointer' }}>
+                                                            <div className="form-check form-switch m-0">
+                                                                <input className="form-check-input" type="checkbox" checked={ct.canEditCopy}
+                                                                    onChange={() => toggleCoTutorPerm(uid, "canEditCopy")} />
+                                                            </div>
+                                                            Edit copy
+                                                        </label>
+                                                        <button className="btn btn-sm btn-outline-danger" onClick={() => removeCoTutor(uid)}>
+                                                            <i className="bi bi-x-lg"></i>
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="d-flex gap-3" style={{ fontSize: '.8rem', color: '#6c757d' }}>
+                                                        <span>{ct.canGrade ? '✓ Grade' : '— Grade'}</span>
+                                                        <span>{ct.canSchedule ? '✓ Schedule' : '— Schedule'}</span>
+                                                        <span>{ct.canEditCopy ? '✓ Edit copy' : '— Edit copy'}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
                     </div>

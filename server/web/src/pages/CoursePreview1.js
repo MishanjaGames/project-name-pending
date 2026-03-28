@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import './CoursePreview.css';
 import { UtilityModal } from '../components/UtilityModal';
+const BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:4040';
+
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 /** A volume/chapter is a "folder" when its type is container, falsy, or 'none'. */
@@ -151,7 +153,7 @@ function CoursePreview({ data, onLogout }) {
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const checkCCourse = async () => {
     try {
-      const res = await fetch(`http://localhost:4040/api/users/${data._id}`, {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/users/${data._id}`, {
         headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` }
       });
       if (res.ok) {
@@ -165,10 +167,10 @@ function CoursePreview({ data, onLogout }) {
     setLoading(true);
     try {
       const [courseRes, dirRes, lvlRes, filesRes] = await Promise.all([
-        fetch(`http://localhost:4040/api/courses/${id}`).catch(() => null),
-        fetch('http://localhost:4040/api/directions').catch(() => null),
-        fetch('http://localhost:4040/api/levels').catch(() => null),
-        fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
+        fetch(`${process.env.REACT_APP_API_URL}/courses/${id}`).catch(() => null),
+        fetch(process.env.REACT_APP_API_URL + '/directions').catch(() => null),
+        fetch(process.env.REACT_APP_API_URL + '/levels').catch(() => null),
+        fetch(`${process.env.REACT_APP_API_URL}/manage/courses/${id}/files`, {
           headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' }
         }).catch(() => null),
       ]);
@@ -201,7 +203,7 @@ function CoursePreview({ data, onLogout }) {
   const fetchUserData = async () => {
     if (!course?.userId) return;
     try {
-      const res = await fetch(`http://localhost:4040/api/manage/users/${course.userId}`, {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/manage/users/${course.userId}`, {
         headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` }
       });
       if (res.ok) { const { data: d } = await res.json(); setAuthor(d); }
@@ -363,7 +365,7 @@ function CoursePreview({ data, onLogout }) {
       if (Object.keys(textFilesToUpload).length) {
         const results = await Promise.all(Object.entries(textFilesToUpload).map(async ([key, fd]) => {
           const form = new FormData(); form.append('file', fd.file);
-          const res = await fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
+          const res = await fetch(`${process.env.REACT_APP_API_URL}/manage/courses/${id}/files`, {
             method: 'POST', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` }, body: form
           }).catch(() => null);
           if (res?.ok) { const r = await res.json(); const url = r.data?.link?.url || r.data?.url || r.url; if (url) urlUpdates[key] = { url, ...fd }; }
@@ -374,7 +376,7 @@ function CoursePreview({ data, onLogout }) {
       }
       const applyUrls = items => items.map(item => { const m = Object.values(urlUpdates).find(u => u.itemId === item.iid); return m ? { ...item, url: m.url } : item; });
       const newVolumes = volumes.map(v => ({ ...v, chapters: v.chapters.map(c => ({ ...c, items: applyUrls(c.items) })) }));
-      const res = await fetch(`http://localhost:4040/api/manage/courses/${id}`, {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/manage/courses/${id}`, {
         method: 'PUT', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...editableCourse, volumes: newVolumes })
       });
@@ -438,8 +440,8 @@ function CoursePreview({ data, onLogout }) {
             <div className="course-info-section">
               <div className="mobile-thumbnail">
                 {editMode
-                  ? <div className="thumbnail-upload"><input type="file" accept="image/*" onChange={handleThumbnailChange} id="mob-thumb" style={{ display: 'none' }} /><label htmlFor="mob-thumb" className="thumbnail-upload-label"><img src={'http://localhost:4040' + editableCourse.links[0].url} alt="" /><div className="thumbnail-overlay"><i className="bi bi-camera"></i><span>Change Photo</span></div></label></div>
-                  : <img src={'http://localhost:4040' + editableCourse.links[0].url} alt="" />}
+                  ? <div className="thumbnail-upload"><input type="file" accept="image/*" onChange={handleThumbnailChange} id="mob-thumb" style={{ display: 'none' }} /><label htmlFor="mob-thumb" className="thumbnail-upload-label"><img src={process.env.REACT_APP_API_URL.replace('/api', '') + '' + editableCourse.links[0].url} alt="" /><div className="thumbnail-overlay"><i className="bi bi-camera"></i><span>Change Photo</span></div></label></div>
+                  : <img src={process.env.REACT_APP_API_URL.replace('/api', '') + '' + editableCourse.links[0].url} alt="" />}
               </div>
 
               <div className="title-price-row">
@@ -506,8 +508,8 @@ function CoursePreview({ data, onLogout }) {
               <div className="purchase-card">
                 <div className="course-thumbnail">
                   {editMode
-                    ? <div className="thumbnail-upload"><input type="file" accept="image/*" onChange={handleThumbnailChange} id="desk-thumb" style={{ display: 'none' }} /><label htmlFor="desk-thumb" className="thumbnail-upload-label"><img src={'http://localhost:4040' + editableCourse.links[0].url} alt="" /><div className="thumbnail-overlay"><i className="bi bi-camera"></i><span>Change Photo</span></div></label></div>
-                    : <img src={'http://localhost:4040' + editableCourse.links[0].url} alt="" />}
+                    ? <div className="thumbnail-upload"><input type="file" accept="image/*" onChange={handleThumbnailChange} id="desk-thumb" style={{ display: 'none' }} /><label htmlFor="desk-thumb" className="thumbnail-upload-label"><img src={process.env.REACT_APP_API_URL.replace('/api', '') + '' + editableCourse.links[0].url} alt="" /><div className="thumbnail-overlay"><i className="bi bi-camera"></i><span>Change Photo</span></div></label></div>
+                    : <img src={process.env.REACT_APP_API_URL.replace('/api', '') + '' + editableCourse.links[0].url} alt="" />}
                 </div>
                 <div className="purchase-card-body">
                   <div className="price-section">
@@ -900,7 +902,7 @@ function AddEntityModal({ kind, initial, preType, uploadedFiles, onSave, onClose
               {ff().length > 0 && (
                 <div className="mb-3">
                   <label className="form-label">Select from uploaded files</label>
-                  <select className="form-select" value={url} onChange={e => { setUrl(e.target.value); setPreview(e.target.value ? `http://localhost:4040${e.target.value}` : ''); }}>
+                  <select className="form-select" value={url} onChange={e => { setUrl(e.target.value); setPreview(e.target.value ? `${BASE_URL}${e.target.value}` : ''); }}>
                     <option value="">— Choose a file —</option>
                     {ff().map((f, i) => <option key={i} value={f.url || f.path}>{f.originalName || f.filename}</option>)}
                   </select>
@@ -1057,7 +1059,7 @@ function TextItemDisplay({ url, refreshKey, localContent, onCloseItem, onCloseCh
     setLoading(true); setError(null);
     (async () => {
       try {
-        const res = await fetch(`http://localhost:4040${url}?_=${refreshKey || Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } });
+        const res = await fetch(`${BASE_URL}${url}?_=${refreshKey || Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } });
         if (res.ok) setContent(await res.text()); else setError('Could not load content');
       } catch (e) { setError('Error: ' + e.message); }
       setLoading(false);
@@ -1139,7 +1141,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedF
   useEffect(() => {
     if (isEditing && type === 'text' && initialData?.url && !content) {
       setLoadingTxt(true); setTxtErr(null);
-      fetch(`http://localhost:4040${initialData.url}?_=${Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } })
+      fetch(`${BASE_URL}${initialData.url}?_=${Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } })
         .then(r => r.ok ? r.text() : Promise.reject()).then(t => setContent(t)).catch(() => setTxtErr('Could not load')).finally(() => setLoadingTxt(false));
     }
   }, []);
@@ -1150,7 +1152,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, uploadedF
   };
   const handleExisting = e => {
     const v = e.target.value; setSelFile(v);
-    if (v) { const f = uploadedFiles.find(f => f.url === v || f.path === v); if (f) { const fu = (f.url || f.path || '').startsWith('http') ? (f.url || f.path) : `http://localhost:4040${f.url || f.path}`; setUrl(fu); setPreview(fu); } }
+    if (v) { const f = uploadedFiles.find(f => f.url === v || f.path === v); if (f) { const fu = (f.url || f.path || '').startsWith('http') ? (f.url || f.path) : `${BASE_URL}${f.url || f.path}`; setUrl(fu); setPreview(fu); } }
     else { setUrl(''); setPreview(''); }
   };
   const handleSave = () => {
@@ -1242,7 +1244,7 @@ function FormEditorModal({ isEditing, initialItem, uploadedFiles = [], onSave, o
   useEffect(() => {
     if (isEditing && initialItem?.url) {
       setLoading(true);
-      fetch(`http://localhost:4040${initialItem.url}?_=${Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } })
+      fetch(`${BASE_URL}${initialItem.url}?_=${Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } })
         .then(r => r.ok ? r.json() : null).then(d => setQuestions(d?.questions?.length ? d.questions : [emptyQ()])).catch(() => setQuestions([emptyQ()])).finally(() => setLoading(false));
     } else { setQuestions([emptyQ()]); }
   }, []);
@@ -1309,7 +1311,7 @@ function FormMediaPicker({ media, uploadedFiles, getFilteredFiles, onSet, onClea
   if (media) return <div className="form-media-preview mt-2">{media.type === 'image' && <img src={media.url} alt="" className="form-media-img" />}{media.type === 'video' && <video src={media.url} controls className="form-media-vid" />}{media.type === 'audio' && <audio src={media.url} controls className="form-media-aud" />}<button className="btn btn-sm btn-outline-danger ms-2" onClick={onClear}><i className="bi bi-x me-1"></i>Remove</button></div>;
   const ff = getFilteredFiles(mt);
   const toEmbed = u => { const s = u.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/); if (s) return `https://www.youtube.com/embed/${s[1]}`; const w = u.match(/[?&]v=([a-zA-Z0-9_-]{11})/); if (w) return `https://www.youtube.com/embed/${w[1]}`; return u; };
-  const attach = () => { const u = fc ? ((uploadedFiles.find(f => f.url === fc || f.path === fc)?.url) || fc) : urlI.trim(); if (!u) { _showInfo('Validation', 'Select or enter URL'); return; } const fu = mt === 'video' ? toEmbed(u) : u; onSet({ type: mt, url: fu.startsWith('http') ? fu : `http://localhost:4040${fu}` }); setOpen(false); setUrlI(''); setFc(''); };
+  const attach = () => { const u = fc ? ((uploadedFiles.find(f => f.url === fc || f.path === fc)?.url) || fc) : urlI.trim(); if (!u) { _showInfo('Validation', 'Select or enter URL'); return; } const fu = mt === 'video' ? toEmbed(u) : u; onSet({ type: mt, url: fu.startsWith('http') ? fu : `${BASE_URL}${fu}` }); setOpen(false); setUrlI(''); setFc(''); };
   return (
     <div className="form-media-picker mt-2">
       <div className="d-flex align-items-center gap-2 mb-2">
@@ -1330,7 +1332,7 @@ function FormItemDisplay({ url, refreshKey }) {
   const [formDef, setFormDef] = useState(null); const [answers, setAnswers] = useState({}); const [submitted, setSubmitted] = useState(false); const [loading, setLoading] = useState(true); const [error, setError] = useState(null);
   const token = localStorage.getItem('token'); const [shuffles] = useState({});
   const getShuffled = (id, arr) => { if (!shuffles[id]) shuffles[id] = [...arr].sort(() => Math.random() - .5); return shuffles[id]; };
-  useEffect(() => { if (!url) { setLoading(false); return; } setLoading(true); setAnswers({}); setSubmitted(false); fetch(`http://localhost:4040${url}?_=${refreshKey || Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } }).then(r => r.ok ? r.json() : null).then(d => { if (d?.questions) setFormDef(d); else setError('Could not load form'); }).catch(() => setError('Error loading form')).finally(() => setLoading(false)); }, [url, refreshKey]);
+  useEffect(() => { if (!url) { setLoading(false); return; } setLoading(true); setAnswers({}); setSubmitted(false); fetch(`${BASE_URL}${url}?_=${refreshKey || Date.now()}`, { headers: { 'Authorization': token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' } }).then(r => r.ok ? r.json() : null).then(d => { if (d?.questions) setFormDef(d); else setError('Could not load form'); }).catch(() => setError('Error loading form')).finally(() => setLoading(false)); }, [url, refreshKey]);
   const setAns = (id, v) => setAnswers(p => ({ ...p, [id]: v }));
   const toggleMult = (id, oi) => { const c = answers[id] || []; setAns(id, c.includes(oi) ? c.filter(i => i !== oi) : [...c, oi]); };
   const isCorrect = q => { const a = answers[q.id]; if (q.type === 'single') return a === q.correctIndex; if (q.type === 'multiple') return [...(a || [])].sort().join(',') === [...(q.correctIndices || [])].sort().join(','); if (q.type === 'correlation') return q.pairs.every((p, i) => a && a[i] === p.right); if (q.type === 'closed') return (a || '').trim().toLowerCase() === (q.correctAnswer || '').trim().toLowerCase(); return null; };

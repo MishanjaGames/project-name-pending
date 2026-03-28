@@ -28,8 +28,8 @@ function EditLevel({ data, onLogout }) {
     try {
       // Fetch both the level and all directions
       const [levelRes, directionsRes] = await Promise.all([
-        fetch(`http://localhost:4040/api/levels/${id}`),
-        fetch('http://localhost:4040/api/directions')
+        fetch(`${process.env.REACT_APP_API_URL}/levels/${id}`),
+        fetch(process.env.REACT_APP_API_URL + '/directions')
       ]);
 
       if (levelRes.ok) {
@@ -83,7 +83,7 @@ function EditLevel({ data, onLogout }) {
     setSaving(true);
 
     try {
-      const response = await fetch(`http://localhost:4040/api/levels/${id}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/levels/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'

@@ -6,6 +6,7 @@ const { validate } = require('../utils/utils')
 const auth     = passport.authenticate('jwt', { session: false })
 const tutorVal = validate('tutor')
 
+router.get('/my', auth, controller.getMyGroups)
 router.get('/',    auth, tutorVal, controller.getBySession)
 router.get('/:id', auth, controller.getById)
 router.post('/',   auth, tutorVal, controller.create)

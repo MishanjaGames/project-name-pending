@@ -65,7 +65,7 @@ function CreateRole({ data, onLogout }) {
                 'Content-Type': 'application/json'
             };
 
-            const response = await fetch('http://localhost:4040/api/manage/roles', {
+            const response = await fetch(process.env.REACT_APP_API_URL + '/manage/roles', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({

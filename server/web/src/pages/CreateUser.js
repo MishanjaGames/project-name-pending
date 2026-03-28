@@ -33,7 +33,7 @@ function CreateUser({ data, onLogout }) {
         if (token) {
             const fetchRoles = async () => {
                 try {
-                    const response = await fetch('http://localhost:4040/api/manage/roles', {
+                    const response = await fetch(process.env.REACT_APP_API_URL + '/manage/roles', {
                         method: 'GET',
                         headers: {
                             'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
@@ -154,7 +154,7 @@ function CreateUser({ data, onLogout }) {
             };
 
             // Step 1: Create user
-            const response = await fetch('http://localhost:4040/api/manage/users', {
+            const response = await fetch(process.env.REACT_APP_API_URL + '/manage/users', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
@@ -181,7 +181,7 @@ function CreateUser({ data, onLogout }) {
                 const profileFormData = new FormData();
                 profileFormData.append('profilePicture', profilePicture);
 
-                await fetch(`http://localhost:4040/api/manage/users/${userId}/profile-picture`, {
+                await fetch(`${process.env.REACT_APP_API_URL}/manage/users/${userId}/profile-picture`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`

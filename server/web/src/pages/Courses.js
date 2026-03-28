@@ -50,7 +50,7 @@ function Courses({ data, onLogout }) {
     const fetchCourses = async () => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:4040/api/manage/courses', {
+            const response = await fetch(process.env.REACT_APP_API_URL + '/manage/courses', {
                 method: 'GET',
                 headers: {
                     'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
@@ -73,7 +73,7 @@ function Courses({ data, onLogout }) {
 
     const fetchUsers = async () => {
         try {
-            const response = await fetch('http://localhost:4040/api/manage/users', {
+            const response = await fetch(process.env.REACT_APP_API_URL + '/manage/users', {
                 method: 'GET',
                 headers: {
                     'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
@@ -167,7 +167,7 @@ function Courses({ data, onLogout }) {
             async () => {
                 try {
                     const token = localStorage.getItem('token');
-                    const response = await fetch(`http://localhost:4040/api/manage/courses/${course._id}`, {
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/manage/courses/${course._id}`, {
                         method: 'DELETE', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
                     });
                     if (response.ok) { showInfo('Deleted', `Course "${course.trans?.[0]?.title}" has been deleted.`); fetchCourses(); fetchUsers(); }
@@ -432,7 +432,7 @@ function Courses({ data, onLogout }) {
                                                                 );
                                                             })()}
                                                             <span className="fw-semibold">
-                                                                {c.isPrivateCopy && <span className="text-warning me-1">[PRIVATE]</span>}
+                                                                {c.isPrivateCopy && <span className="badge bg-warning text-dark me-1" style={{ fontSize: '.68rem', verticalAlign: 'middle' }}><i className="bi bi-lock-fill me-1"></i>Private</span>}
                                                                 {c.trans?.[0]?.title || 'Untitled'}
                                                             </span>
                                                         </div>

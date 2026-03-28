@@ -33,8 +33,8 @@ function Promos({ data, onLogout }) {
         setLoading(true);
         try {
             const [pr, cr] = await Promise.all([
-                fetch("http://localhost:4040/api/promos", { headers: ah }),
-                fetch("http://localhost:4040/api/manage/courses", { headers: ah })
+                fetch(process.env.REACT_APP_API_URL + "/promos", { headers: ah }),
+                fetch(process.env.REACT_APP_API_URL + "/manage/courses", { headers: ah })
             ]);
             if (pr.ok) { const d = await pr.json(); setPromos(d.data || []); }
             if (cr.ok) { const d = await cr.json(); setCourses(d.data || []); }
@@ -60,7 +60,7 @@ function Promos({ data, onLogout }) {
         if (!validate()) return;
         setSaving(true);
         try {
-            const res = await fetch("http://localhost:4040/api/promos", {
+            const res = await fetch(process.env.REACT_APP_API_URL + "/promos", {
                 method: "POST", headers: ah,
                 body: JSON.stringify({
                     code: form.code, courseIds: form.courseIds,
@@ -81,7 +81,7 @@ function Promos({ data, onLogout }) {
 
     const handleToggle = async (promo) => {
         try {
-            const res = await fetch(`http://localhost:4040/api/promos/${promo._id}/toggle`, { method: "PATCH", headers: ah });
+            const res = await fetch(`${process.env.REACT_APP_API_URL}/promos/${promo._id}/toggle`, { method: "PATCH", headers: ah });
             if (res.ok) { const d = await res.json(); setPromos(p => p.map(x => x._id === promo._id ? { ...x, active: d.data.active } : x)); }
         } catch (e) { showInfo("Error", "Network error"); }
     };
@@ -89,7 +89,7 @@ function Promos({ data, onLogout }) {
     const handleDelete = (promo) => {
         showConfirm("Delete Promo", `Delete code "${promo.code}"? This cannot be undone.`, async () => {
             try {
-                const res = await fetch(`http://localhost:4040/api/promos/${promo._id}`, { method: "DELETE", headers: ah });
+                const res = await fetch(`${process.env.REACT_APP_API_URL}/promos/${promo._id}`, { method: "DELETE", headers: ah });
                 if (res.ok) setPromos(p => p.filter(x => x._id !== promo._id));
                 else { const err = await res.json(); showInfo("Error", err.message); }
             } catch (e) { showInfo("Error", "Network error"); }

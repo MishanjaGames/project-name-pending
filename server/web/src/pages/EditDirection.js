@@ -24,7 +24,7 @@ function EditDirection({ data, onLogout }) {
   const fetchDirection = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:4040/api/directions/${id}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/directions/${id}`);
       if (response.ok) {
         const {data} = await response.json();
         setDirectionName(data.directionName);
@@ -52,7 +52,7 @@ function EditDirection({ data, onLogout }) {
     setSaving(true);
 
     try {
-      const response = await fetch(`http://localhost:4040/api/directions/${id}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/directions/${id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,

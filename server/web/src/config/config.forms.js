@@ -89,7 +89,7 @@ export const creatorApplicationConfig = {
     title:       'Tutor Application',
     description: 'Fill the form to apply for a tutor role. HRs will contact you after review.',
 
-    apiBase:  'http://localhost:4040/api',
+    apiBase:  process.env.REACT_APP_API_URL || 'http://localhost:4040/api',
     listPath: '/manage/forms',
     viewPath: (id) => `/manage/forms/detail/${id}`,
 
@@ -135,7 +135,7 @@ export const tutorApplicationConfig = {
     title:       'Creator Application',
     description: 'Fill the form to apply for a creator role. HRs will contact you after review.',
 
-    apiBase:  'http://localhost:4040/api',
+    apiBase:  process.env.REACT_APP_API_URL || 'http://localhost:4040/api',
     listPath: '/manage/forms',
     viewPath: (id) => `/manage/forms/detail/${id}`,
 
@@ -183,7 +183,7 @@ export const supportTicketConfig = {
     formType:    'support-ticket',
     title:       'Support Ticket',
     description: 'Report a problem or ask a question.',
-    apiBase:     'http://localhost:4040/api',
+    apiBase:     process.env.REACT_APP_API_URL || 'http://localhost:4040/api',
     listPath:    '/manage/forms/support-ticket',
     viewPath:    (id) => `/manage/forms/support-ticket/${id}`,
     fields: [

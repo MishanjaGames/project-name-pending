@@ -160,9 +160,24 @@ module.exports.update = async (req, res) => {
             if (req.body[field] !== undefined) update[field] = req.body[field]
         }
 
+        // Handle file removals first
+        let currentFiles = [...(assignment.taskFiles || [])]
+        if (req.body.removeFiles) {
+            try {
+                const toRemove = JSON.parse(req.body.removeFiles)
+                toRemove.forEach(filename => {
+                    const filePath = path.join(STORAGE_ROOT, 'assignments', assignment.sessionId.toString(), filename)
+                    if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+                })
+                currentFiles = currentFiles.filter(f => !toRemove.includes(f.filename))
+            } catch (e) { /* ignore parse errors */ }
+        }
+
         if ((req.files || []).length > 0) {
             const newFiles = moveUploadedFiles(req.files, assignment.sessionId)
-            update.taskFiles = [...(assignment.taskFiles || []), ...newFiles]
+            update.taskFiles = [...currentFiles, ...newFiles]
+        } else if (req.body.removeFiles) {
+            update.taskFiles = currentFiles
         }
 
         if (req.body.customOverdueDeduction !== undefined) {

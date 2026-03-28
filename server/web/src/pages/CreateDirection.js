@@ -26,7 +26,7 @@ function CreateDirection({ data, onLogout }) {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:4040/api/directions', {
+      const response = await fetch(process.env.REACT_APP_API_URL + '/directions', {
         method: 'POST',
         headers: {
           'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,

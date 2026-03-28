@@ -4,6 +4,7 @@ import { Navbar } from '../components/Navbar';
 import { extendSession } from '../utils/utils';
 import './ViewCourse.css';
 import { UtilityModal } from '../components/UtilityModal';
+import { PaymentModal } from '../components/PaymentModal';
 
 // ─── Helpers (shared with CoursePreview) ──────────────────────────────────────
 const isContainer = (e) => !e?.type || e.type === 'container' || e.type === 'none';
@@ -249,12 +250,23 @@ function ViewCourse({ data, onLogout }) {
   const [mainView, setMainView] = useState('course'); // 'course' | 'assignments'
   const [sessionAssignments, setSessionAssignments] = useState([]);
 
+  // ── Language switcher ──────────────────────────────────────────────────────
+  const [activeLangIdx, setActiveLangIdx] = useState(0);
+  // Helper: get translated field for current language with fallback to base (index 0)
+  const t = (field) => course?.trans?.[activeLangIdx]?.[field] || course?.trans?.[0]?.[field] || '';
+
+  // ── Payment modal ───────────────────────────────────────────────────────────
+  const [showPayment, setShowPayment] = useState(false);
+
   // ── Bootstrap ──────────────────────────────────────────────────────────────
   useEffect(() => {
     fetchData(); fetchComments(); fetchRating();
     if (sessionId) fetchSession();
     fetchCourseProgress();
   }, [id, sessionId]);
+
+  // Reset lang when course changes
+  useEffect(() => { setActiveLangIdx(0); }, [id]);
 
   // ── Session fetch: load session + find student's group ────────────────────
   const fetchSession = async () => {
@@ -578,7 +590,7 @@ function ViewCourse({ data, onLogout }) {
         {/* ── Sidebar ── */}
         <aside className="vc-sidebar">
           <div className="vc-sidebar-header">
-            <span className="vc-sidebar-title" title={course.title}>{course.title}</span>
+            <span className="vc-sidebar-title" title={course.trans?.[0]?.title}>{course.trans?.[0]?.title}</span>
             <button className="vc-sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} title="Toggle sidebar">
               <i className={`bi bi-layout-sidebar${sidebarOpen ? '' : '-reverse'}`}></i>
             </button>
@@ -775,19 +787,35 @@ function ViewCourse({ data, onLogout }) {
             <div className="vc-welcome">
               {/* ── Left: course info ── */}
               <div className="vc-welcome-inner">
+                {/* ── Lang switcher ── */}
+                {course.add_langs?.length > 0 && (
+                  <div className="d-flex gap-1 mb-3 flex-wrap">
+                    {[course.base_lang, ...course.add_langs].map((lang, idx) => (
+                      <button
+                        key={lang}
+                        className={`btn btn-sm ${activeLangIdx === idx ? 'btn-primary' : 'btn-outline-secondary'}`}
+                        style={{ fontSize: '.75rem', padding: '2px 10px', borderRadius: 999 }}
+                        onClick={() => setActiveLangIdx(idx)}
+                      >
+                        {lang.toUpperCase()}
+                        {idx === 0 && <span className="ms-1 opacity-50" style={{ fontSize: '.65rem' }}>base</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {course.links[0] ? (
                   <CourseThumbnail
                     src={'http://localhost:4040' + course.links[0].url}
-                    alt={course.title}
+                    alt={t('title')}
                   />
                 ) : (
                   <div className="vc-welcome-icon">
                     <i className="bi bi-book-open" />
                   </div>
                 )}
-                <h1 className="vc-welcome-title">{course.title}</h1>
-                {course.description && (
-                  <p className="vc-welcome-desc">{course.description}</p>
+                <h1 className="vc-welcome-title">{t('title')}</h1>
+                {t('description') && (
+                  <p className="vc-welcome-desc">{t('description')}</p>
                 )}
                 <div className="vc-welcome-meta">
                   <span className="vc-badge">{course.direction}</span>
@@ -813,6 +841,12 @@ function ViewCourse({ data, onLogout }) {
                   <div className="vc-locked-notice">
                     <i className="bi bi-lock-fill"></i>
                     <span>Purchase this course to access the content.</span>
+                    {course.courseType !== 'HOSTED' && (
+                      <button className="btn btn-primary btn-sm mt-2"
+                        onClick={() => setShowPayment(true)}>
+                        {course.price > 0 ? `Buy for $${course.price}` : 'Enrol for free'}
+                      </button>
+                    )}
                   </div>
                 ) : (
                   flatItems.length > 0 && (
@@ -1031,6 +1065,13 @@ function ViewCourse({ data, onLogout }) {
         onCancel={modal.onCancel || closeModal}
         onClose={closeModal}
       />
+      {showPayment && course && (
+        <PaymentModal
+          course={course}
+          onClose={() => setShowPayment(false)}
+          onSuccess={() => { setShowPayment(false); setLocked(false); fetchData(); }}
+        />
+      )}
     </>
   );
 }
@@ -1173,7 +1214,8 @@ function TextViewer({ url, token, actionProps }) {
     setLoading(true); setError(null);
     (async () => {
       try {
-        const res = await fetch(`http://localhost:4040${url}?_=${Date.now()}`, {
+        const fullUrl = url.startsWith('http') ? url : `http://localhost:4040${url}`;
+        const res = await fetch(`${fullUrl}?_=${Date.now()}`, {
           headers: { Authorization: token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' },
         });
         if (res.ok) setHtml(parseTextSyntax(await res.text()));

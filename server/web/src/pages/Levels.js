@@ -30,8 +30,8 @@ function Levels({ data, onLogout }) {
     try {
       // Fetch both levels and directions
       const [levelsRes, directionsRes] = await Promise.all([
-        fetch('http://localhost:4040/api/levels'),
-        fetch('http://localhost:4040/api/directions')
+        fetch(process.env.REACT_APP_API_URL + '/levels'),
+        fetch(process.env.REACT_APP_API_URL + '/directions')
       ]);
       if (levelsRes.status === 401 || directionsRes.status === 401) {
         await extendSession(data)
@@ -76,7 +76,7 @@ function Levels({ data, onLogout }) {
       async () => {
         try {
           const token = localStorage.getItem('token');
-          const response = await fetch(`http://localhost:4040/api/levels/${level._id}`, {
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/levels/${level._id}`, {
             method: 'DELETE', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
           });
           if (response.ok) { showInfo('Deleted', `Level "${level.levelName}" has been deleted.`); fetchData(); }

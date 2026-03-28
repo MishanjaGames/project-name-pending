@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
+const BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:4040';
+
 
 // Format code as user types: strip non-alnum, insert dashes every 5 chars
 function formatCode(raw) {
@@ -35,7 +37,7 @@ function RedeemKey({ data, onLogout }) {
         setResult(null);
 
         try {
-            const res = await fetch("http://localhost:4040/api/keys/redeem", {
+            const res = await fetch(process.env.REACT_APP_API_URL + "/keys/redeem", {
                 method: "POST",
                 headers: {
                     Authorization: `${token.split(" ")[0]} ${token.split(" ")[1]}`,
@@ -87,7 +89,7 @@ function RedeemKey({ data, onLogout }) {
                                     {result.courses.map(c => (
                                         <div key={c._id} className="d-flex align-items-center gap-3 p-2 rounded bg-light border">
                                             {c.thumbnail ? (
-                                                <img src={`http://localhost:4040${c.thumbnail}`} alt={c.title}
+                                                <img src={`${BASE_URL}${c.thumbnail}`} alt={c.title}
                                                     className="rounded" style={{ width: 48, height: 48, objectFit: "cover" }} />
                                             ) : (
                                                 <div className="rounded bg-primary bg-opacity-10 d-flex align-items-center justify-content-center"

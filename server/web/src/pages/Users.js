@@ -48,7 +48,7 @@ function Users({ data, onLogout }) {
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:4040/api/manage/users', {
+            const response = await fetch(process.env.REACT_APP_API_URL + '/manage/users', {
                 method: 'GET',
                 headers: {
                     'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
@@ -64,7 +64,7 @@ function Users({ data, onLogout }) {
                 // If the current user is root and not already in the list, fetch and prepend self
                 if (isRoot && data?._id && !userList.find(u => u._id === data._id)) {
                     try {
-                        const selfRes = await fetch('http://localhost:4040/api/users/c', {
+                        const selfRes = await fetch(process.env.REACT_APP_API_URL + '/users/c', {
                             method: 'GET',
                             headers: {
                                 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
@@ -88,7 +88,7 @@ function Users({ data, onLogout }) {
 
     const fetchRoles = async () => {
         try {
-            const response = await fetch('http://localhost:4040/api/manage/roles', {
+            const response = await fetch(process.env.REACT_APP_API_URL + '/manage/roles', {
                 method: 'GET',
                 headers: {
                     'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
@@ -185,7 +185,7 @@ function Users({ data, onLogout }) {
             async () => {
                 try {
                     const token = localStorage.getItem('token');
-                    const response = await fetch(`http://localhost:4040/api/manage/users/${user._id}`, {
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/manage/users/${user._id}`, {
                         method: 'DELETE', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
                     });
                     if (response.ok) { showInfo('Deleted', `User "${user.nickname}" has been deleted.`); setUsers(prev => prev.filter(u => u._id !== user._id)); }

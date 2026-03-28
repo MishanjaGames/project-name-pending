@@ -40,7 +40,7 @@ function Roles({ data, onLogout }) {
     const fetchRoles = async () => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:4040/api/manage/roles', {
+            const response = await fetch(process.env.REACT_APP_API_URL + '/manage/roles', {
                 method: 'GET',
                 headers: {
                     'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
@@ -100,7 +100,7 @@ function Roles({ data, onLogout }) {
             async () => {
                 try {
                     const token = localStorage.getItem('token');
-                    const response = await fetch(`http://localhost:4040/api/manage/roles/${role._id}`, {
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/manage/roles/${role._id}`, {
                         method: 'DELETE', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
                     });
                     if (response.ok) { showInfo('Deleted', `Role "${role.roleName}" has been deleted.`); setRoles(prev => prev.filter(r => r._id !== role._id)); }

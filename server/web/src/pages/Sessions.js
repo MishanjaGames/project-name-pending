@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import { UtilityModal } from "../components/UtilityModal";
 
-const API = "http://localhost:4040/api";
+const API = process.env.REACT_APP_API_URL + "";
 const TUTOR_RANKS = ['assistant','teacher','lecturer','instructor','tutor','professor'];
 
 function Sessions({ data, onLogout }) {

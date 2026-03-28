@@ -35,7 +35,7 @@ function EditRole({ data, onLogout }) {
 
             const fetchRole = async () => {
                 try {
-                    const response = await fetch(`http://localhost:4040/api/manage/roles/${id}`, {
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/manage/roles/${id}`, {
                         method: 'GET',
                         headers
                     });
@@ -126,7 +126,7 @@ function EditRole({ data, onLogout }) {
                 'Content-Type': 'application/json'
             };
 
-            const response = await fetch(`http://localhost:4040/api/manage/roles/${id}`, {
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/manage/roles/${id}`, {
                 method: 'PUT',
                 headers,
                 body: JSON.stringify({

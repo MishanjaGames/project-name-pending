@@ -1,4 +1,6 @@
 import AuthImage from './AuthImage';
+const BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:4040';
+
 
 /**
  * ItemModal — reusable "View Details" modal for Courses, Users, and Roles.
@@ -59,7 +61,7 @@ function CourseDetail({ item, extraData }) {
     const thumbUrl = item.links?.find(l =>
         l.description?.toLowerCase().includes('thumbnail') || l.type === 'image'
     )?.url;
-    const fullThumb = thumbUrl ? `http://localhost:4040${thumbUrl}` : null;
+    const fullThumb = thumbUrl ? `${BASE_URL}${thumbUrl}` : null;
     const title = item.trans?.[0]?.title || 'Untitled';
     const initials = title.charAt(0).toUpperCase();
 
@@ -124,7 +126,7 @@ function UserDetail({ item, extraData }) {
     const roleObj = typeof item.role === 'object' ? item.role : roles.find(r => r._id === item.role);
     const avatarUrl = item.links?.find(l => l.type === 'image' && l.description?.toLowerCase() === 'profile picture')?.url
         || item.links?.find(l => l.type === 'image')?.url;
-    const fullAvatar = avatarUrl ? `http://localhost:4040${avatarUrl}` : null;
+    const fullAvatar = avatarUrl ? `${BASE_URL}${avatarUrl}` : null;
     const initials = (item.nickname || '?').charAt(0).toUpperCase();
     const lvl = roleObj?.accessLevel || '';
 

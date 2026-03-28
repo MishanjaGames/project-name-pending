@@ -30,6 +30,8 @@ import RedeemKey from './pages/RedeemKey';
 import ViewForm from './pages/ViewForm';
 import Sessions from './pages/Sessions';
 import ManageSession from './pages/ManageSession';
+import StudentDashboard from './pages/StudentDashboard';
+import Grades from './pages/Grades';
 
 function App() {
   const navigate = useNavigate();
@@ -280,6 +282,18 @@ function App() {
         <Route path="/support/open-ticket" element={
           isLoggedIn ?
             <ApplicationForm formType={'support-ticket'} data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+
+        {/* Student Routes */}
+        <Route path="/my-courses" element={
+          isLoggedIn ?
+            <StudentDashboard data={userData} onLogout={handleLogout} /> :
+            <Navigate to="/login" />
+        } />
+        <Route path="/my-grades" element={
+          isLoggedIn ?
+            <Grades data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
         } />
 

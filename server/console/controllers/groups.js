@@ -226,3 +226,17 @@ module.exports.remove = async (req, res) => {
         res.status(200).json({ message: 'Group deleted', data: { _id: group._id } })
     } catch (e) { errorHandler(res, 500, e) }
 }
+// Get all groups where requester is a member (student view)
+module.exports.getMyGroups = async (req, res) => {
+    try {
+        const requester = await getRequester(req)
+        if (!requester) return errorHandler(res, 401, 'Authentication required')
+
+        const groups = await Groups.find({ 'members.userId': requester._id })
+            .populate('members.userId', 'nickname email')
+            .populate('assignments.assignmentId', 'title dueAt markScale maxMark')
+            .sort({ createdAt: -1 })
+
+        res.status(200).json({ data: groups })
+    } catch (e) { errorHandler(res, 500, e) }
+}

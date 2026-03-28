@@ -40,8 +40,8 @@ function Keys({ data, onLogout }) {
         setLoading(true);
         try {
             const [keysRes, coursesRes] = await Promise.all([
-                fetch("http://localhost:4040/api/keys", { headers: ah }),
-                fetch("http://localhost:4040/api/manage/courses", { headers: ah })
+                fetch(process.env.REACT_APP_API_URL + "/keys", { headers: ah }),
+                fetch(process.env.REACT_APP_API_URL + "/manage/courses", { headers: ah })
             ]);
             if (keysRes.ok) { const d = await keysRes.json(); setKeys(d.data || []); }
             if (coursesRes.ok) { const d = await coursesRes.json(); setCourses(d.data || []); }
@@ -59,7 +59,7 @@ function Keys({ data, onLogout }) {
 
         setGenerating(true);
         try {
-            const res = await fetch("http://localhost:4040/api/keys", {
+            const res = await fetch(process.env.REACT_APP_API_URL + "/keys", {
                 method: "POST", headers: ah,
                 body: JSON.stringify({
                     courseIds: genCourseIds,
@@ -84,7 +84,7 @@ function Keys({ data, onLogout }) {
     const handleDelete = (key) => {
         showConfirm("Delete Key", `Delete key ${key.code}? This cannot be undone.`, async () => {
             try {
-                const res = await fetch(`http://localhost:4040/api/keys/${key._id}`, { method: "DELETE", headers: ah });
+                const res = await fetch(`${process.env.REACT_APP_API_URL}/keys/${key._id}`, { method: "DELETE", headers: ah });
                 if (res.ok) { setKeys(p => p.filter(k => k._id !== key._id)); }
                 else { const err = await res.json(); showInfo("Error", err.message); }
             } catch (e) { showInfo("Error", "Network error"); }

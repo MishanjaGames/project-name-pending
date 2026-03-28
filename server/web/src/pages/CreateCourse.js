@@ -347,9 +347,27 @@ function CreateCourse({ data, onLogout }) {
 
                                         {/* Content files */}
                                         <div className="col-12">
-                                            <label className="form-label fw-semibold">Course Content Files <span className="text-muted">(Videos, PDFs, etc.)</span></label>
-                                            <div className="border rounded p-3 bg-light">
-                                                <div className="mb-2 d-flex align-items-center gap-2 flex-wrap">
+                                            <div className="card border-0 shadow-sm">
+                                                <div className="card-header bg-white d-flex align-items-center justify-content-between">
+                                                    <span className="fw-semibold">
+                                                        <i className="bi bi-folder2-open me-2 text-primary"></i>
+                                                        Course Files
+                                                    </span>
+                                                    {contentFiles.length > 0 && (
+                                                        <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
+                                                            {contentFiles.length} pending
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="card-body p-3">
+                                                    {/* Lang tab hint when course has extra langs */}
+                                                    {addLangs.length > 0 && (
+                                                        <div className="alert alert-info py-2 small mb-3">
+                                                            <i className="bi bi-info-circle me-1"></i>
+                                                            Files uploaded here apply to all language versions. You can tag files per-language after creating the course in Edit Course.
+                                                        </div>
+                                                    )}
+
                                                     <input type="file" id="contentFiles" className="d-none" multiple
                                                         onChange={e => {
                                                             const files = Array.from(e.target.files).filter(f => {
@@ -359,44 +377,63 @@ function CreateCourse({ data, onLogout }) {
                                                             setContentFiles(p => [...p, ...files]);
                                                         }}
                                                         accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip" />
-                                                    <label htmlFor="contentFiles" className="btn btn-outline-primary btn-sm">Choose Files</label>
+
+                                                    {contentFiles.length === 0 ? (
+                                                        <label htmlFor="contentFiles"
+                                                            className="d-flex flex-column align-items-center justify-content-center gap-2 border border-2 border-dashed rounded p-4 text-muted"
+                                                            style={{ cursor: 'pointer', borderStyle: 'dashed' }}>
+                                                            <i className="bi bi-cloud-upload" style={{ fontSize: '2rem', color: '#3b5bdb' }}></i>
+                                                            <span className="fw-semibold small">Click to choose files</span>
+                                                            <span style={{ fontSize: '.75rem' }}>Images, videos, PDFs, docs, archives · Max 512 MB each</span>
+                                                        </label>
+                                                    ) : (
+                                                        <>
+                                                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                                                <label htmlFor="contentFiles" className="btn btn-sm btn-outline-success" style={{ cursor: 'pointer' }}>
+                                                                    <i className="bi bi-plus-lg me-1"></i>Add more
+                                                                </label>
+                                                                <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setContentFiles([])}>
+                                                                    <i className="bi bi-x-lg me-1"></i>Clear all
+                                                                </button>
+                                                            </div>
+                                                            <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+                                                                {contentFiles.map((f, i) => {
+                                                                    const ext = f.name.split('.').pop().toLowerCase();
+                                                                    const isImg = f.type.startsWith('image/');
+                                                                    const isVid = f.type.startsWith('video/');
+                                                                    const isAud = f.type.startsWith('audio/');
+                                                                    const isDoc = ['pdf','doc','docx','ppt','pptx'].includes(ext);
+                                                                    const isZip = ['zip','rar','7z'].includes(ext);
+                                                                    const iconMap = { img:'bi-image', vid:'bi-camera-video', aud:'bi-music-note', doc:'bi-file-pdf', zip:'bi-file-zip' };
+                                                                    const colorMap = { img:'#198754', vid:'#0d6efd', aud:'#fd7e14', doc:'#dc3545', zip:'#6f42c1' };
+                                                                    const key = isImg?'img':isVid?'vid':isAud?'aud':isDoc?'doc':isZip?'zip':'img';
+                                                                    return (
+                                                                        <div key={i} className="d-flex align-items-center gap-2 bg-white p-2 rounded mb-1 border">
+                                                                            <div className="d-flex flex-column" style={{ gap: 1 }}>
+                                                                                <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
+                                                                                    style={{ width: 20, height: 18, fontSize: '.6rem' }}
+                                                                                    disabled={i === 0} onClick={() => moveItem(setContentFiles, i, -1)}>▲</button>
+                                                                                <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
+                                                                                    style={{ width: 20, height: 18, fontSize: '.6rem' }}
+                                                                                    disabled={i === contentFiles.length - 1} onClick={() => moveItem(setContentFiles, i, 1)}>▼</button>
+                                                                            </div>
+                                                                            <i className={`bi ${iconMap[key] || 'bi-file-earmark'}`}
+                                                                                style={{ color: colorMap[key] || '#6c757d', fontSize: '1.1rem', width: 20, textAlign: 'center' }}></i>
+                                                                            <div className="flex-grow-1 overflow-hidden">
+                                                                                <div className="small fw-semibold text-truncate">{f.name}</div>
+                                                                                <div style={{ fontSize: '.72rem', color: '#6c757d' }}>{(f.size/1024/1024).toFixed(2)} MB</div>
+                                                                            </div>
+                                                                            <button type="button" className="btn btn-sm btn-outline-danger"
+                                                                                onClick={() => setContentFiles(p => p.filter((_,j) => j !== i))}>
+                                                                                <i className="bi bi-x-lg"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </div>
-                                                <small className="text-muted d-block mb-2">Max 512 MB per file.</small>
-                                                {contentFiles.length > 0 ? (
-                                                    <>
-                                                        <div className="d-flex justify-content-between align-items-center mb-2">
-                                                            <strong className="small">Files to Upload ({contentFiles.length})</strong>
-                                                            <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setContentFiles([])}>Clear All</button>
-                                                        </div>
-                                                        <small className="text-muted d-block mb-1">Use ▲ ▼ to set upload order</small>
-                                                        <div style={{ maxHeight: 250, overflowY: "auto" }}>
-                                                            {contentFiles.map((f, i) => (
-                                                                <div key={i} className="d-flex justify-content-between align-items-center bg-white p-2 rounded mb-2 border">
-                                                                    {/* Sort controls */}
-                                                                    <div className="d-flex flex-column me-2" style={{ gap: 1 }}>
-                                                                        <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
-                                                                            style={{ width: 22, height: 20, fontSize: "0.65rem" }}
-                                                                            disabled={i === 0}
-                                                                            onClick={() => moveItem(setContentFiles, i, -1)}
-                                                                            title="Move up">▲</button>
-                                                                        <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
-                                                                            style={{ width: 22, height: 20, fontSize: "0.65rem" }}
-                                                                            disabled={i === contentFiles.length - 1}
-                                                                            onClick={() => moveItem(setContentFiles, i, 1)}
-                                                                            title="Move down">▼</button>
-                                                                    </div>
-                                                                    <div className="flex-grow-1">
-                                                                        <div className="small fw-semibold text-truncate" style={{ maxWidth: 380 }}>{f.name}</div>
-                                                                        <div className="text-muted" style={{ fontSize: "0.75rem" }}>{(f.size / 1024 / 1024).toFixed(2)} MB</div>
-                                                                    </div>
-                                                                    <button type="button" className="btn btn-sm btn-outline-danger ms-2" onClick={() => setContentFiles(p => p.filter((_, j) => j !== i))} title="Remove">×</button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <div className="text-center py-3 text-muted small">No files selected yet</div>
-                                                )}
                                             </div>
                                         </div>
                                     </div>

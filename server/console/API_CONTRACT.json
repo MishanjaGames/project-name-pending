@@ -1,8 +1,8 @@
 {
   "_meta": {
-    "baseUrl": "process.env.REACT_APP_API_URL  ?  e.g. http://localhost:4040/api",
+    "baseUrl": "process.env.REACT_APP_API_URL  â†’  e.g. http://localhost:4040/api",
     "auth": "All protected routes require header: Authorization: Bearer <token>",
-    "tokenStorage": "localStorage.getItem('token')  ?  'Bearer eyJ...'",
+    "tokenStorage": "localStorage.getItem('token')  â†’  'Bearer eyJ...'",
     "buildAuthHeader": "{ Authorization: token, 'Content-Type': 'application/json' }",
     "note": "Routes marked [public] require no token. All others require Bearer token."
   },
@@ -74,8 +74,8 @@
       "url": "/users",
       "access": "public (token optional, affects filtering)",
       "query": {
-        "search": "optional string — filters by nickname or email",
-        "tutorOnly": "true — returns only users with tutorRank set"
+        "search": "optional string â€” filters by nickname or email",
+        "tutorOnly": "true â€” returns only users with tutorRank set"
       },
       "response_200": { "data": ["...array of user objects..."] }
     },
@@ -144,7 +144,7 @@
       "method": "POST",
       "url": "/users/:id/profile-picture",
       "access": "manage+",
-      "body": "multipart/form-data — field name: 'avatar' (image file)",
+      "body": "multipart/form-data â€” field name: 'avatar' (image file)",
       "response_200": {
         "message": "Profile picture uploaded successfully",
         "data": { "userId": "...", "filename": "avatar.jpg", "link": { "url": "/api/files/users/:id/avatar.jpg" } }
@@ -154,7 +154,7 @@
       "method": "PUT",
       "url": "/users/:id/profile-picture",
       "access": "manage+",
-      "body": "multipart/form-data — field name: 'avatar' (image file)",
+      "body": "multipart/form-data â€” field name: 'avatar' (image file)",
       "response_200": {
         "message": "Profile picture updated successfully",
         "data": { "userId": "...", "filename": "avatar.jpg", "link": {} }
@@ -210,7 +210,7 @@
       "method": "PUT or PATCH",
       "url": "/courses/:id",
       "access": "create+",
-      "body": "Same shape as create — all fields optional in PATCH",
+      "body": "Same shape as create â€” all fields optional in PATCH",
       "response_200": { "message": "Course updated successfully", "data": "{ course }" }
     },
     "delete": {
@@ -265,21 +265,21 @@
       "method": "GET",
       "url": "/courses/:id/files/:filename",
       "access": "public",
-      "query": { "download": "true — forces download disposition" },
+      "query": { "download": "true â€” forces download disposition" },
       "response": "Binary file"
     },
     "uploadFile": {
       "method": "POST",
       "url": "/courses/:id/files",
       "access": "create+",
-      "body": "multipart/form-data — field: 'file'; optional query: ?thumbnail=true",
+      "body": "multipart/form-data â€” field: 'file'; optional query: ?thumbnail=true",
       "response_201": { "message": "File uploaded", "data": { "url": "/api/files/courses/:id/filename.jpg", "filename": "..." } }
     },
     "uploadMultipleFiles": {
       "method": "POST",
       "url": "/courses/:id/files/multiple",
       "access": "create+",
-      "body": "multipart/form-data — field: 'files' (multiple)",
+      "body": "multipart/form-data â€” field: 'files' (multiple)",
       "response_201": { "message": "Files uploaded", "data": [{ "url": "...", "filename": "..." }] }
     },
     "deleteFile": {
@@ -453,7 +453,7 @@
       "access": "Bearer",
       "body": { "code": "ABCDE-FGHIJ-KLMNO" },
       "response_200": {
-        "message": "Key redeemed — 2 course(s) added to your library",
+        "message": "Key redeemed â€” 2 course(s) added to your library",
         "data": {
           "alreadyOwned": 0,
           "newlyUnlocked": 2,
@@ -544,7 +544,7 @@
       "access": "Bearer",
       "body": { "code": "LAUNCH20", "courseId": "64b5c987e..." },
       "response_200": {
-        "message": "Promo applied — course added to your library",
+        "message": "Promo applied â€” course added to your library",
         "data": {
           "courseId": "...",
           "courseTitle": "React Course",
@@ -720,7 +720,7 @@
       "method": "PATCH",
       "url": "/assignments/:id",
       "access": "tutor in session or manage+",
-      "body": "multipart/form-data — same fields as create, all optional",
+      "body": "multipart/form-data â€” same fields as create, all optional",
       "note": "markScale and maxMark can only be changed if no submissions exist yet.",
       "response_200": { "message": "Assignment updated", "data": "{ updated assignment }" }
     },
@@ -765,7 +765,7 @@
       "method": "POST",
       "url": "/submissions/:groupId/:assignmentId",
       "access": "Bearer (active group member only)",
-      "body": "multipart/form-data — field: 'submission' (zip or txt file, max 200MB)",
+      "body": "multipart/form-data â€” field: 'submission' (zip or txt file, max 200MB)",
       "note": "Re-submission only allowed before deadline or if previous was declined.",
       "response_201": {
         "message": "Submitted successfully",
@@ -799,14 +799,14 @@
     "submitApplication": {
       "method": "POST",
       "url": "/forms/apply/:formType",
-      "access": "public (Bearer optional — attaches userId if present)",
+      "access": "public (Bearer optional â€” attaches userId if present)",
       "body": "multipart/form-data",
       "fields": {
-        "data": "JSON string — { firstName, lastName, email, about, ... } (shape depends on formType)",
-        "skills": "JSON string — array of skill objects",
-        "cert_0": "file — certificate for skills[0]",
-        "example_0": "file — example file for skills[0]",
-        "cert_1": "file — certificate for skills[1]"
+        "data": "JSON string â€” { firstName, lastName, email, about, ... } (shape depends on formType)",
+        "skills": "JSON string â€” array of skill objects",
+        "cert_0": "file â€” certificate for skills[0]",
+        "example_0": "file â€” example file for skills[0]",
+        "cert_1": "file â€” certificate for skills[1]"
       },
       "formTypes": ["creator", "tutor", "support-ticket"],
       "response_201": { "message": "Submission received", "data": { "_id": "...", "status": "pending" } }
@@ -848,7 +848,7 @@
       "method": "GET",
       "url": "/files/courses/:courseId/:filename",
       "access": "public",
-      "query": { "download": "true — forces download disposition" },
+      "query": { "download": "true â€” forces download disposition" },
       "response": "Binary file"
     },
     "getUserProfilePicture": {
@@ -928,7 +928,7 @@
     },
     "CoursePreview_doubleBaseUrl": {
       "current_wrong": "BASE/api/courses/... (double /api prefix because BASE already has /api stripped)",
-      "correct": "process.env.REACT_APP_API_URL + '/courses/...' — just use the env var directly"
+      "correct": "process.env.REACT_APP_API_URL + '/courses/...' â€” just use the env var directly"
     },
     "ViewCourse_CoursePreview1_brokenUrlReplace": {
       "current_wrong": "Template literal contains raw JS expression as string: `(process.env...replace...)${url}`",
@@ -936,7 +936,7 @@
     },
     "ManageSession_overrideRank": {
       "current_wrong": "fetch .../override-rank with no body",
-      "note": "Controller expects { tutorId } in body — front end omits it. Only works if frontend passes tutorId."
+      "note": "Controller expects { tutorId } in body â€” front end omits it. Only works if frontend passes tutorId."
     },
     "Settings_SSE": {
       "note": "SSE streams need token as query param, not in Authorization header. Use: /utils/status/stream?token=<full token string>"

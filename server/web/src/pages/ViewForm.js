@@ -58,7 +58,7 @@ const getEmail = (sub, config) => {
     return null;
 };
 
-const API_BASE = "http://localhost:4040/api";
+const API_BASE = process.env.REACT_APP_API_URL + "";
 
 // ─── FileRow ──────────────────────────────────────────────────────────────────
 

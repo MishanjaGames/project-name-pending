@@ -69,7 +69,7 @@ function Main({ data, onLogout }) {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
-    const url = `http://localhost:4040/api/utils/status/stream?token=${encodeURIComponent(token)}`;
+    const url = `${process.env.REACT_APP_API_URL}/utils/status/stream?token=${encodeURIComponent(token)}`;
     const es = new EventSource(url);
     esRef.current = es;
     es.onopen = () => setSseState('open');

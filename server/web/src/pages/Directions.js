@@ -29,7 +29,7 @@ function Directions({ data, onLogout }) {
   const fetchDirections = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:4040/api/directions');
+      const response = await fetch(process.env.REACT_APP_API_URL + '/directions');
 
       if (response.status === 401) {
         await extendSession(data)
@@ -62,7 +62,7 @@ function Directions({ data, onLogout }) {
       async () => {
         try {
           const token = localStorage.getItem('token');
-          const response = await fetch(`http://localhost:4040/api/directions/${directions._id}`, {
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/directions/${directions._id}`, {
             method: 'DELETE', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
           });
           if (response.ok) { showInfo('Deleted', `Direction "${directions.directionName}" has been deleted.`); fetchDirections(); }

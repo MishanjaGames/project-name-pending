@@ -15,6 +15,8 @@ router.delete('/:id', auth, validate('create'), controller.remove)
 router.get('/:id/rating',  auth, controller.getMyRating)
 router.post('/:id/rating', auth, controller.rateById)
 
+router.post('/:id/purchase', auth, controller.purchase)
+
 router.get('/:id/comments',               controller.getComments)
 router.post('/:id/comments',              auth, controller.addComment)
 router.delete('/:id/comments/:commentId', auth, controller.deleteComment)

@@ -51,7 +51,7 @@ function EditUser({ data, onLogout }) {
 
             const fetchUser = async () => {
                 try {
-                    const response = await fetch(`http://localhost:4040/api/manage/users/${id}`, {
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/manage/users/${id}`, {
                         method: 'GET',
                         headers
                     });
@@ -83,7 +83,7 @@ function EditUser({ data, onLogout }) {
 
             const fetchRoles = async () => {
                 try {
-                    const response = await fetch('http://localhost:4040/api/manage/roles', {
+                    const response = await fetch(process.env.REACT_APP_API_URL + '/manage/roles', {
                         method: 'GET',
                         headers
                     });
@@ -166,7 +166,7 @@ function EditUser({ data, onLogout }) {
                 updatePayload.password = newPassword;
             }
 
-            const response = await fetch(`http://localhost:4040/api/manage/users/${id}`, {
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/manage/users/${id}`, {
                 method: 'PATCH',
                 headers: {
                     ...headers,
@@ -187,7 +187,7 @@ function EditUser({ data, onLogout }) {
                 const profileFormData = new FormData();
                 profileFormData.append('profilePicture', profilePicture);
 
-                const uploadResponse = await fetch(`http://localhost:4040/api/manage/users/${id}/profile-picture`, {
+                const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL}/manage/users/${id}/profile-picture`, {
                     method: 'PUT',
                     headers,
                     body: profileFormData
@@ -402,7 +402,7 @@ function EditUser({ data, onLogout }) {
                                                                 const headers = {
                                                                     'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`
                                                                 };
-                                                                const response = await fetch(`http://localhost:4040/api/manage/users/${id}/profile-picture`, {
+                                                                const response = await fetch(`${process.env.REACT_APP_API_URL}/manage/users/${id}/profile-picture`, {
                                                                     method: 'DELETE',
                                                                     headers
                                                                 });

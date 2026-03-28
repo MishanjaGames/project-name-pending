@@ -39,7 +39,7 @@ function Settings({ data, onLogout }) {
                 'Content-Type': 'application/json'
             };
 
-            const response = await fetch(`http://localhost:4040/api/utils/logs?date=${date}&lines=100`, {
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/utils/logs?date=${date}&lines=100`, {
                 method: 'GET',
                 headers
             });
@@ -70,7 +70,7 @@ function Settings({ data, onLogout }) {
                 'Content-Type': 'application/json'
             };
 
-            const response = await fetch('http://localhost:4040/api/utils/logs/files', {
+            const response = await fetch(process.env.REACT_APP_API_URL + '/utils/logs/files', {
                 method: 'GET',
                 headers
             });
@@ -103,7 +103,7 @@ function Settings({ data, onLogout }) {
 
         // Use SSE only for 'today' — historical files don't change
         if (selectedDate === 'today') {
-            const url = `http://localhost:4040/api/utils/logs/stream?token=${encodeURIComponent(token)}&date=today&lines=100`;
+            const url = `${process.env.REACT_APP_API_URL}/utils/logs/stream?token=${encodeURIComponent(token)}&date=today&lines=100`;
             const es = new EventSource(url);
             esRef.current = es;
             setSseState('connecting');
@@ -340,7 +340,7 @@ function Settings({ data, onLogout }) {
                                     <tbody>
                                         <tr>
                                             <td className="text-muted fw-semibold small" style={{ width: '40%' }}>Server</td>
-                                            <td>http://localhost:4040</td>
+                                            <td>{(process.env.REACT_APP_API_URL || 'http://localhost:4040/api').replace('/api', '')}</td>
                                         </tr>
                                         <tr>
                                             <td className="text-muted fw-semibold small">User</td>

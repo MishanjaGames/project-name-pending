@@ -3,22 +3,23 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { Provider } from 'react-redux'
 import { BrowserRouter } from 'react-router-dom';
-import emailjs from "@emailjs/browser";
+import emailjs from '@emailjs/browser';
 
-emailjs.init("Nvm4o7f3CGBjRYtZ5");
+const EMAILJS_KEY = process.env.REACT_APP_EMAILJS_PUBLIC_KEY;
+if (EMAILJS_KEY) {
+  emailjs.init(EMAILJS_KEY);
+} else {
+  console.warn('EmailJS public key not set. Check REACT_APP_EMAILJS_PUBLIC_KEY in .env');
+}
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </React.StrictMode>
 );
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();

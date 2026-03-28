@@ -183,6 +183,10 @@ function CoursePreview({ data, onLogout }) {
   const [editableCourse, setEditableCourse] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  // ── Language switcher (preview mode only) ──────────────────────────────────
+  const [previewLangIdx, setPreviewLangIdx] = useState(0);
+  const pt = (field) => course?.trans?.[previewLangIdx]?.[field] || course?.trans?.[0]?.[field] || '';
   const [textRefreshKey, setTextRefreshKey] = useState(0);
   const [localTextContent, setLocalTextContent] = useState({});
   const [textFilesToUpload, setTextFilesToUpload] = useState({});
@@ -862,9 +866,23 @@ function CoursePreview({ data, onLogout }) {
               </div>
 
               <div className="title-price-row">
+                {/* Lang switcher — only in preview mode when course has extra langs */}
+                {!editMode && course.add_langs?.length > 0 && (
+                  <div className="d-flex gap-1 mb-2 flex-wrap">
+                    {[course.base_lang, ...course.add_langs].map((lang, idx) => (
+                      <button key={lang}
+                        className={`btn btn-sm ${previewLangIdx === idx ? 'btn-primary' : 'btn-outline-secondary'}`}
+                        style={{ fontSize: '.72rem', padding: '2px 10px', borderRadius: 999 }}
+                        onClick={() => setPreviewLangIdx(idx)}>
+                        {lang.toUpperCase()}
+                        {idx === 0 && <span className="ms-1 opacity-50" style={{ fontSize: '.6rem' }}>base</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {editMode
                   ? <input type="text" className="form-control course-title-input" value={editableCourse.trans?.[0]?.title || ''} onChange={e => { const t = editableCourse.trans ? [...editableCourse.trans] : [{}]; t[0] = { ...t[0], title: e.target.value }; handleCourseFieldChange('trans', t); }} />
-                  : <h1 className="course-title">{course.isPrivateCopy && <span className="text-warning me-1">[PRIVATE]</span>}{course.trans?.[0]?.title}</h1>}
+                  : <h1 className="course-title">{course.isPrivateCopy && <span className="text-warning me-1">[PRIVATE]</span>}{pt('title')}</h1>}
                 <div className="mobile-price">
                   {editMode
                     ? <input type="number" className="form-control price-input" value={editableCourse.price} onChange={e => handleCourseFieldChange('price', parseFloat(e.target.value))} step="0.01" min="0" />
@@ -885,7 +903,7 @@ function CoursePreview({ data, onLogout }) {
               </div>
 
               <div className="description-box">
-                {editMode ? <textarea className="form-control" value={editableCourse.trans?.[0]?.description || ''} onChange={e => { const t = editableCourse.trans ? [...editableCourse.trans] : [{}]; t[0] = { ...t[0], description: e.target.value }; handleCourseFieldChange('trans', t); }} rows="3" /> : <p>{course.trans?.[0]?.description}</p>}
+                {editMode ? <textarea className="form-control" value={editableCourse.trans?.[0]?.description || ''} onChange={e => { const t = editableCourse.trans ? [...editableCourse.trans] : [{}]; t[0] = { ...t[0], description: e.target.value }; handleCourseFieldChange('trans', t); }} rows="3" /> : <p>{pt('description')}</p>}
               </div>
 
               <div className="mobile-skills">
@@ -893,7 +911,7 @@ function CoursePreview({ data, onLogout }) {
                 <div className="skills-grid">
                   {editMode
                     ? <>{(editableCourse.trans?.[0]?.skills || []).map((s, i) => <div className="skill-item-edit" key={i}><input type="text" className="form-control skill-input" value={s} onChange={e => handleSkillChange(i, e.target.value)} /><button className="btn btn-sm btn-danger" onClick={() => removeSkill(i)}><i className="bi bi-x"></i></button></div>)}<button className="btn btn-sm btn-primary" onClick={addSkill}><i className="bi bi-plus"></i> Add Skill</button></>
-                    : (course.trans?.[0]?.skills || []).map((s, i) => <div className="skill-item" key={i}><i className="bi bi-check-circle-fill text-success"></i><span>{s}</span></div>)}
+                    : (pt('skills') || []).map((s, i) => <div className="skill-item" key={i}><i className="bi bi-check-circle-fill text-success"></i><span>{s}</span></div>)}
                 </div>
               </div>
 

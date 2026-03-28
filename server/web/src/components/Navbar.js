@@ -1,209 +1,162 @@
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react"
 import './navbar.css'
+import AuthImage from './AuthImage'
+
+const ACCESS = { default: 0, create: 1, tutor: 1.5, quality: 2, manage: 3, admin: 4, root: 5 }
+const lvl = (a) => ACCESS[a] ?? 0
+
+const NAV_SECTIONS = [
+    {
+        label: 'Learning',
+        minLvl: 0,
+        items: [
+            { to: '/my-courses', icon: 'bi-collection-play', label: 'My Courses' },
+            { to: '/my-grades', icon: 'bi-award', label: 'My Grades' },
+            { to: '/redeem', icon: 'bi-key', label: 'Redeem Key' },
+        ]
+    },
+    {
+        label: 'Support',
+        minLvl: 2,
+        items: [
+            { to: '/creator/apply', icon: 'bi-pen', label: 'Creator Apply' },
+            { to: '/tutor/apply', icon: 'bi-mortarboard', label: 'Tutor Apply' },
+            { to: '/support/open-ticket', icon: 'bi-headset', label: 'Support' },
+            { to: '/manage/forms', icon: 'bi-ui-checks', label: 'Applications / Forms' },
+        ]
+    },
+    {
+        label: 'Management',
+        minLvl: 3,
+        items: [
+            { to: '/', icon: 'bi-speedometer2', label: 'Dashboard' },
+            { to: '/manage/courses', icon: 'bi-book', label: 'Courses' },
+            { to: '/manage/sessions', icon: 'bi-people', label: 'Sessions' },
+            { to: '/manage/users', icon: 'bi-people-fill', label: 'Users' },
+            { to: '/manage/roles', icon: 'bi-shield-lock', label: 'Roles' },
+            { to: '/manage/promos', icon: 'bi-tag', label: 'Promo Codes' },
+            { to: '/manage/keys', icon: 'bi-key-fill', label: 'Product Keys' },
+            { to: '/manage/directions', icon: 'bi-compass', label: 'Directions' },
+            { to: '/manage/levels', icon: 'bi-bar-chart-steps', label: 'Levels' },
+        ]
+    },
+    {
+        label: 'Catalogue',
+        minLvl: 3,
+        items: []
+    },
+    {
+        label: 'System',
+        minLvl: 4,
+        items: [
+            { to: '/manage/settings', icon: 'bi-gear', label: 'Settings' },
+        ]
+    },
+]
 
 export const Navbar = ({ data, onLogout }) => {
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+    const [open, setOpen] = useState(false)
     const location = useLocation()
     const navigate = useNavigate()
+    const userLvl = lvl(data?.accessLevel)
 
-    useEffect(() => {
-        setIsSidebarOpen(false)
-    }, [location])
+    useEffect(() => { setOpen(false) }, [location])
 
-    const toggleSidebar = () => {
-        setIsSidebarOpen(!isSidebarOpen)
+    const isActive = (to) =>
+        to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
+
+    const accessLabel = data?.accessLevel || 'default'
+    const accessColors = {
+        root: '#424242', admin: '#dc3545', manage: '#ffc107',
+        quality: '#35dc3d',tutor: '#0dcaf0', create: '#0d6efd', default: '#9aa0a5'
     }
-
-    const closeSidebar = () => {
-        setIsSidebarOpen(false)
-    }
+    const roleColor = accessColors[accessLabel] || '#6c757d'
 
     return (
         <>
-            {/* Top Bar with Hamburger - Always visible */}
             <nav className="top-bar navbar navbar-dark bg-dark">
-                <div className="container-fluid">
-                    <button 
-                        className="navbar-toggler border-0 p-2" 
-                        type="button" 
-                        onClick={toggleSidebar}
-                        aria-label="Toggle sidebar"
-                    >
+                <div className="container-fluid px-3">
+                    <button className="navbar-toggler border-0 p-2" type="button"
+                        onClick={() => setOpen(o => !o)} aria-label="Toggle sidebar">
                         <span className="navbar-toggler-icon"></span>
                     </button>
-                    {!isSidebarOpen && (
-                        <span className="navbar-brand mb-0 h5 mx-auto">Admin Panel</span>
-                    )}
-                    <div style={{ width: '31px' }}>
-                        {!isSidebarOpen && (
-                        <button className="btn btn-outline-light btn-sm w-100" onClick={onLogout}>
-                            <svg width="16" height="16" fill="currentColor" className="me-2" viewBox="0 0 16 16">
-                                <path fillRule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2z"/>
-                                <path fillRule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z"/>
-                            </svg>
-                        </button>)}
-                    </div> {/* Spacer for centering */}
-                    
+                    <span className="navbar-brand mb-0 h6 mx-auto fw-bold" style={{ letterSpacing: '-.01em' }}>
+                        <i className="bi bi-mortarboard-fill me-2" style={{ color: '#3b5bdb' }}></i>
+                        project-name-pending Admin Panel
+                    </span>
+                    <button className="btn btn-outline-light btn-sm d-flex align-items-center justify-content-center"
+                        style={{ width: 34, height: 34 }} onClick={onLogout} title="Logout">
+                        <i className="bi bi-box-arrow-right"></i>
+                    </button>
                 </div>
             </nav>
 
-            {/* Overlay when sidebar is open */}
-            {isSidebarOpen && (
-                <div className="sidebar-overlay" onClick={closeSidebar}></div>
-            )}
+            {open && <div className="sidebar-overlay" onClick={() => setOpen(false)} />}
 
-            {/* Sidebar */}
-            <aside className={`sidebar bg-dark text-white ${isSidebarOpen ? 'show' : ''}`}>
-                {/* Sidebar Header */}
-                <div className="sidebar-header p-3 border-bottom border-secondary">
-                    <div className="d-flex align-items-center justify-content-between">
-                        <h4 className="fw-bold mb-0">Admin Panel</h4>
-                        {/* <button 
-                            className="btn btn-sm btn-outline-light" 
-                            onClick={closeSidebar}
-                            aria-label="Close sidebar"
-                        >
-                            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z"/>
-                            </svg>
-                        </button> */}
+            <aside className={`sidebar bg-dark text-white ${open ? 'show' : ''}`}>
+
+                {/* ── User strip ── */}
+                <div className="sidebar-user px-3 py-3">
+                    <div className="d-flex align-items-center gap-2 mb-2">
+                        <AuthImage
+                            src={data?.links?.find(l => l.type === 'image' && l.description?.toLowerCase() === 'profile picture')?.url || null}
+                            alt={data?.nickname}
+                            className="sb-avatar"
+                            style={{ objectFit: 'cover', padding: 0 }}
+                            fallback={<div className="sb-avatar">{(data?.nickname || '?')[0].toUpperCase()}</div>}
+                        />
+                        <div className="overflow-hidden flex-1">
+                            <div className="fw-semibold text-white text-truncate" style={{ fontSize: '.875rem' }}>
+                                {data?.nickname || 'User'}
+                            </div>
+                            <div className="text-truncate" style={{ fontSize: '.72rem', color: '#868e96' }}>
+                                {data?.email}
+                            </div>
+                        </div>
                     </div>
+                    <span className="sb-role-badge" style={{ background: roleColor, color: ['manage', 'default', 'tutor'].includes(accessLabel) ? '#000' : '#fff' }}>
+                        {accessLabel}
+                    </span>
                 </div>
 
-                {/* Sidebar Navigation */}
+                {/* ── Nav ── */}
                 <nav className="sidebar-nav">
-                    <ul className="nav flex-column">
-                        <li className="nav-item">
-                            <Link 
-                                to='/' 
-                                className="nav-link text-white d-flex align-items-center"
-                                onClick={closeSidebar}
-                            >
-                                <span>Dashboard</span>
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link 
-                                to='/manage/courses' 
-                                className="nav-link text-white d-flex align-items-center"
-                                onClick={closeSidebar}
-                            >
-                                <span>Courses</span>
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link 
-                                to='/manage/directions' 
-                                className="nav-link text-white d-flex align-items-center"
-                                onClick={closeSidebar}
-                            >
-                                <span>Directions</span>
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link 
-                                to='/manage/forms' 
-                                className="nav-link text-white d-flex align-items-center"
-                                onClick={closeSidebar}
-                            >
-                                <span>Forms</span>
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link 
-                                to='/manage/levels' 
-                                className="nav-link text-white d-flex align-items-center"
-                                onClick={closeSidebar}
-                            >
-                                <span>Levels</span>
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link 
-                                to='/manage/roles' 
-                                className="nav-link text-white d-flex align-items-center"
-                                onClick={closeSidebar}
-                            >
-                                <span>Roles</span>
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link 
-                                to='/manage/users' 
-                                className="nav-link text-white d-flex align-items-center"
-                                onClick={closeSidebar}
-                            >
-                                <span>Users</span>
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link 
-                                to='/manage/sessions' 
-                                className="nav-link text-white d-flex align-items-center"
-                                onClick={closeSidebar}
-                            >
-                                <span>Sessions</span>
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link 
-                                to='/manage/settings' 
-                                className="nav-link text-white d-flex align-items-center"
-                                onClick={closeSidebar}
-                            >
-                                <span>Settings</span>
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link 
-                                to='/manage/promos' 
-                                className="nav-link text-white d-flex align-items-center"
-                                onClick={closeSidebar}
-                            >
-                                <span>Promo Codes</span>
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link 
-                                to='/manage/keys' 
-                                className="nav-link text-white d-flex align-items-center"
-                                onClick={closeSidebar}
-                            >
-                                <span>Product Keys</span>
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link 
-                                to='/redeem' 
-                                className="nav-link text-white d-flex align-items-center"
-                                onClick={closeSidebar}
-                            >
-                                <span>Redeem Key</span>
-                            </Link>
-                        </li>
-                    </ul>
+                    {NAV_SECTIONS.map(section => {
+                        if (userLvl < (section.minLvl || 0)) return null
+                        const items = section.items.filter(i => userLvl >= (i.minLvl || 0))
+                        if (!items.length) return null
+                        return (
+                            <div key={section.label} className="sb-section">
+                                <div className="sb-section-label">{section.label}</div>
+                                <ul className="nav flex-column">
+                                    {items.map(item => {
+                                        const active = isActive(item.to)
+                                        return (
+                                            <li key={item.to} className="nav-item">
+                                                <Link to={item.to}
+                                                    className={`nav-link sb-link d-flex align-items-center gap-2 ${active ? 'active' : ''}`}>
+                                                    <i className={`bi ${item.icon} sb-icon`}></i>
+                                                    <span className="sb-label">{item.label}</span>
+                                                    {active && <i className="bi bi-dot ms-auto sb-dot"></i>}
+                                                </Link>
+                                            </li>
+                                        )
+                                    })}
+                                </ul>
+                            </div>
+                        )
+                    })}
                 </nav>
 
-                {/* Sidebar Footer with User Info */}
-                <div className="sidebar-footer border-top border-secondary p-3 mt-auto">
-                    <div className="mb-3">
-                        <small className="text-white-50 d-block mb-1">User:</small>
-                        <p className="mb-1 fw-bold text-white text-truncate">{data.nickname}</p>
-                        <small className="text-white-50 d-block mb-1">{data.email}</small>
-                        <small>
-                            <button className="btn btn-outline-light btn-sm" onClick={()=>navigate(`/manage/user/${data._id}`)}>
-                                Profile Settings
-                            </button>
-                        </small>
-                    </div>
-                    
-                    <button className="btn btn-outline-light btn-sm w-100" onClick={onLogout}>
-                        <svg width="16" height="16" fill="currentColor" className="me-2" viewBox="0 0 16 16">
-                            <path fillRule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2z"/>
-                            <path fillRule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z"/>
-                        </svg>
-                        Logout
+                {/* ── Footer ── */}
+                <div className="sidebar-footer border-top border-secondary p-3 d-flex flex-column gap-2">
+                    <button className="btn btn-sm btn-outline-secondary w-100 text-white border-secondary"
+                        onClick={() => { navigate(`/manage/user/${data?._id}`); setOpen(false) }}>
+                        <i className="bi bi-person-gear me-2"></i>Profile Settings
+                    </button>
+                    <button className="btn btn-sm btn-outline-danger w-100" onClick={onLogout}>
+                        <i className="bi bi-box-arrow-right me-2"></i>Logout
                     </button>
                 </div>
             </aside>

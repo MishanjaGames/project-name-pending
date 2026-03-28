@@ -378,7 +378,6 @@ function CreatorForm({ formType, data, onLogout }) {
                 skill.examples.filter(ex => ex.kind === "file").forEach(ex => fd.append(`example_${i}`, ex.file));
             });
 
-            console.log(fd)
 
             const res = await fetch(`${config.apiBase}/forms/apply/${config.formType}`, {
                 method: "POST",
