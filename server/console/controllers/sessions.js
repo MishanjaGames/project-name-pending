@@ -53,8 +53,8 @@ module.exports.getById = async (req, res) => {
         if (!requester) return errorHandler(res, 401, 'Authentication required')
 
         const session = await Sessions.findById(req.params.id)
-            .populate('courseId', 'trans base_lang level direction courseType isPrivateCopy links')
-            .populate('privateCopyId', 'trans base_lang links')
+            .populate('courseId', 'trans base_lang level direction courseType isPrivateCopy links volumes')
+            .populate('privateCopyId', 'trans base_lang links volumes')
             .populate('hostTutor', 'nickname email tutorRank')
             .populate('coTutors.userId', 'nickname email tutorRank')
 

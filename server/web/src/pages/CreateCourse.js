@@ -3,8 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import { UtilityModal } from '../components/UtilityModal';
 
-const LANG_LABELS = { en: "English", ua: "Ukrainian" };
-const ALL_LANGS   = ["en", "ua"];
+// ── Language registry — add new languages here ──────────────────────────────
+const LANG_LABELS = {
+    en: "English", ua: "Ukrainian", de: "German", fr: "French",
+    es: "Spanish", pl: "Polish", it: "Italian", pt: "Portuguese",
+    zh: "Chinese", ja: "Japanese", ko: "Korean", ar: "Arabic",
+    tr: "Turkish", nl: "Dutch", sv: "Swedish", cs: "Czech",
+};
+const ALL_LANGS = Object.keys(LANG_LABELS);
 const emptyTrans  = () => ({ title: "", description: "", skills: [] });
 
 function CreateCourse({ data, onLogout }) {
@@ -22,7 +28,8 @@ function CreateCourse({ data, onLogout }) {
     const [errors, setErrors]             = useState({});
     const [thumbnailFile, setThumbnailFile]       = useState(null);
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
-    const [contentFiles, setContentFiles]         = useState([]);
+    // per-language files: { [langCode]: File[] }
+    const [langFiles, setLangFiles] = useState({});
     // ── Modal state ──────────────────────────────────────────────────────────
     const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
     const closeModal  = () => setModal(p => ({ ...p, show: false }));
@@ -141,9 +148,11 @@ function CreateCourse({ data, onLogout }) {
                 const fd = new FormData(); fd.append("file", renamed);
                 await fetch(`http://localhost:4040/api/manage/courses/${cd._id}/files`, { method: "POST", headers: mh, body: fd });
             }
-            if (contentFiles.length > 0) {
-                const fd = new FormData(); contentFiles.forEach(f => fd.append("files", f));
-                await fetch(`http://localhost:4040/api/manage/courses/${cd._id}/files/multiple`, { method: "POST", headers: mh, body: fd });
+            // Upload per-language files
+            for (const [lang, files] of Object.entries(langFiles)) {
+                if (!files.length) continue;
+                const fd = new FormData(); files.forEach(f => fd.append("files", f));
+                await fetch(`http://localhost:4040/api/manage/courses/${cd._id}/files/multiple?lang=${lang}`, { method: "POST", headers: mh, body: fd });
             }
             showInfo('Success', 'Course created successfully!');
             navigate("/manage/courses");
@@ -269,7 +278,7 @@ function CreateCourse({ data, onLogout }) {
                                                             placeholder={`Course description in ${LANG_LABELS[lang]}`} />
                                                     </div>
 
-                                                    <div>
+                                                    <div className="mb-3">
                                                         <label className="form-label fw-semibold">Skills</label>
                                                         <div className="input-group mb-2">
                                                             <input type="text" className="form-control"
@@ -291,6 +300,83 @@ function CreateCourse({ data, onLogout }) {
                                                                 ))}
                                                             </div>
                                                         )}
+                                                    </div>
+
+                                                    {/* ── Per-language Course Files ── */}
+                                                    <div className="card border-0 shadow-sm">
+                                                        <div className="card-header bg-white d-flex align-items-center justify-content-between">
+                                                            <span className="fw-semibold">
+                                                                <i className="bi bi-folder2-open me-2 text-primary"></i>
+                                                                Course Files <small className="text-muted fw-normal ms-1">({LANG_LABELS[lang]})</small>
+                                                            </span>
+                                                            {(langFiles[lang]?.length || 0) > 0 && (
+                                                                <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
+                                                                    {langFiles[lang].length} pending
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="card-body p-3">
+                                                            <input type="file" id={`contentFiles-${lang}`} className="d-none" multiple
+                                                                onChange={e => {
+                                                                    const files = Array.from(e.target.files).filter(f => {
+                                                                        if (f.size > 512 * 1024 * 1024) { showInfo('File Too Large', `${f.name} exceeds 512 MB limit.`); return false; }
+                                                                        return true;
+                                                                    });
+                                                                    setLangFiles(p => ({ ...p, [lang]: [...(p[lang] || []), ...files] }));
+                                                                    e.target.value = '';
+                                                                }}
+                                                                accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip" />
+
+                                                            {!(langFiles[lang]?.length) ? (
+                                                                <label htmlFor={`contentFiles-${lang}`}
+                                                                    className="d-flex flex-column align-items-center justify-content-center gap-2 border border-2 border-dashed rounded p-4 text-muted"
+                                                                    style={{ cursor: 'pointer', borderStyle: 'dashed' }}>
+                                                                    <i className="bi bi-cloud-upload" style={{ fontSize: '2rem', color: '#3b5bdb' }}></i>
+                                                                    <span className="fw-semibold small">Click to choose files for {LANG_LABELS[lang]}</span>
+                                                                    <span style={{ fontSize: '.75rem' }}>Images, videos, PDFs, docs, archives · Max 512 MB each</span>
+                                                                </label>
+                                                            ) : (
+                                                                <>
+                                                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                                                        <label htmlFor={`contentFiles-${lang}`} className="btn btn-sm btn-outline-success" style={{ cursor: 'pointer' }}>
+                                                                            <i className="bi bi-plus-lg me-1"></i>Add more
+                                                                        </label>
+                                                                        <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setLangFiles(p => ({ ...p, [lang]: [] }))}>
+                                                                            <i className="bi bi-x-lg me-1"></i>Clear all
+                                                                        </button>
+                                                                    </div>
+                                                                    <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+                                                                        {(langFiles[lang] || []).map((f, i) => {
+                                                                            const ext = f.name.split('.').pop().toLowerCase();
+                                                                            const isImg = f.type.startsWith('image/'), isVid = f.type.startsWith('video/'), isAud = f.type.startsWith('audio/');
+                                                                            const isDoc = ['pdf','doc','docx','ppt','pptx'].includes(ext), isZip = ['zip','rar','7z'].includes(ext);
+                                                                            const key = isImg?'img':isVid?'vid':isAud?'aud':isDoc?'doc':isZip?'zip':'img';
+                                                                            const iconMap = { img:'bi-image', vid:'bi-camera-video', aud:'bi-music-note', doc:'bi-file-pdf', zip:'bi-file-zip' };
+                                                                            const colorMap = { img:'#198754', vid:'#0d6efd', aud:'#fd7e14', doc:'#dc3545', zip:'#6f42c1' };
+                                                                            return (
+                                                                                <div key={i} className="d-flex align-items-center gap-2 bg-white p-2 rounded mb-1 border">
+                                                                                    <div className="d-flex flex-column" style={{ gap: 1 }}>
+                                                                                        <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1" style={{ width: 20, height: 18, fontSize: '.6rem' }}
+                                                                                            disabled={i === 0} onClick={() => setLangFiles(p => { const arr = [...p[lang]]; [arr[i-1],arr[i]]=[arr[i],arr[i-1]]; return {...p,[lang]:arr}; })}>▲</button>
+                                                                                        <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1" style={{ width: 20, height: 18, fontSize: '.6rem' }}
+                                                                                            disabled={i === langFiles[lang].length - 1} onClick={() => setLangFiles(p => { const arr = [...p[lang]]; [arr[i],arr[i+1]]=[arr[i+1],arr[i]]; return {...p,[lang]:arr}; })}>▼</button>
+                                                                                    </div>
+                                                                                    <i className={`bi ${iconMap[key] || 'bi-file-earmark'}`} style={{ color: colorMap[key] || '#6c757d', fontSize: '1.1rem', width: 20, textAlign: 'center' }}></i>
+                                                                                    <div className="flex-grow-1 overflow-hidden">
+                                                                                        <div className="small fw-semibold text-truncate">{f.name}</div>
+                                                                                        <div style={{ fontSize: '.72rem', color: '#6c757d' }}>{(f.size/1024/1024).toFixed(2)} MB</div>
+                                                                                    </div>
+                                                                                    <button type="button" className="btn btn-sm btn-outline-danger"
+                                                                                        onClick={() => setLangFiles(p => ({ ...p, [lang]: p[lang].filter((_,j) => j !== i) }))}>
+                                                                                        <i className="bi bi-x-lg"></i>
+                                                                                    </button>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))}
@@ -345,97 +431,6 @@ function CreateCourse({ data, onLogout }) {
                                             <small className="text-muted">Determines how students access this course</small>
                                         </div>
 
-                                        {/* Content files */}
-                                        <div className="col-12">
-                                            <div className="card border-0 shadow-sm">
-                                                <div className="card-header bg-white d-flex align-items-center justify-content-between">
-                                                    <span className="fw-semibold">
-                                                        <i className="bi bi-folder2-open me-2 text-primary"></i>
-                                                        Course Files
-                                                    </span>
-                                                    {contentFiles.length > 0 && (
-                                                        <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
-                                                            {contentFiles.length} pending
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="card-body p-3">
-                                                    {/* Lang tab hint when course has extra langs */}
-                                                    {addLangs.length > 0 && (
-                                                        <div className="alert alert-info py-2 small mb-3">
-                                                            <i className="bi bi-info-circle me-1"></i>
-                                                            Files uploaded here apply to all language versions. You can tag files per-language after creating the course in Edit Course.
-                                                        </div>
-                                                    )}
-
-                                                    <input type="file" id="contentFiles" className="d-none" multiple
-                                                        onChange={e => {
-                                                            const files = Array.from(e.target.files).filter(f => {
-                                                                if (f.size > 512 * 1024 * 1024) { showInfo('File Too Large', `${f.name} exceeds 512 MB limit.`); return false; }
-                                                                return true;
-                                                            });
-                                                            setContentFiles(p => [...p, ...files]);
-                                                        }}
-                                                        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip" />
-
-                                                    {contentFiles.length === 0 ? (
-                                                        <label htmlFor="contentFiles"
-                                                            className="d-flex flex-column align-items-center justify-content-center gap-2 border border-2 border-dashed rounded p-4 text-muted"
-                                                            style={{ cursor: 'pointer', borderStyle: 'dashed' }}>
-                                                            <i className="bi bi-cloud-upload" style={{ fontSize: '2rem', color: '#3b5bdb' }}></i>
-                                                            <span className="fw-semibold small">Click to choose files</span>
-                                                            <span style={{ fontSize: '.75rem' }}>Images, videos, PDFs, docs, archives · Max 512 MB each</span>
-                                                        </label>
-                                                    ) : (
-                                                        <>
-                                                            <div className="d-flex justify-content-between align-items-center mb-2">
-                                                                <label htmlFor="contentFiles" className="btn btn-sm btn-outline-success" style={{ cursor: 'pointer' }}>
-                                                                    <i className="bi bi-plus-lg me-1"></i>Add more
-                                                                </label>
-                                                                <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setContentFiles([])}>
-                                                                    <i className="bi bi-x-lg me-1"></i>Clear all
-                                                                </button>
-                                                            </div>
-                                                            <div style={{ maxHeight: 280, overflowY: 'auto' }}>
-                                                                {contentFiles.map((f, i) => {
-                                                                    const ext = f.name.split('.').pop().toLowerCase();
-                                                                    const isImg = f.type.startsWith('image/');
-                                                                    const isVid = f.type.startsWith('video/');
-                                                                    const isAud = f.type.startsWith('audio/');
-                                                                    const isDoc = ['pdf','doc','docx','ppt','pptx'].includes(ext);
-                                                                    const isZip = ['zip','rar','7z'].includes(ext);
-                                                                    const iconMap = { img:'bi-image', vid:'bi-camera-video', aud:'bi-music-note', doc:'bi-file-pdf', zip:'bi-file-zip' };
-                                                                    const colorMap = { img:'#198754', vid:'#0d6efd', aud:'#fd7e14', doc:'#dc3545', zip:'#6f42c1' };
-                                                                    const key = isImg?'img':isVid?'vid':isAud?'aud':isDoc?'doc':isZip?'zip':'img';
-                                                                    return (
-                                                                        <div key={i} className="d-flex align-items-center gap-2 bg-white p-2 rounded mb-1 border">
-                                                                            <div className="d-flex flex-column" style={{ gap: 1 }}>
-                                                                                <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
-                                                                                    style={{ width: 20, height: 18, fontSize: '.6rem' }}
-                                                                                    disabled={i === 0} onClick={() => moveItem(setContentFiles, i, -1)}>▲</button>
-                                                                                <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
-                                                                                    style={{ width: 20, height: 18, fontSize: '.6rem' }}
-                                                                                    disabled={i === contentFiles.length - 1} onClick={() => moveItem(setContentFiles, i, 1)}>▼</button>
-                                                                            </div>
-                                                                            <i className={`bi ${iconMap[key] || 'bi-file-earmark'}`}
-                                                                                style={{ color: colorMap[key] || '#6c757d', fontSize: '1.1rem', width: 20, textAlign: 'center' }}></i>
-                                                                            <div className="flex-grow-1 overflow-hidden">
-                                                                                <div className="small fw-semibold text-truncate">{f.name}</div>
-                                                                                <div style={{ fontSize: '.72rem', color: '#6c757d' }}>{(f.size/1024/1024).toFixed(2)} MB</div>
-                                                                            </div>
-                                                                            <button type="button" className="btn btn-sm btn-outline-danger"
-                                                                                onClick={() => setContentFiles(p => p.filter((_,j) => j !== i))}>
-                                                                                <i className="bi bi-x-lg"></i>
-                                                                            </button>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
                                     </div>
 
                                     {/* Actions */}

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import { UtilityModal } from "../components/UtilityModal";
+import { VideoConference } from "../components/VideoConference";
 
 const API = "http://localhost:4040/api";
 const TUTOR_RANKS = ['assistant','teacher','lecturer','instructor','tutor','professor'];
@@ -20,6 +21,28 @@ function ManageSession({ data, onLogout }) {
     const [loading, setLoading]     = useState(true);
     const [tab, setTab]             = useState("overview");
     const [saving, setSaving]       = useState(false);
+
+    // ── Video conference ────────────────────────────────────────────────────
+    const [showConference, setShowConference] = useState(false);
+    const [inviteCopied, setInviteCopied]     = useState(false);
+    const RTC_API = "http://localhost:5050";
+
+    const copyInviteLink = async () => {
+        try {
+            const token = localStorage.getItem("token");
+            const ah2 = { Authorization: `${token?.split(" ")[0]} ${token?.split(" ")[1]}`, "Content-Type": "application/json" };
+            await fetch(`${RTC_API}/rooms`, {
+                method: "POST",
+                headers: ah2,
+                body: JSON.stringify({ sessionId: id, displayName: id })
+            });
+        } catch {}
+        const link = `${window.location.origin}/meeting?session=${id}`;
+        navigator.clipboard.writeText(link).then(() => {
+            setInviteCopied(true);
+            setTimeout(() => setInviteCopied(false), 2500);
+        });
+    };
 
     // Modal
     const [modal, setModal] = useState({ show: false, type: "info", title: "", message: "", confirmToken: "", tokenLabel: "", onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
@@ -424,7 +447,7 @@ function ManageSession({ data, onLogout }) {
 
     const course = session.courseId;
     const statusColors = { draft: "secondary", active: "success", completed: "primary", archived: "dark" };
-
+    const link = session.privateCopyId===null?course._id:session.privateCopyId._id
     return (
         <>
             <Navbar data={data} onLogout={onLogout} />
@@ -446,6 +469,16 @@ function ManageSession({ data, onLogout }) {
                     </div>
                     {isHost && (
                         <div className="d-flex gap-2 flex-wrap">
+                            <button className="btn btn-success btn-sm d-flex align-items-center gap-1"
+                                onClick={() => window.open(`/meeting?session=${id}`, '_self')}>
+                                <i className="bi bi-camera-video-fill"></i> Start Video
+                            </button>
+                            <button className="btn btn-outline-info btn-sm d-flex align-items-center gap-1"
+                                onClick={copyInviteLink}
+                                title="Copy invite link for this video room">
+                                <i className={`bi ${inviteCopied ? "bi-check-lg" : "bi-link-45deg"}`}></i>
+                                {inviteCopied ? "Copied!" : "Invite link"}
+                            </button>
                             {session.status === "draft" && (
                                 <button className="btn btn-success btn-sm" disabled={saving} onClick={() => updateStatus("active")}>
                                     <i className="bi bi-play-fill me-1"></i>Start Session
@@ -488,10 +521,10 @@ function ManageSession({ data, onLogout }) {
                         <i className="bi bi-eye me-1"></i>View Course
                     </button>
                     <button className="btn btn-sm btn-outline-success"
-                        onClick={() => navigate(`/course/view/${session.privateCopyId?._id}?session=${id}`)}>
+                        onClick={() => navigate(`/course/view/${link}?session=${id}`)}>
                         <i className="bi bi-eye me-1"></i>Go to Course
                     </button>
-                    <div className="d-flex gap-2" hidden={session.privateCopyId?false:true}>
+                    <div className="d-flex gap-2" hidden={session.privateCopyId?true:false}>
                         <button className="btn btn-sm btn-outline-warning"
                             onClick={() => navigate(`/manage/course/preview/${session.privateCopyId._id}?private=1`)}>
                             <i className="bi bi-pencil me-1"></i>Edit Private Copy
@@ -1438,6 +1471,13 @@ function ManageSession({ data, onLogout }) {
                 )}
             </div>
 
+            {showConference && (
+                <VideoConference
+                    sessionId={id}
+                    nickname={data?.nickname}
+                    onClose={() => setShowConference(false)}
+                />
+            )}
             <UtilityModal show={modal.show} type={modal.type} title={modal.title} message={modal.message}
                 danger={modal.danger} confirmToken={modal.confirmToken} tokenLabel={modal.tokenLabel}
                 deleteLabel={modal.deleteLabel || "Delete"}

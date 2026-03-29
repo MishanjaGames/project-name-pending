@@ -5,6 +5,7 @@ import { extendSession } from '../utils/utils';
 import './ViewCourse.css';
 import { UtilityModal } from '../components/UtilityModal';
 import { PaymentModal } from '../components/PaymentModal';
+import { VideoConference } from '../components/VideoConference';
 
 // ─── Helpers (shared with CoursePreview) ──────────────────────────────────────
 const isContainer = (e) => !e?.type || e.type === 'container' || e.type === 'none';
@@ -148,25 +149,12 @@ const ITEM_ACTIONS = {
 };
 
 // ─── executeJsAction ──────────────────────────────────────────────────────────
-// Handles any action not in ITEM_ACTIONS.
-//
-// Arrow function syntax (action IS the function):
-//   [btn:Hi|() => alert('Hello')]
-//   [btn:Toggle|() => { const el = document.querySelector('#box'); el.hidden = !el.hidden; }]
-//   [btn:Double|(x) => console.log(x * 2)]   ← (x) receives nothing; use for side-effects
-//
-// Dot-path call syntax (action = fn path, params = comma-separated args):
-//   [btn:Hi|alert:Hello world]
-//   [btn:Log|console.log:a,b,c]              → console.log('a','b','c')
-//   [btn:Find|document.querySelector:#my-id]
-//   [btn:Scroll|window.scrollTo:0,0]
 function executeJsAction(action, params) {
   try {
     const trimmed = action.trim();
 
     // ── Arrow function ─────────────────────────────────────────────────────
     if (/^(\(.*?\)|[\w$]+)\s*=>/.test(trimmed)) {
-      // Wrap in parens so `new Function` parses it as an expression
       const fn = new Function(`return (${trimmed})`)();
       if (typeof fn === 'function') fn();
       return;
@@ -190,7 +178,6 @@ function executeJsAction(action, params) {
       return;
     }
 
-    // "a, b, c" → ['a','b','c'];  empty params → no args
     const args = params.trim() !== '' ? params.split(',').map(s => s.trim()) : [];
     fn.apply(obj, args);
   } catch (e) {
@@ -220,7 +207,6 @@ function ViewCourse({ data, onLogout }) {
   const [session, setSession] = useState(null);
   const [sessionGroup, setSessionGroup] = useState(null);  // student's group in this session
   const [sessionDeadlines, setSessionDeadlines] = useState([]); // from session.deadlines
-
 
   // ── Comments state ─────────────────────────────────────────────────────────
   const [comments, setComments] = useState([]);
@@ -257,6 +243,28 @@ function ViewCourse({ data, onLogout }) {
 
   // ── Payment modal ───────────────────────────────────────────────────────────
   const [showPayment, setShowPayment] = useState(false);
+  // ── Video conference ────────────────────────────────────────────────────────
+  const [showConference, setShowConference] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const RTC_API = 'http://localhost:5050';
+
+  const copyInviteLink = async () => {
+    if (!sessionId) return;
+    try {
+      const tok = localStorage.getItem('token');
+      const hdrs = { Authorization: `${tok?.split(' ')[0]} ${tok?.split(' ')[1]}`, 'Content-Type': 'application/json' };
+      await fetch(`${RTC_API}/rooms`, {
+        method: 'POST',
+        headers: hdrs,
+        body: JSON.stringify({ sessionId, displayName: course?.title || sessionId })
+      });
+    } catch { }
+    const link = `${window.location.origin}/meeting?session=${sessionId}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2500);
+    });
+  };
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -309,17 +317,50 @@ function ViewCourse({ data, onLogout }) {
     } catch (e) { console.error('Progress fetch error:', e); }
   };
 
-  const fetchSessionAssignments = async () => {
-    if (!sessionGroup) return;
+  // ── Save progress (0–1) — fires when user visits an item ──────────────────
+  // progress = (itemIndex + 1) / totalItems, never goes backwards.
+  const saveProgress = useCallback(async (visitedFlatIdx) => {
+    if (!token || locked || flatItems.length === 0) return;
+    const progress = Math.min(1, (visitedFlatIdx + 1) / flatItems.length);
     try {
-      const res = await fetch(`http://localhost:4040/api/assignments?groupId=${sessionGroup._id}`, {
-        headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` }
+      await fetch(`http://localhost:4040/api/users/me/courses/${id}/progress`, {
+        method: 'PATCH',
+        headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ process: progress })
       });
-      if (res.ok) { const { data: d } = await res.json(); setSessionAssignments(d || []); }
+      if (progress >= 1) setCourseFinished(true);
+    } catch (e) { console.error('Progress save error:', e); }
+  }, [token, locked, id]); // flatItems.length added below after flatItems is built
+
+  const fetchSessionAssignments = async () => {
+    if (!sessionId || !token) return;
+    try {
+      // Get all groups for this session
+      const groupRes = await fetch(
+        `http://localhost:4040/api/groups?sessionId=${sessionId}`,
+        { headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` } }
+      );
+      if (!groupRes.ok) return;
+      const { data: groups } = await groupRes.json();
+
+      // Find student's group
+      const myGroup = (groups || []).find(g =>
+        g.members?.some(m => String(m.userId?._id || m.userId) === String(data._id))
+      );
+      if (!myGroup) return; // student not added to any group yet
+
+      const res = await fetch(
+        `http://localhost:4040/api/assignments?groupId=${myGroup._id}`,
+        { headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` } }
+      );
+      if (res.ok) {
+        const { data: d } = await res.json();
+        setSessionAssignments(d || []);
+      }
     } catch (e) { console.error('Assignments fetch error:', e); }
   };
 
-  useEffect(() => { if (sessionGroup) fetchSessionAssignments(); }, [sessionGroup]);
+  useEffect(() => { if (sessionId) fetchSessionAssignments(); }, [sessionId]);
 
   const handleFinishCourse = async () => {
     if (courseFinished || !token) return;
@@ -446,10 +487,6 @@ function ViewCourse({ data, onLogout }) {
   };
 
   // ── Deadline helpers ───────────────────────────────────────────────────────
-  /**
-   * Returns deadline info for a given target (volume, chapter, or item).
-   * { deadline, isPast, isLocked }
-   */
   const getDeadlineFor = (targetType, targetId) => {
     if (!sessionDeadlines.length) return null;
     const dl = sessionDeadlines.find(
@@ -497,10 +534,10 @@ function ViewCourse({ data, onLogout }) {
     const handleLoad = (e) => {
       const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
       const r = w / h;
-      if (r >= 1.7) setRatio('wide');       // 16:9, banners
-      else if (r >= 1.2 && r < 1.7) setRatio('landscape');  // 4:3, standard
-      else if (r >= 0.85 && r < 1.2) setRatio('square');     // 1:1-ish
-      else setRatio('portrait');   // tall covers
+      if (r >= 1.7) setRatio('wide');
+      else if (r >= 1.2 && r < 1.7) setRatio('landscape');
+      else if (r >= 0.85 && r < 1.2) setRatio('square');
+      else setRatio('portrait');
     };
 
     return (
@@ -552,12 +589,22 @@ function ViewCourse({ data, onLogout }) {
     ? flatItems.findIndex(f => f.vi === selected.vi && f.ci === selected.ci && f.ii === selected.ii)
     : -1;
 
+  // ── Navigate to item by flat index, saving progress ───────────────────────
   const goTo = (idx) => {
     if (idx < 0 || idx >= flatItems.length) return;
     const { vi, ci, ii } = flatItems[idx];
     setSelected({ vi, ci, ii });
     if (vi != null) setOpenVolumes(p => ({ ...p, [volumes[vi]?.vid]: true }));
     if (ci != null) setOpenChapters(p => ({ ...p, [volumes[vi]?.chapters[ci]?.cid]: true }));
+    // Save progress based on how far through the course the user has navigated
+    if (!locked && flatItems.length > 0) {
+      const progress = Math.min(1, (idx + 1) / flatItems.length);
+      fetch(`http://localhost:4040/api/users/me/courses/${id}/progress`, {
+        method: 'PATCH',
+        headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ process: progress })
+      }).then(r => { if (r.ok && progress >= 1) setCourseFinished(true); }).catch(() => { });
+    }
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -643,7 +690,13 @@ function ViewCourse({ data, onLogout }) {
                                     <button
                                       key={item.iid}
                                       className={`vc-nav-item-btn${isSel ? ' vc-nav-item-btn--active' : ''}${(isLocked || itemDeadlineLocked) ? ' vc-nav-item-btn--locked' : ''}`}
-                                      onClick={() => !(isLocked || itemDeadlineLocked) && setSelected({ vi, ci, ii })}
+                                      onClick={() => {
+                                        if (isLocked || itemDeadlineLocked) return;
+                                        const flatIdx = flatItems.findIndex(f => f.vi === vi && f.ci === ci && f.ii === ii);
+                                        // goTo handles state update + progress save
+                                        if (flatIdx >= 0) goTo(flatIdx);
+                                        else setSelected({ vi, ci, ii });
+                                      }}
                                       title={isLocked ? 'Purchase course to unlock' : itemDeadlineLocked ? 'Locked after deadline' : item.title}
                                     >
                                       <i
@@ -831,6 +884,25 @@ function ViewCourse({ data, onLogout }) {
                       Session: {session.hostTutor?.nickname || 'Tutor'}
                     </span>
                   )}
+                  {session && !locked && (
+                    <>
+                      <button
+                        className="btn btn-sm btn-success d-inline-flex align-items-center gap-1"
+                        style={{ fontSize: '.75rem', padding: '3px 10px', borderRadius: 999 }}
+                        onClick={() => window.location.href = `/meeting?session=${sessionId}`}
+                        title="Join video conference for this session">
+                        <i className="bi bi-camera-video-fill"></i> Join Video
+                      </button>
+                      <button
+                        className="btn btn-sm btn-outline-info d-inline-flex align-items-center gap-1"
+                        style={{ fontSize: '.75rem', padding: '3px 10px', borderRadius: 999 }}
+                        onClick={copyInviteLink}
+                        title="Copy invite link">
+                        <i className={`bi ${inviteCopied ? 'bi-check-lg' : 'bi-link-45deg'}`}></i>
+                        {inviteCopied ? 'Copied!' : 'Invite'}
+                      </button>
+                    </>
+                  )}
                   {course.isPrivateCopy && (
                     <span className="vc-badge vc-badge--copy" title="This is a tutor-edited version">
                       <i className="bi bi-pencil-fill me-1"></i>Tutor Edition
@@ -852,19 +924,14 @@ function ViewCourse({ data, onLogout }) {
                   flatItems.length > 0 && (
                     <div className="d-flex gap-2 flex-wrap align-items-center">
                       {courseFinished ? (
-                      <button className="btn btn-success" onClick={handleFinishCourse} disabled={courseFinished}>
-                        <i className="bi bi-check-circle-fill me-1"></i>Completed!
-                      </button>
-                    ):(
-                    <button className="vc-start-btn" onClick={() => goTo(0)}>
-                        Start Learning <i className="bi bi-arrow-right ms-1"></i>
-                      </button>
-                    )}
-                      {/* <button className="btn btn-success" onClick={handleFinishCourse} disabled={courseFinished}>
-                        {courseFinished
-                          ? <><i className="bi bi-check-circle-fill me-1"></i>Completed!</>
-                          : <><i className="bi bi-flag-fill me-1"></i>Finish Course</>}
-                      </button> */}
+                        <button className="btn btn-success" onClick={handleFinishCourse} disabled={courseFinished}>
+                          <i className="bi bi-check-circle-fill me-1"></i>Completed!
+                        </button>
+                      ) : (
+                        <button className="vc-start-btn" onClick={() => goTo(0)}>
+                          Start Learning <i className="bi bi-arrow-right ms-1"></i>
+                        </button>
+                      )}
                       {sessionId && (
                         <button className={`btn btn-outline-primary`} onClick={() => setMainView(v => v === 'assignments' ? 'course' : 'assignments')}>
                           <i className="bi bi-clipboard-check me-1"></i>
@@ -1004,7 +1071,6 @@ function ViewCourse({ data, onLogout }) {
                               <span className="vc-comment-date">
                                 {new Date(comment.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                               </span>
-                              {/* Delete button: shown to author or manager/admin/root */}
                               {data?._id && comment.userId && (() => {
                                 const al = data?.role?.accessLevel;
                                 const rn = data?.role?.roleName;
@@ -1070,6 +1136,13 @@ function ViewCourse({ data, onLogout }) {
           course={course}
           onClose={() => setShowPayment(false)}
           onSuccess={() => { setShowPayment(false); setLocked(false); fetchData(); }}
+        />
+      )}
+      {showConference && sessionId && (
+        <VideoConference
+          sessionId={sessionId}
+          nickname={data?.nickname}
+          onClose={() => setShowConference(false)}
         />
       )}
     </>

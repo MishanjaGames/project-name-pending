@@ -145,7 +145,7 @@ function Sessions({ data, onLogout }) {
                                             <option value="">Select a course…</option>
                                             {courses.map(c => (
                                                 <option key={c._id} value={c._id}>
-                                                    {courseTitle(c)} — {c.level} ({c.courseType || 'SELF_TAUGHT'})
+                                                   {c.isPrivateCopy?"[PRIVATE]":''} {courseTitle(c)} — {c.level} ({c.courseType || 'SELF_TAUGHT'})
                                                 </option>
                                             ))}
                                         </select>

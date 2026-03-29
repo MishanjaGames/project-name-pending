@@ -4,8 +4,14 @@ import { Navbar } from "../components/Navbar";
 import AuthImage from "../components/AuthImage";
 import { UtilityModal } from '../components/UtilityModal';
 
-const LANG_LABELS = { en: "English", ua: "Ukrainian" };
-const ALL_LANGS   = ["en", "ua"];
+// ── Language registry — add new languages here ──────────────────────────────
+const LANG_LABELS = {
+    en: "English", ua: "Ukrainian", de: "German", fr: "French",
+    es: "Spanish", pl: "Polish", it: "Italian", pt: "Portuguese",
+    zh: "Chinese", ja: "Japanese", ko: "Korean", ar: "Arabic",
+    tr: "Turkish", nl: "Dutch", sv: "Swedish", cs: "Czech",
+};
+const ALL_LANGS = Object.keys(LANG_LABELS);
 const emptyTrans  = () => ({ title: "", description: "", skills: [] });
 
 function EditCourse({ data, onLogout }) {
@@ -34,7 +40,8 @@ function EditCourse({ data, onLogout }) {
     // File states
     const [thumbnail, setThumbnail]               = useState(null);
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
-    const [courseFiles, setCourseFiles]           = useState([]);
+    // per-language pending files: { [langCode]: File[] }
+    const [courseFiles, setCourseFiles]           = useState({});
     const [existingFiles, setExistingFiles]       = useState([]);
     // File filter/sort for existingFiles
     const [fileSearch, setFileSearch]   = useState('');
@@ -225,26 +232,26 @@ function EditCourse({ data, onLogout }) {
                 await fetch(`http://localhost:4040/api/manage/courses/${id}/files?thumbnail=true`, { method: "POST", headers: mh, body: fd });
             }
 
-            if (courseFiles.length > 0) {
-                const fd = new FormData(); courseFiles.forEach(f => fd.append("files", f));
-                const fr = await fetch(`http://localhost:4040/api/manage/courses/${id}/files/multiple`, { method: "POST", headers: mh, body: fd });
-                if (!fr.ok) { const err = await fr.json(); showInfo('Error', `File upload failed: ${err.message || "Unknown error"}`); }
-                else {
-                    // Refresh existing files list
-                    const refreshRes = await fetch(`http://localhost:4040/api/manage/courses/${id}/files`, { headers: ah });
-                    if (refreshRes.ok) {
-                        const d = await refreshRes.json();
-                        const all = d.data || d.files || [];
-                        setExistingFiles(all.filter(f => {
-                            const fn = (f.originalName || f.filename || "").toLowerCase();
-                            return !fn.includes("thumbnail") && !isSystemTextFile(f.originalName || f.filename || "");
-                        }));
-                    }
+            if (courseFiles && Object.keys(courseFiles).some(k => courseFiles[k]?.length)) {
+                for (const [lang, files] of Object.entries(courseFiles)) {
+                    if (!files.length) continue;
+                    const fd = new FormData(); files.forEach(f => fd.append("files", f));
+                    const fr = await fetch(`http://localhost:4040/api/manage/courses/${id}/files/multiple?lang=${lang}`, { method: "POST", headers: mh, body: fd });
+                    if (!fr.ok) { const err = await fr.json(); showInfo('Error', `File upload failed: ${err.message || "Unknown error"}`); }
+                }
+                const refreshRes = await fetch(`http://localhost:4040/api/manage/courses/${id}/files`, { headers: ah });
+                if (refreshRes.ok) {
+                    const d = await refreshRes.json();
+                    const all = d.data || d.files || [];
+                    setExistingFiles(all.filter(f => {
+                        const fn = (f.originalName || f.filename || "").toLowerCase();
+                        return !fn.includes("thumbnail") && !isSystemTextFile(f.originalName || f.filename || "");
+                    }));
                 }
             }
 
             showInfo('Success', 'Course updated successfully!');
-            setThumbnail(null); setThumbnailPreview(null); setCourseFiles([]);
+            setThumbnail(null); setThumbnailPreview(null); setCourseFiles({});
             navigate("/manage/courses");
         } catch (err) { console.error(err); showInfo('Error', 'Error updating course. Please try again.'); }
         finally { setSaving(false); }
@@ -440,10 +447,10 @@ function EditCourse({ data, onLogout }) {
                                                 <div className="card-header bg-white d-flex align-items-center justify-content-between">
                                                     <span className="fw-semibold">
                                                         <i className="bi bi-folder2-open me-2 text-primary"></i>
-                                                        Course Files
+                                                        Course Files <small className="text-muted fw-normal ms-1">({LANG_LABELS[allLangs[activeLang]]})</small>
                                                     </span>
                                                     <span className="badge bg-light text-dark border">
-                                                        {existingFiles.length} uploaded · {courseFiles.length} pending
+                                                        {existingFiles.filter(f => !f.lang || f.lang === allLangs[activeLang]).length} uploaded · {(courseFiles[allLangs[activeLang]] || []).length} pending
                                                     </span>
                                                 </div>
                                                 <div className="card-body p-3">
@@ -484,13 +491,15 @@ function EditCourse({ data, onLogout }) {
                                                     )}
 
                                                     {/* Existing files list */}
-                                                    {existingFiles.length > 0 && (
+                                                    {existingFiles.filter(f => !f.lang || f.lang === allLangs[activeLang]).length > 0 && (
                                                         <div className="mb-3" style={{ maxHeight: 320, overflowY: 'auto' }}>
                                                             {(() => {
+                                                                const activeLangCode = allLangs[activeLang];
+                                                                const langFiles = existingFiles.filter(f => !f.lang || f.lang === activeLangCode);
                                                                 const isFiltered = fileSearch || fileTypeFilter !== 'all';
                                                                 const isSorted   = fileSortBy !== 'date';
                                                                 const reorderDisabled = isFiltered || isSorted;
-                                                                return [...existingFiles]
+                                                                return [...langFiles]
                                                                     .filter(file => {
                                                                         if (fileSearch && !file.filename?.toLowerCase().includes(fileSearch.toLowerCase()) &&
                                                                             !file.url?.toLowerCase().includes(fileSearch.toLowerCase())) return false;
@@ -555,100 +564,77 @@ function EditCourse({ data, onLogout }) {
                                                             })()}
                                                         </div>
                                                     )}
-                                                    {existingFiles.length === 0 && (
-                                                        <p className="text-muted small text-center py-2">No uploaded files yet.</p>
+                                                    {existingFiles.filter(f => !f.lang || f.lang === allLangs[activeLang]).length === 0 && (
+                                                        <p className="text-muted small text-center py-2">No uploaded files for this language yet.</p>
                                                     )}
 
-                                                    {/* Upload section — tabs by language */}
+                                                    {/* Upload section — tied to active language tab */}
                                                     <div className="border-top pt-3">
                                                         <div className="d-flex align-items-center justify-content-between mb-2">
-                                                            <span className="fw-semibold small"><i className="bi bi-cloud-upload me-1 text-success"></i>Upload new files</span>
+                                                            <span className="fw-semibold small">
+                                                                <i className="bi bi-cloud-upload me-1 text-success"></i>
+                                                                Upload new files <span className="text-muted fw-normal">({LANG_LABELS[allLangs[activeLang]]})</span>
+                                                            </span>
                                                             <small className="text-muted">Max 512 MB per file</small>
                                                         </div>
 
-                                                        {/* Lang tabs for upload — only shown when course has extra langs */}
-                                                        {addLangs.length > 0 && (() => {
-                                                            const allLangsLocal = [baseLang, ...addLangs];
-                                                            const LANG_LABELS_LOCAL = { en: 'English', ua: 'Ukrainian' };
-                                                            const [uploadLangTab, setUploadLangTab] = [
-                                                                // use the activeLang state already in scope
-                                                                activeLang,
-                                                                setActiveLang
-                                                            ];
+                                                        {(() => {
+                                                            const lang = allLangs[activeLang];
+                                                            const pending = courseFiles[lang] || [];
                                                             return (
-                                                                <div className="mb-2">
-                                                                    <div className="d-flex gap-1 flex-wrap mb-2">
-                                                                        <button type="button"
-                                                                            className={`btn btn-sm ${uploadLangTab === -1 ? 'btn-secondary' : 'btn-outline-secondary'}`}
-                                                                            style={{ fontSize: '.75rem' }}
-                                                                            onClick={() => setUploadLangTab(-1)}>
-                                                                            <i className="bi bi-globe me-1"></i>All langs
-                                                                        </button>
-                                                                        {allLangsLocal.map((lang, idx) => (
-                                                                            <button key={lang} type="button"
-                                                                                className={`btn btn-sm ${uploadLangTab === idx ? 'btn-primary' : 'btn-outline-secondary'}`}
-                                                                                style={{ fontSize: '.75rem' }}
-                                                                                onClick={() => setUploadLangTab(idx)}>
-                                                                                {LANG_LABELS_LOCAL[lang] || lang}
-                                                                                {idx === 0 && <span className="ms-1 opacity-50" style={{fontSize:'.6rem'}}>base</span>}
-                                                                            </button>
-                                                                        ))}
-                                                                    </div>
-                                                                    <small className="text-muted d-block mb-2">
-                                                                        {uploadLangTab === -1
-                                                                            ? 'These files will be visible for all language versions of the course.'
-                                                                            : `These files will only be shown for the ${LANG_LABELS_LOCAL[allLangsLocal[uploadLangTab]] || allLangsLocal[uploadLangTab]} version.`}
-                                                                    </small>
-                                                                </div>
+                                                                <>
+                                                                    <input type="file" id={`courseFiles-${lang}`} className="d-none" multiple
+                                                                        onChange={e => {
+                                                                            const files = Array.from(e.target.files).filter(f => {
+                                                                                if (f.size > 512 * 1024 * 1024) { showInfo('File Too Large', `${f.name} exceeds 512 MB limit.`); return false; }
+                                                                                return true;
+                                                                            });
+                                                                            setCourseFiles(p => ({ ...p, [lang]: [...(p[lang] || []), ...files] }));
+                                                                            e.target.value = '';
+                                                                        }}
+                                                                        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xlsx,.xls,.zip" />
+                                                                    <label htmlFor={`courseFiles-${lang}`} className="btn btn-sm btn-outline-success mb-2">
+                                                                        <i className="bi bi-plus-lg me-1"></i>Choose files…
+                                                                    </label>
+
+                                                                    {pending.length > 0 && (
+                                                                        <div>
+                                                                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                                                                <span className="small fw-semibold text-success">
+                                                                                    <i className="bi bi-clock-history me-1"></i>{pending.length} file(s) pending upload
+                                                                                </span>
+                                                                                <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setCourseFiles(p => ({ ...p, [lang]: [] }))}>
+                                                                                    <i className="bi bi-x-lg me-1"></i>Clear
+                                                                                </button>
+                                                                            </div>
+                                                                            {pending.map((f, i) => (
+                                                                                <div key={i} className="d-flex align-items-center gap-2 bg-white p-2 rounded mb-1 border border-success border-opacity-50">
+                                                                                    <div className="d-flex flex-column" style={{ gap: 1 }}>
+                                                                                        <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
+                                                                                            style={{ width: 20, height: 18, fontSize: '.6rem' }}
+                                                                                            disabled={i === 0}
+                                                                                            onClick={() => setCourseFiles(p => { const arr = [...p[lang]]; [arr[i-1],arr[i]]=[arr[i],arr[i-1]]; return {...p,[lang]:arr}; })}>▲</button>
+                                                                                        <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
+                                                                                            style={{ width: 20, height: 18, fontSize: '.6rem' }}
+                                                                                            disabled={i === pending.length - 1}
+                                                                                            onClick={() => setCourseFiles(p => { const arr = [...p[lang]]; [arr[i],arr[i+1]]=[arr[i+1],arr[i]]; return {...p,[lang]:arr}; })}>▼</button>
+                                                                                    </div>
+                                                                                    <i className="bi bi-file-earmark text-success" style={{ fontSize: '1.1rem', width: 20, textAlign: 'center' }}></i>
+                                                                                    <div className="flex-grow-1 overflow-hidden">
+                                                                                        <div className="small fw-semibold text-truncate">{f.name}</div>
+                                                                                        <div style={{ fontSize: '.72rem', color: '#6c757d' }}>{(f.size / 1024 / 1024).toFixed(2)} MB</div>
+                                                                                    </div>
+                                                                                    <button type="button" className="btn btn-sm btn-outline-danger"
+                                                                                        onClick={() => setCourseFiles(p => ({ ...p, [lang]: p[lang].filter((_, j) => j !== i) }))}>
+                                                                                        <i className="bi bi-x-lg"></i>
+                                                                                    </button>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </>
                                                             );
                                                         })()}
-
-                                                        <input type="file" id="courseFiles" className="d-none" multiple
-                                                            onChange={e => {
-                                                                const files = Array.from(e.target.files).filter(f => {
-                                                                    if (f.size > 512 * 1024 * 1024) { showInfo('File Too Large', `${f.name} exceeds 512 MB limit.`); return false; }
-                                                                    return true;
-                                                                });
-                                                                setCourseFiles(p => [...p, ...files]);
-                                                            }}
-                                                            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xlsx,.xls" />
-                                                        <label htmlFor="courseFiles" className="btn btn-sm btn-outline-success mb-2">
-                                                            <i className="bi bi-plus-lg me-1"></i>Choose files…
-                                                        </label>
-
-                                                        {courseFiles.length > 0 && (
-                                                            <div>
-                                                                <div className="d-flex justify-content-between align-items-center mb-2">
-                                                                    <span className="small fw-semibold text-success">
-                                                                        <i className="bi bi-clock-history me-1"></i>{courseFiles.length} file(s) pending upload
-                                                                    </span>
-                                                                    <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setCourseFiles([])}>
-                                                                        <i className="bi bi-x-lg me-1"></i>Clear
-                                                                    </button>
-                                                                </div>
-                                                                {courseFiles.map((f, i) => (
-                                                                    <div key={i} className="d-flex align-items-center gap-2 bg-white p-2 rounded mb-1 border border-success border-opacity-50">
-                                                                        <div className="d-flex flex-column" style={{ gap: 1 }}>
-                                                                            <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
-                                                                                style={{ width: 20, height: 18, fontSize: '.6rem' }}
-                                                                                disabled={i === 0} onClick={() => moveItem(setCourseFiles, i, -1)}>▲</button>
-                                                                            <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
-                                                                                style={{ width: 20, height: 18, fontSize: '.6rem' }}
-                                                                                disabled={i === courseFiles.length - 1} onClick={() => moveItem(setCourseFiles, i, 1)}>▼</button>
-                                                                        </div>
-                                                                        <i className="bi bi-file-earmark text-success" style={{ fontSize: '1.1rem', width: 20, textAlign:'center' }}></i>
-                                                                        <div className="flex-grow-1 overflow-hidden">
-                                                                            <div className="small fw-semibold text-truncate">{f.name}</div>
-                                                                            <div style={{ fontSize: '.72rem', color: '#6c757d' }}>{(f.size / 1024 / 1024).toFixed(2)} MB</div>
-                                                                        </div>
-                                                                        <button type="button" className="btn btn-sm btn-outline-danger"
-                                                                            onClick={() => setCourseFiles(p => p.filter((_, j) => j !== i))}>
-                                                                            <i className="bi bi-x-lg"></i>
-                                                                        </button>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

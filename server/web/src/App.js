@@ -31,6 +31,8 @@ import ViewForm from './pages/ViewForm';
 import Sessions from './pages/Sessions';
 import ManageSession from './pages/ManageSession';
 import StudentDashboard from './pages/StudentDashboard';
+import RoomPage from './pages/RoomPage';
+import MeetingPage from './pages/MeetingPage';
 import Grades from './pages/Grades';
 
 function App() {
@@ -295,6 +297,20 @@ function App() {
           isLoggedIn ?
             <Grades data={userData} onLogout={handleLogout} /> :
             <Navigate to="/login" />
+        } />
+
+        {/* Meeting page — /meeting?session=ID or /meeting?room=ID */}
+        <Route path="/meeting" element={
+            isLoggedIn
+                ? <MeetingPage data={userData} />
+                : null// <Navigate to="/login" />
+        } />
+
+        {/* Direct room link — shareable video conference URL */}
+        <Route path="/room/:roomId" element={
+            isLoggedIn
+                ? <RoomPage data={userData} />
+                : <Navigate to="/login" />
         } />
 
         <Route path="*" element={<Navigate to={isLoggedIn ? "/" : "/login"} />} />

@@ -194,6 +194,12 @@ const courseSchema = new Schema({
         description: {
             type: String,
             required: false
+        },
+        lang: {
+            type: String,
+            required: false,
+            default: null,
+            description: 'Language code this file belongs to (e.g. en, ua). null = all languages'
         }
     }],
     // Supplementary files uploaded by the tutor (session-level, tutor access only)

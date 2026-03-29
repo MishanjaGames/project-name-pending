@@ -194,6 +194,35 @@ module.exports.finishCourse = async (req, res) => {
     }
 }
 
+module.exports.updateCourseProgress = async (req, res) => {
+    try {
+        const decoded = await utils.parseToken(req.headers.authorization.split(' ')[1])
+        const user = await Users.findById(decoded._id)
+        if (!user) return errorHandler(res, 404, 'User not found')
+
+        const { courseId } = req.params
+        let { process } = req.body
+        process = parseFloat(process)
+        if (isNaN(process) || process < 0 || process > 1)
+            return errorHandler(res, 400, 'process must be a number between 0 and 1')
+
+        const existing = user.courses?.find(c => c._id?.toString() === courseId)
+        if (existing) {
+            // Never decrease progress below current value
+            if (process > existing.process) existing.process = process
+        } else {
+            user.courses.push({ _id: courseId, process })
+        }
+
+        user.updatedAt = new Date()
+        await user.save()
+        const saved = user.courses.find(c => c._id?.toString() === courseId)
+        res.status(200).json({ message: 'Progress updated', data: { process: saved?.process } })
+    } catch (e) {
+        errorHandler(res, 500, e)
+    }
+}
+
 // ── Profile picture ───────────────────────────────────────────────────────────
 
 module.exports.getProfilePicture = (req, res) => fileHandler.sendUserProfilePicture(req, res)

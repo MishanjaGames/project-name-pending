@@ -6,7 +6,8 @@ const { validate } = require('../utils/utils')
 const auth = passport.authenticate('jwt', { session: false })
 
 router.get('/c',                             auth, controller.getCurrent)
-router.patch('/me/courses/:courseId/finish', auth, controller.finishCourse)
+router.patch('/me/courses/:courseId/finish',    auth, controller.finishCourse)
+router.patch('/me/courses/:courseId/progress',  auth, controller.updateCourseProgress)
 
 router.get('/',      controller.getAll)
 router.get('/:id',   controller.getById)
