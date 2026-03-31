@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Navbar } from '../components/Navbar';
+import AppLayout from '../components/Layout';
 import { UtilityModal } from '../components/UtilityModal';
 
 function CreateDirection({ data, onLogout }) {
@@ -53,9 +53,8 @@ function CreateDirection({ data, onLogout }) {
   };
 
   return (
-    <>
-      <Navbar data={data} onLogout={onLogout} />
-      <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
+    <AppLayout data={data} onLogout={onLogout} title="Create Direction">
+<div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="mb-0">Create Direction</h2>
           <button
@@ -139,7 +138,7 @@ function CreateDirection({ data, onLogout }) {
                 onClose={modal.onClose || closeModal}
             />
 
-    </>
+    </AppLayout>
 
   );
 }

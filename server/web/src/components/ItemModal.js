@@ -1,5 +1,6 @@
+import { toHttps } from '../utils/utils';
 import AuthImage from './AuthImage';
-const BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:4040';
+const BASE_URL = toHttps(process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://localhost:4040');
 
 
 /**

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import { extendSession } from "../utils/utils";
 import { FORM_CONFIGS } from "../config/config.forms";
 
@@ -194,23 +194,20 @@ function Forms({ data, onLogout }) {
 
     if (loading) {
         return (
-            <>
-                <Navbar data={data} onLogout={onLogout} />
-                <div className="flex-grow-1 d-flex align-items-center justify-content-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
+    <AppLayout data={data} onLogout={onLogout} title="Applications">
+<div className="flex-grow-1 d-flex align-items-center justify-content-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
                     <div className="text-center">
                         <div className="spinner-border text-primary mb-3" style={{ width: '2.5rem', height: '2.5rem' }}></div>
                         <p className="text-muted small mb-0">Loading forms…</p>
                     </div>
                 </div>
-            </>
+            </AppLayout>
         );
     }
 
         return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-
-            <div className="min-vh-100 bg-light p-3 p-md-4">
+    <AppLayout data={data} onLogout={onLogout} title="Applications">
+<div className="min-vh-100 bg-light p-3 p-md-4">
 
                 {/* Header */}
                 <div className="row mb-4">
@@ -458,7 +455,7 @@ function Forms({ data, onLogout }) {
                 onConfirm={handleConfirm}
                 onCancel={() => setConfirm(null)}
             />
-        </>
+        </AppLayout>
     );
 }
 

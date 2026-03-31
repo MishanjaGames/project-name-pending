@@ -1,0 +1,126 @@
+services:
+  # ──────────────────────────────────────────────────────────────────────────
+  # CONSOLE SERVER (Main API & Database)
+  # ──────────────────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: ./console
+      dockerfile: Dockerfile
+    container_name: console_app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4040}:4040"
+    env_file:
+      - .env
+      - ./console/.env
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/${DB_NAME:-P_01}
+      - LOCALDB_URI=mongodb://mongo:27017/${DB_NAME:-P_01}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      - app_storage:/app/storage
+    networks:
+      - app-network
+
+  mongo:
+    image: mongo:7
+    container_name: console_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - app-network
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # RTC SERVER (WebRTC Signaling & TURN)
+  # ──────────────────────────────────────────────────────────────────────────
+  rtc:
+    build:
+      context: ./rtc
+      dockerfile: Dockerfile
+    container_name: rtc-server
+    restart: unless-stopped
+    ports:
+      - "5050:5050"         # Signaling / REST API
+    env_file:
+      - .env
+      - ./rtc/.env
+    environment:
+      PORT: 5050
+      JWT_SECRET: ${JWT_SECRET}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      MONGO_URI: ${MONGO_URI}
+      STUN_URLS: stun:coturn:3478
+      TURN_URL: turn:coturn:3478
+      TURN_USERNAME: ${TURN_USERNAME}
+      TURN_CREDENTIAL: ${TURN_CREDENTIAL}
+    depends_on:
+      - coturn
+      - mongo
+    networks:
+      - app-network
+      - rtc-net
+
+  coturn:
+    image: coturn/coturn:latest
+    container_name: coturn
+    restart: unless-stopped
+    # For Windows Docker Desktop: using bridge network with ports
+    # For Linux production: switch to network_mode: host
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "5349:5349/tcp"
+      - "5349:5349/udp"
+      - "49152-65535:49152-65535/udp"
+    volumes:
+      - ./rtc/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    networks:
+      - rtc-net
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # WEB FRONTEND (React/Nginx)
+  # ──────────────────────────────────────────────────────────────────────────
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL}
+        REACT_APP_RTC_URL: ${REACT_APP_RTC_URL}
+        REACT_APP_EMAILJS_PUBLIC_KEY: ${REACT_APP_EMAILJS_PUBLIC_KEY}
+    container_name: web-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped
+    env_file:
+      - ./web/.env
+      - .env
+    environment:
+      - NODE_ENV=${NODE_ENV}
+    depends_on:
+      - app
+      - rtc
+    networks:
+      - app-network
+
+volumes:
+  mongo_data:
+  app_storage:
+
+networks:
+  app-network:
+    driver: bridge
+  rtc-net:
+    driver: bridge

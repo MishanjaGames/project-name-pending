@@ -13,17 +13,16 @@
  */
 
 const rooms = new Map()
+const CHAT_HISTORY_LIMIT = 200
 
 function getOrCreate(roomId) {
     if (!rooms.has(roomId)) {
-        rooms.set(roomId, { id: roomId, peers: new Map(), createdAt: new Date() })
+        rooms.set(roomId, { id: roomId, peers: new Map(), chat: [], createdAt: new Date() })
     }
     return rooms.get(roomId)
 }
 
-function get(roomId) {
-    return rooms.get(roomId) || null
-}
+function get(roomId)    { return rooms.get(roomId) || null }
 
 function addPeer(roomId, socketId, peerInfo) {
     const room = getOrCreate(roomId)
@@ -31,40 +30,46 @@ function addPeer(roomId, socketId, peerInfo) {
     return room
 }
 
+function updatePeer(socketId, patch) {
+    for (const room of rooms.values()) {
+        if (room.peers.has(socketId)) {
+            const p = room.peers.get(socketId)
+            room.peers.set(socketId, { ...p, ...patch })
+            return
+        }
+    }
+}
+
 function removePeer(socketId) {
-    // Remove from every room this socket was in
-    const affected = []
     for (const [roomId, room] of rooms) {
         if (room.peers.has(socketId)) {
             room.peers.delete(socketId)
-            affected.push(roomId)
-            // Clean up empty rooms
             if (room.peers.size === 0) rooms.delete(roomId)
         }
     }
-    return affected
 }
 
 function getPeers(roomId) {
     const room = rooms.get(roomId)
-    if (!room) return []
-    return Array.from(room.peers.values())
+    return room ? Array.from(room.peers.values()) : []
 }
 
-function getRoomsForSocket(socketId) {
-    const result = []
-    for (const [roomId, room] of rooms) {
-        if (room.peers.has(socketId)) result.push(roomId)
-    }
-    return result
+function getPeerBySocket(socketId, roomId) {
+    return rooms.get(roomId)?.peers.get(socketId) || null
+}
+
+function addChatMessage(roomId, msg) {
+    const room = getOrCreate(roomId)
+    room.chat.push(msg)
+    if (room.chat.length > CHAT_HISTORY_LIMIT) room.chat.shift()
+}
+
+function getChatHistory(roomId) {
+    return rooms.get(roomId)?.chat || []
 }
 
 function listAll() {
-    return Array.from(rooms.entries()).map(([id, room]) => ({
-        id,
-        peerCount: room.peers.size,
-        createdAt: room.createdAt
-    }))
+    return Array.from(rooms.entries()).map(([id, room]) => ({ id, peerCount: room.peers.size, createdAt: room.createdAt }))
 }
 
-module.exports = { getOrCreate, get, addPeer, removePeer, getPeers, getRoomsForSocket, listAll }
+module.exports = { getOrCreate, get, addPeer, updatePeer, removePeer, getPeers, getPeerBySocket, addChatMessage, getChatHistory, listAll }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Navbar } from '../components/Navbar';
+import AppLayout from '../components/Layout';
 import { UtilityModal } from '../components/UtilityModal';
 
 function EditDirection({ data, onLogout }) {
@@ -81,21 +81,19 @@ function EditDirection({ data, onLogout }) {
 
   if (loading) {
     return (
-      <>
-        <Navbar data={data} onLogout={onLogout} />
-        <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
+    <AppLayout data={data} onLogout={onLogout} title="Edit Direction">
+<div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
           <div className="text-center py-5">
             <div className="spinner-border text-primary"></div>
           </div>
         </div>
-      </>
+      </AppLayout>
     );
   }
 
   return (
-    <>
-      <Navbar data={data} onLogout={onLogout} />
-      <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
+    <AppLayout data={data} onLogout={onLogout} title="Edit Direction">
+<div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="mb-0">Edit Direction</h2>
           <button
@@ -179,7 +177,7 @@ function EditDirection({ data, onLogout }) {
                 onClose={modal.onClose || closeModal}
             />
 
-    </>
+    </AppLayout>
 
   );
 }

@@ -1,8 +1,9 @@
+import { toHttps } from '../utils/utils';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Navbar } from '../components/Navbar';
+import AppLayout from '../components/Layout';
 
-const API = 'http://localhost:4040/api';
+const API = toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api');
 
 function ProgressBar({ value }) {
     const pct = Math.round((value || 0) * 100);
@@ -87,16 +88,14 @@ function StudentDashboard({ data, onLogout }) {
     const inProgress = courses.filter(c => (c.process || 0) > 0 && (c.process || 0) < 1).length;
 
     if (loading) return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="ap-loading"><div className="spinner-border text-primary" /><span>Loading your courses…</span></div>
-        </>
+    <AppLayout data={data} onLogout={onLogout} title="My Courses">
+<div className="ap-loading"><div className="spinner-border text-primary" /><span>Loading your courses…</span></div>
+        </AppLayout>
     );
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+    <AppLayout data={data} onLogout={onLogout} title="My Courses">
+<div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
 
                 {/* Header */}
                 <div className="mb-4">
@@ -168,7 +167,7 @@ function StudentDashboard({ data, onLogout }) {
                                             <div className="card border-0 shadow-sm h-100" style={{ cursor: 'pointer' }}
                                                 onClick={() => navigate(`/course/view/${c._id}${mySession ? `?session=${mySession._id}` : ''}`)}>
                                                 {thumb && (
-                                                    <img src={`http://localhost:4040${thumb.url}`} alt={title}
+                                                    <img src={`${toHttps(process.env.REACT_APP_API_URL?.replace('/api','') || 'https://localhost:4040')}${thumb.url}`} alt={title}
                                                         className="card-img-top" style={{ height: 140, objectFit: 'cover' }} />
                                                 )}
                                                 <div className="card-body p-3">
@@ -238,7 +237,7 @@ function StudentDashboard({ data, onLogout }) {
                     </div>
                 )}
             </div>
-        </>
+        </AppLayout>
     );
 }
 

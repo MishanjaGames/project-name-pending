@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import { UtilityModal } from '../components/UtilityModal';
 
 function CreateRole({ data, onLogout }) {
@@ -119,10 +119,8 @@ function CreateRole({ data, onLogout }) {
     };
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+    <AppLayout data={data} onLogout={onLogout} title="Create Role">
+<div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
                 {/* Page Header */}
                 <div className="row mb-4">
                     <div className="col-12">
@@ -304,7 +302,7 @@ function CreateRole({ data, onLogout }) {
                 onCancel={modal.onCancel || closeModal}
                 onClose={modal.onClose || closeModal}
             />
-        </>
+        </AppLayout>
     );
 }
 

@@ -1,8 +1,8 @@
 import axios from 'axios';
-import { getToken, removeToken } from './utils';
+import { getToken, removeToken, toHttps } from './utils';
 
 const apiClient = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:4040/api',
+  baseURL: toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api'),
   withCredentials: true,
 });
 

@@ -1,12 +1,212 @@
-import { useEffect, useState, useCallback } from "react";
+import { toHttps } from '../utils/utils';
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import { UtilityModal } from "../components/UtilityModal";
 import { VideoConference } from "../components/VideoConference";
 
-const API = "http://localhost:4040/api";
+const API = toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api');
 const TUTOR_RANKS = ['assistant','teacher','lecturer','instructor','tutor','professor'];
 const MARK_SCALES = ['5','12','100','custom'];
+
+// ── Calendar schedule view ─────────────────────────────────────────────────
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function ScheduleCalendar({ schedule = [], onRemove, canEdit, onEventClick }) {
+    const [calYear, setCalYear]   = useState(() => new Date().getFullYear());
+    const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
+    const [view, setView]         = useState('month'); // 'month' | 'list'
+
+    // Expand recurring events into actual occurrences for this month
+    const expandEvents = () => {
+        const events = [];
+        const start = new Date(calYear, calMonth, 1);
+        const end   = new Date(calYear, calMonth + 1, 0, 23, 59, 59);
+
+        schedule.forEach((entry, idx) => {
+            const base = new Date(entry.datetime);
+            if (!entry.isRecurring) {
+                if (base >= start && base <= end) {
+                    events.push({ ...entry, _idx: idx, occDate: base });
+                }
+                return;
+            }
+            // Generate occurrences
+            const freq = entry.recurrence?.frequency || 'weekly';
+            const endDate = entry.recurrence?.endDate ? new Date(entry.recurrence.endDate) : null;
+            const maxOcc  = entry.recurrence?.maxOccurrences || 52;
+            let cursor = new Date(base);
+            let count  = 0;
+            while (count < maxOcc) {
+                if (endDate && cursor > endDate) break;
+                if (cursor > end) break;
+                if (cursor >= start) {
+                    events.push({ ...entry, _idx: idx, occDate: new Date(cursor), _generated: true });
+                }
+                count++;
+                switch (freq) {
+                    case 'daily':    cursor.setDate(cursor.getDate() + 1); break;
+                    case 'weekly':   cursor.setDate(cursor.getDate() + 7); break;
+                    case 'biweekly': cursor.setDate(cursor.getDate() + 14); break;
+                    case 'monthly':  cursor.setMonth(cursor.getMonth() + 1); break;
+                    default:         cursor.setDate(cursor.getDate() + 7);
+                }
+            }
+        });
+        return events;
+    };
+
+    const events = expandEvents();
+
+    // Build grid: days array for month view
+    const firstDay = new Date(calYear, calMonth, 1).getDay();
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    const daysInPrev  = new Date(calYear, calMonth, 0).getDate();
+    const totalCells  = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+    const cells = [];
+    for (let i = 0; i < totalCells; i++) {
+        let d, isOther = false;
+        if (i < firstDay) { d = new Date(calYear, calMonth - 1, daysInPrev - firstDay + i + 1); isOther = true; }
+        else if (i < firstDay + daysInMonth) { d = new Date(calYear, calMonth, i - firstDay + 1); }
+        else { d = new Date(calYear, calMonth + 1, i - firstDay - daysInMonth + 1); isOther = true; }
+        const dayEvents = events.filter(e => e.occDate.toDateString() === d.toDateString());
+        cells.push({ date: d, isOther, dayEvents });
+    }
+
+    const today = new Date();
+    const isToday = (d) => d.toDateString() === today.toDateString();
+
+    return (
+        <div>
+            {/* Toolbar */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'.75rem', gap:'1rem', flexWrap:'wrap' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:'.5rem' }}>
+                    <button className="btn btn-outline-secondary btn-sm" onClick={() => {
+                        if (calMonth === 0) { setCalMonth(11); setCalYear(y => y-1); }
+                        else setCalMonth(m => m-1);
+                    }}>‹</button>
+                    <span style={{ fontWeight:700, fontSize:'1rem', minWidth:160, textAlign:'center' }}>
+                        {MONTHS[calMonth]} {calYear}
+                    </span>
+                    <button className="btn btn-outline-secondary btn-sm" onClick={() => {
+                        if (calMonth === 11) { setCalMonth(0); setCalYear(y => y+1); }
+                        else setCalMonth(m => m+1);
+                    }}>›</button>
+                    <button className="btn btn-outline-secondary btn-sm" onClick={() => { setCalMonth(today.getMonth()); setCalYear(today.getFullYear()); }}>Today</button>
+                </div>
+                <div style={{ display:'flex', gap:'.5rem' }}>
+                    <button className={`btn btn-sm ${view==='month'?'btn-primary':'btn-outline-secondary'}`} onClick={() => setView('month')}>
+                        <i className="bi bi-grid-3x3-gap me-1" />Month
+                    </button>
+                    <button className={`btn btn-sm ${view==='list'?'btn-primary':'btn-outline-secondary'}`} onClick={() => setView('list')}>
+                        <i className="bi bi-list-ul me-1" />List
+                    </button>
+                </div>
+            </div>
+
+            {/* Month view */}
+            {view === 'month' && (
+                <div style={{ border:'1px solid var(--border)', borderRadius:'var(--radius)', overflow:'hidden' }}>
+                    {/* Day headers */}
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', background:'var(--table-head-bg)', borderBottom:'1px solid var(--border)' }}>
+                        {DAYS.map(d => (
+                            <div key={d} style={{ textAlign:'center', padding:'.45rem', fontSize:'.65rem', fontWeight:700, letterSpacing:'.07em', textTransform:'uppercase', color:'var(--text-muted)' }}>{d}</div>
+                        ))}
+                    </div>
+                    {/* Day cells */}
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)' }}>
+                        {cells.map((cell, i) => (
+                            <div key={i} style={{
+                                minHeight:80, padding:'.35rem', borderRight: (i+1)%7===0?'none':'1px solid var(--border)',
+                                borderBottom: i >= totalCells-7 ? 'none' : '1px solid var(--border)',
+                                background: isToday(cell.date) ? 'var(--accent-light)' : 'var(--surface)',
+                                opacity: cell.isOther ? .4 : 1,
+                            }}>
+                                <div style={{
+                                    width:24, height:24, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                                    background: isToday(cell.date) ? 'var(--accent)' : 'transparent',
+                                    color: isToday(cell.date) ? '#fff' : 'var(--text-2)',
+                                    fontWeight:600, fontSize:'.78rem', marginBottom:2
+                                }}>{cell.date.getDate()}</div>
+                                {cell.dayEvents.slice(0,3).map((ev, j) => (
+                                    <div key={j} title={ev.title}
+                                        onClick={() => onEventClick?.(ev)}
+                                        style={{
+                                            fontSize:'.6rem', padding:'1px 4px', borderRadius:3, marginBottom:1,
+                                            background: ev.meetingLink ? 'var(--success)' : ev._generated ? 'var(--info)' : 'var(--accent)',
+                                            color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                                            cursor:'pointer'
+                                        }}>
+                                        {new Date(ev.occDate).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} {ev.title}
+                                    </div>
+                                ))}
+                                {cell.dayEvents.length > 3 && (
+                                    <div style={{ fontSize:'.6rem', color:'var(--text-muted)', paddingLeft:4 }}>+{cell.dayEvents.length-3} more</div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* List view */}
+            {view === 'list' && (
+                <div>
+                    {schedule.length === 0 ? (
+                        <div className="empty-state">
+                            <div className="empty-state-icon">📅</div>
+                            <div className="empty-state-title">No schedule entries</div>
+                            <div style={{ fontSize:'.82rem', color:'var(--text-muted)' }}>Add your first meeting below</div>
+                        </div>
+                    ) : (
+                        <div className="d-flex flex-column gap-2">
+                            {schedule.map((s, i) => {
+                                const dt = new Date(s.datetime);
+                                const isPast = dt < new Date();
+                                return (
+                                    <div key={i} className="card" style={{ opacity: isPast ? .7 : 1 }}>
+                                        <div className="card-body py-2 px-3 d-flex align-items-center gap-3">
+                                            <div style={{ textAlign:'center', borderRight:'1px solid var(--border)', paddingRight:12, minWidth:48 }}>
+                                                <div style={{ fontWeight:700, fontSize:'1.2rem', color:isPast?'var(--text-muted)':'var(--accent)', lineHeight:1 }}>{dt.getDate()}</div>
+                                                <div style={{ fontSize:'.62rem', color:'var(--text-muted)' }}>{dt.toLocaleString('en',{month:'short'})} {dt.getFullYear()}</div>
+                                            </div>
+                                            <div style={{ flex:1, minWidth:0 }}>
+                                                <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                                                    <span style={{ fontWeight:600, fontSize:'.88rem' }}>{s.title}</span>
+                                                    {isPast && <span className="badge bg-secondary" style={{fontSize:'.6rem'}}>Past</span>}
+                                                    {s.isRecurring && <span className="badge bg-info" style={{fontSize:'.6rem'}}><i className="bi bi-arrow-repeat me-1" />{s.recurrence?.frequency}</span>}
+                                                </div>
+                                                <div style={{ fontSize:'.75rem', color:'var(--text-muted)' }}>
+                                                    {dt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} · {s.durationMin} min
+                                                    {s.notes && <> · <em>{s.notes}</em></>}
+                                                </div>
+                                            </div>
+                                            <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
+                                                {s.meetingLink && (
+                                                    <a href={s.meetingLink} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-success" style={{fontSize:'.75rem'}}>
+                                                        <i className="bi bi-camera-video me-1" />Join
+                                                    </a>
+                                                )}
+                                                {canEdit && (
+                                                    <button className="btn btn-sm btn-outline-danger" onClick={() => onRemove(i)} title="Remove">
+                                                        <i className="bi bi-trash" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+
 
 function ManageSession({ data, onLogout }) {
     const { id } = useParams();
@@ -25,7 +225,7 @@ function ManageSession({ data, onLogout }) {
     // ── Video conference ────────────────────────────────────────────────────
     const [showConference, setShowConference] = useState(false);
     const [inviteCopied, setInviteCopied]     = useState(false);
-    const RTC_API = "http://localhost:5050";
+    const RTC_API = toHttps(process.env.REACT_APP_RTC_URL || 'https://localhost:5050');
 
     const copyInviteLink = async () => {
         try {
@@ -434,24 +634,25 @@ function ManageSession({ data, onLogout }) {
 
     // ────────────────────────────────────────────────────────────────────────
     if (loading) return (
-        <><Navbar data={data} onLogout={onLogout} />
-        <div className="flex-grow-1 d-flex align-items-center justify-content-center">
-            <div className="spinner-border text-primary" />
-        </div></>
+        <AppLayout data={data} onLogout={onLogout} title="Session">
+            <div className="d-flex align-items-center justify-content-center" style={{minHeight:300}}>
+                <div className="spinner-border text-primary" />
+            </div>
+        </AppLayout>
     );
 
     if (!session) return (
-        <><Navbar data={data} onLogout={onLogout} />
-        <div className="flex-grow-1 p-4 text-muted">Session not found.</div></>
+        <AppLayout data={data} onLogout={onLogout} title="Session">
+            <div className="empty-state"><div className="empty-state-icon">🔍</div><div className="empty-state-title">Session not found</div></div>
+        </AppLayout>
     );
 
     const course = session.courseId;
     const statusColors = { draft: "secondary", active: "success", completed: "primary", archived: "dark" };
     const link = session.privateCopyId===null?course._id:session.privateCopyId._id
+    const courseTitle2 = courseTitle(course);
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+        <AppLayout data={data} onLogout={onLogout} title={courseTitle2}>
 
                 {/* Header */}
                 <div className="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-4">
@@ -766,54 +967,12 @@ function ManageSession({ data, onLogout }) {
                                 </div>
                             </div>
                         )}
-                        {!session.schedule?.length ? (
-                            <p className="text-muted">No schedule entries yet.</p>
-                        ) : (
-                            <div className="d-flex flex-column gap-2">
-                                {session.schedule.map((s, i) => {
-                                    const dt = new Date(s.datetime);
-                                    const isPast = dt < new Date();
-                                    return (
-                                        <div key={i} className={`card border-0 shadow-sm ${isPast ? 'opacity-75' : ''}`}>
-                                            <div className="card-body py-2 px-3 d-flex align-items-center gap-3">
-                                                {/* Date block */}
-                                                <div className="text-center border-end pe-3" style={{ minWidth: 48 }}>
-                                                    <div className="fw-bold" style={{ fontSize: '1.1rem', color: isPast ? '#868e96' : '#3b5bdb', lineHeight: 1 }}>{dt.getDate()}</div>
-                                                    <div style={{ fontSize: '.65rem', color: '#868e96' }}>{dt.toLocaleString('en',{month:'short'})} '{String(dt.getFullYear()).slice(2)}</div>
-                                                </div>
-                                                {/* Info */}
-                                                <div className="flex-grow-1 overflow-hidden">
-                                                    <div className="d-flex align-items-center gap-2 flex-wrap">
-                                                        <span className="fw-semibold small">{s.title}</span>
-                                                        {isPast && <span className="badge bg-secondary" style={{fontSize:'.65rem'}}>Past</span>}
-                                                        {s.isRecurring && <span className="badge bg-info text-dark" style={{fontSize:'.65rem'}}><i className="bi bi-arrow-repeat me-1"></i>{s.recurrence?.frequency}</span>}
-                                                    </div>
-                                                    <div style={{ fontSize: '.75rem', color: '#868e96' }}>
-                                                        {dt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
-                                                        <span className="mx-1">·</span>{s.durationMin} min
-                                                        {s.notes && <><span className="mx-1">·</span><span className="fst-italic">{s.notes}</span></>}
-                                                    </div>
-                                                </div>
-                                                {/* Actions */}
-                                                <div className="d-flex gap-2 align-items-center">
-                                                    {s.meetingLink && (
-                                                        <a href={s.meetingLink} target="_blank" rel="noopener noreferrer"
-                                                            className="btn btn-sm btn-outline-primary" style={{fontSize:'.78rem'}}>
-                                                            <i className="bi bi-camera-video me-1"></i>Join
-                                                        </a>
-                                                    )}
-                                                    {canEditSession && (
-                                                        <button className="btn btn-sm btn-outline-danger" onClick={() => removeScheduleEntry(i)}>
-                                                            <i className="bi bi-trash"></i>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+                        <ScheduleCalendar
+                            schedule={session.schedule || []}
+                            onRemove={removeScheduleEntry}
+                            canEdit={canEditSession}
+                            onEventClick={(ev) => ev.meetingLink && window.open(ev.meetingLink, '_blank')}
+                        />
                     </div>
                 )}
 
@@ -1469,22 +1628,13 @@ function ManageSession({ data, onLogout }) {
                         )}
                     </div>
                 )}
-            </div>
-
-            {showConference && (
-                <VideoConference
-                    sessionId={id}
-                    nickname={data?.nickname}
-                    onClose={() => setShowConference(false)}
-                />
-            )}
             <UtilityModal show={modal.show} type={modal.type} title={modal.title} message={modal.message}
                 danger={modal.danger} confirmToken={modal.confirmToken} tokenLabel={modal.tokenLabel}
                 deleteLabel={modal.deleteLabel || "Delete"}
                 onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
                 onDelete={() => { modal.onDelete?.(); closeModal(); }}
                 onCancel={modal.onCancel || closeModal} onClose={modal.onClose || closeModal} />
-        </>
+        </AppLayout>
     );
 }
 

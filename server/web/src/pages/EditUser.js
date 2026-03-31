@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import AuthImage from "../components/AuthImage";
 import { jwtDecode } from 'jwt-decode';
 import { UtilityModal } from '../components/UtilityModal';
@@ -276,9 +276,8 @@ function EditUser({ data, onLogout }) {
 
     if (loading) {
         return (
-            <>
-                <Navbar data={data} onLogout={onLogout} />
-                <div className="flex-grow-1 d-flex align-items-center justify-content-center">
+    <AppLayout data={data} onLogout={onLogout} title="Edit User">
+<div className="flex-grow-1 d-flex align-items-center justify-content-center">
                     <div className="text-center">
                         <div className="spinner-border text-primary mb-3" role="status">
                             <span className="visually-hidden">Loading...</span>
@@ -286,15 +285,13 @@ function EditUser({ data, onLogout }) {
                         <p className="text-muted">Loading user details...</p>
                     </div>
                 </div>
-            </>
+            </AppLayout>
         );
     }
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+    <AppLayout data={data} onLogout={onLogout} title="Edit User">
+<div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
                 {/* Page Header */}
                 <div className="row mb-4">
                     <div className="col-12">
@@ -726,7 +723,7 @@ function EditUser({ data, onLogout }) {
                 onClose={modal.onClose || closeModal}
             />
 
-        </>
+        </AppLayout>
 
     );
 }

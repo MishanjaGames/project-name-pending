@@ -1,6 +1,7 @@
+import { toHttps } from '../utils/utils';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Navbar } from '../components/Navbar';
+import AppLayout from '../components/Layout';
 import { extendSession } from '../utils/utils';
 import './ViewCourse.css';
 import { UtilityModal } from '../components/UtilityModal';
@@ -190,6 +191,7 @@ function ViewCourse({ data, onLogout }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
+  const API = toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api');
 
   const [course, setCourse] = useState(null);
   const [volumes, setVolumes] = useState([]);
@@ -241,12 +243,24 @@ function ViewCourse({ data, onLogout }) {
   // Helper: get translated field for current language with fallback to base (index 0)
   const t = (field) => course?.trans?.[activeLangIdx]?.[field] || course?.trans?.[0]?.[field] || '';
 
+  // Helper: resolve volumes for a given lang index
+  // Non-base langs use trans[idx].volumes if non-empty, else fall back to base (course.volumes)
+  const resolveVolumes = (courseData, langIdx) => {
+    const raw = langIdx > 0 && courseData?.trans?.[langIdx]?.volumes?.length
+      ? courseData.trans[langIdx].volumes
+      : (courseData?.volumes || []);
+    return raw.map(v => ({
+      ...v, type: v.type || 'container',
+      chapters: (v.chapters || []).map(c => ({ ...c, type: c.type || 'container' }))
+    }));
+  };
+
   // ── Payment modal ───────────────────────────────────────────────────────────
   const [showPayment, setShowPayment] = useState(false);
   // ── Video conference ────────────────────────────────────────────────────────
   const [showConference, setShowConference] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
-  const RTC_API = 'http://localhost:5050';
+  const RTC_API = toHttps(process.env.REACT_APP_RTC_URL || 'https://localhost:5050');
 
   const copyInviteLink = async () => {
     if (!sessionId) return;
@@ -276,11 +290,17 @@ function ViewCourse({ data, onLogout }) {
   // Reset lang when course changes
   useEffect(() => { setActiveLangIdx(0); }, [id]);
 
+  // Re-resolve volumes when language switches
+  useEffect(() => {
+    if (!course) return;
+    setVolumes(resolveVolumes(course, activeLangIdx));
+  }, [activeLangIdx, course]);
+
   // ── Session fetch: load session + find student's group ────────────────────
   const fetchSession = async () => {
     if (!sessionId || !token) return;
     try {
-      const res = await fetch(`http://localhost:4040/api/sessions/${sessionId}`, {
+      const res = await fetch(`${API}/sessions/${sessionId}`, {
         headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` }
       });
       if (!res.ok) return;
@@ -290,7 +310,7 @@ function ViewCourse({ data, onLogout }) {
 
       // Find the group that contains this user as a member
       const groupRes = await fetch(
-        `http://localhost:4040/api/groups?sessionId=${sessionId}`,
+        `${API}/groups?sessionId=${sessionId}`,
         { headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` } }
       );
       if (groupRes.ok) {
@@ -306,7 +326,7 @@ function ViewCourse({ data, onLogout }) {
   const fetchCourseProgress = async () => {
     if (!token || !data?._id) return;
     try {
-      const res = await fetch(`http://localhost:4040/api/users/${data._id}`, {
+      const res = await fetch(`${API}/users/${data._id}`, {
         headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` }
       });
       if (res.ok) {
@@ -323,7 +343,7 @@ function ViewCourse({ data, onLogout }) {
     if (!token || locked || flatItems.length === 0) return;
     const progress = Math.min(1, (visitedFlatIdx + 1) / flatItems.length);
     try {
-      await fetch(`http://localhost:4040/api/users/me/courses/${id}/progress`, {
+      await fetch(`${API}/users/me/courses/${id}/progress`, {
         method: 'PATCH',
         headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ process: progress })
@@ -337,7 +357,7 @@ function ViewCourse({ data, onLogout }) {
     try {
       // Get all groups for this session
       const groupRes = await fetch(
-        `http://localhost:4040/api/groups?sessionId=${sessionId}`,
+        `${API}/groups?sessionId=${sessionId}`,
         { headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` } }
       );
       if (!groupRes.ok) return;
@@ -350,7 +370,7 @@ function ViewCourse({ data, onLogout }) {
       if (!myGroup) return; // student not added to any group yet
 
       const res = await fetch(
-        `http://localhost:4040/api/assignments?groupId=${myGroup._id}`,
+        `${API}/assignments?groupId=${myGroup._id}`,
         { headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` } }
       );
       if (res.ok) {
@@ -363,13 +383,15 @@ function ViewCourse({ data, onLogout }) {
   useEffect(() => { if (sessionId) fetchSessionAssignments(); }, [sessionId]);
 
   const handleFinishCourse = async () => {
+    // Always navigate back to the welcome screen
+    setSelected(null);
     if (courseFinished || !token) return;
     try {
-      const res = await fetch(`http://localhost:4040/api/users/me/courses/${id}/finish`, {
+      const res = await fetch(`${API}/users/me/courses/${id}/finish`, {
         method: 'PATCH',
         headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
       });
-      if (res.ok) { setCourseFinished(true); showInfo('Course Completed!', 'Congratulations! You have finished this course.'); setSelected(null); }
+      if (res.ok) { setCourseFinished(true); showInfo('Course Completed!', 'Congratulations! You have finished this course.'); }
       else { const j = await res.json(); showInfo('Error', j.message || 'Could not mark course as finished.'); }
     } catch (e) { showInfo('Error', 'Network error.'); }
   };
@@ -377,7 +399,7 @@ function ViewCourse({ data, onLogout }) {
   const fetchComments = async () => {
     setCommentsLoading(true);
     try {
-      const res = await fetch(`http://localhost:4040/api/courses/${id}/comments`);
+      const res = await fetch(`${API}/courses/${id}/comments`);
       if (res.ok) {
         const json = await res.json();
         setComments(json.data || []);
@@ -390,7 +412,7 @@ function ViewCourse({ data, onLogout }) {
     if (!commentText.trim()) return;
     setCommentPosting(true);
     try {
-      const res = await fetch(`http://localhost:4040/api/courses/${id}/comments`, {
+      const res = await fetch(`${API}/courses/${id}/comments`, {
         method: 'POST',
         headers: {
           'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
@@ -411,7 +433,7 @@ function ViewCourse({ data, onLogout }) {
   const fetchRating = async () => {
     if (!token) return;
     try {
-      const res = await fetch(`http://localhost:4040/api/courses/${id}/rating`, {
+      const res = await fetch(`${API}/courses/${id}/rating`, {
         headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` }
       });
       if (res.ok) {
@@ -427,7 +449,7 @@ function ViewCourse({ data, onLogout }) {
     if (locked || ratingSubmitting) return;
     setRatingSubmitting(true);
     try {
-      const res = await fetch(`http://localhost:4040/api/courses/${id}/rating`, {
+      const res = await fetch(`${API}/courses/${id}/rating`, {
         method: 'POST',
         headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ value })
@@ -445,7 +467,7 @@ function ViewCourse({ data, onLogout }) {
   const handleDeleteComment = async (commentId) => {
     showConfirm('Delete Comment', 'Are you sure you want to delete this comment?', async () => {
       try {
-        const res = await fetch(`http://localhost:4040/api/courses/${id}/comments/${commentId}`, {
+        const res = await fetch(`${API}/courses/${id}/comments/${commentId}`, {
           method: 'DELETE',
           headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` }
         });
@@ -464,7 +486,7 @@ function ViewCourse({ data, onLogout }) {
       if (sessionId && fetchedCourse?.courseType === 'HOSTED') {
         // sessionGroup may not be loaded yet — fetch inline
         const groupRes = await fetch(
-          `http://localhost:4040/api/groups?sessionId=${sessionId}`,
+          `${API}/groups?sessionId=${sessionId}`,
           { headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` } }
         );
         if (groupRes.ok) {
@@ -476,7 +498,7 @@ function ViewCourse({ data, onLogout }) {
         }
       }
       // Check purchased courses (SELF_TAUGHT and MENTORED)
-      const res = await fetch(`http://localhost:4040/api/users/${data._id}`, {
+      const res = await fetch(`${API}/users/${data._id}`, {
         headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}` }
       });
       if (res.ok) {
@@ -501,23 +523,19 @@ function ViewCourse({ data, onLogout }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:4040/api/courses/${id}`);
+      const res = await fetch(`${API}/courses/${id}`);
       if (res.status === 401) await extendSession(data);
       if (res.ok) {
         const { data: d } = await res.json();
         if (d) {
           setCourse(d);
-          setVolumes(
-            (d.volumes || []).map(v => ({
-              ...v, type: v.type || 'container',
-              chapters: (v.chapters || []).map(c => ({ ...c, type: c.type || 'container' }))
-            }))
-          );
+          const resolved = resolveVolumes(d, 0); // start at base lang
+          setVolumes(resolved);
           // Auto-expand first volume & chapter
-          if (d.volumes.length) {
-            setOpenVolumes({ [d.volumes[0].vid]: true });
-            if (d.volumes[0].chapters?.length) {
-              setOpenChapters({ [d.volumes[0].chapters[0].cid]: true });
+          if (resolved.length) {
+            setOpenVolumes({ [resolved[0].vid]: true });
+            if (resolved[0].chapters?.length) {
+              setOpenChapters({ [resolved[0].chapters[0].cid]: true });
             }
           }
           await checkAccess(d);
@@ -599,7 +617,7 @@ function ViewCourse({ data, onLogout }) {
     // Save progress based on how far through the course the user has navigated
     if (!locked && flatItems.length > 0) {
       const progress = Math.min(1, (idx + 1) / flatItems.length);
-      fetch(`http://localhost:4040/api/users/me/courses/${id}/progress`, {
+      fetch(`${API}/users/me/courses/${id}/progress`, {
         method: 'PATCH',
         headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ process: progress })
@@ -609,30 +627,27 @@ function ViewCourse({ data, onLogout }) {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   if (loading) return (
-    <>
-      <Navbar data={data} onLogout={onLogout} />
-      <div className="vc-loading">
+    <AppLayout data={data} onLogout={onLogout} title="">
+<div className="vc-loading">
         <div className="vc-spinner"></div>
         <p>Loading course…</p>
       </div>
-    </>
+    </AppLayout>
   );
 
   if (!course) return (
-    <>
-      <Navbar data={data} onLogout={onLogout} />
-      <div className="vc-error">
+    <AppLayout data={data} onLogout={onLogout} title="">
+<div className="vc-error">
         <i className="bi bi-exclamation-circle"></i>
         <p>Course not found.</p>
         <button className="vc-btn-ghost" onClick={() => navigate(-1)}>← Go back</button>
       </div>
-    </>
+    </AppLayout>
   );
 
   return (
-    <>
-      <Navbar data={data} onLogout={onLogout} />
-      <div className={`vc-root${sidebarOpen ? '' : ' vc-root--collapsed'}`}>
+    <AppLayout data={data} onLogout={onLogout} title="">
+<div className={`vc-root${sidebarOpen ? '' : ' vc-root--collapsed'}`}>
 
         {/* ── Sidebar ── */}
         <aside className="vc-sidebar">
@@ -807,7 +822,7 @@ function ViewCourse({ data, onLogout }) {
                             <div className="mb-3">
                               <strong className="small">Task files:</strong>
                               {a.taskFiles.map((f, i) => (
-                                <a key={i} href={`http://localhost:4040${f.url}`} className="btn btn-outline-secondary btn-sm ms-2" target="_blank" rel="noopener noreferrer">
+                                <a key={i} href={`${toHttps(process.env.REACT_APP_API_URL?.replace('/api','') || 'https://localhost:4040')}${f.url}`} className="btn btn-outline-secondary btn-sm ms-2" target="_blank" rel="noopener noreferrer">
                                   <i className="bi bi-download me-1"></i>{f.originalName || f.filename}
                                 </a>
                               ))}
@@ -858,7 +873,7 @@ function ViewCourse({ data, onLogout }) {
                 )}
                 {course.links[0] ? (
                   <CourseThumbnail
-                    src={'http://localhost:4040' + course.links[0].url}
+                    src={(toHttps(process.env.REACT_APP_API_URL?.replace('/api','') || 'https://localhost:4040')) + course.links[0].url}
                     alt={t('title')}
                   />
                 ) : (
@@ -1114,7 +1129,7 @@ function ViewCourse({ data, onLogout }) {
               onNext={() => goTo(currentFlatIdx + 1)}
               setOpenVolumes={setOpenVolumes}
               setOpenChapters={setOpenChapters}
-              finish={handleFinishCourse}
+              finish={() => handleFinishCourse()}
               sessionId={sessionId}
               sessionGroup={sessionGroup}
               studentId={data?._id}
@@ -1145,7 +1160,7 @@ function ViewCourse({ data, onLogout }) {
           onClose={() => setShowConference(false)}
         />
       )}
-    </>
+    </AppLayout>
   );
 }
 
@@ -1287,7 +1302,7 @@ function TextViewer({ url, token, actionProps }) {
     setLoading(true); setError(null);
     (async () => {
       try {
-        const fullUrl = url.startsWith('http') ? url : `http://localhost:4040${url}`;
+        const fullUrl = url.startsWith('http') ? url : `${toHttps(process.env.REACT_APP_API_URL?.replace('/api','') || 'https://localhost:4040')}${url}`;
         const res = await fetch(`${fullUrl}?_=${Date.now()}`, {
           headers: { Authorization: token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' },
         });
@@ -1420,7 +1435,7 @@ function FormViewer({ url, token: tok }) {
   useEffect(() => {
     if (!url) { setLoading(false); return; }
     setLoading(true);
-    fetch(`http://localhost:4040${url}?_=${Date.now()}`, {
+    fetch(`${toHttps(process.env.REACT_APP_API_URL?.replace('/api','') || 'https://localhost:4040')}${url}?_=${Date.now()}`, {
       headers: { Authorization: token ? `${token.split(' ')[0]} ${token.split(' ')[1]}` : '' },
     })
       .then(r => r.ok ? r.json() : null)
@@ -1580,7 +1595,8 @@ function AssignmentItemView({ item, sessionId, sessionGroup, studentId, token })
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-
+  const API = toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api');
+  
   useEffect(() => {
     if (!item?.assignmentId || !sessionGroup) return;
     // Find assignment entry in group
@@ -1605,7 +1621,7 @@ function AssignmentItemView({ item, sessionId, sessionGroup, studentId, token })
     setUploading(true); setError(''); setMessage('');
     try {
       const res = await fetch(
-        `http://localhost:4040/api/submissions/${sessionGroup._id}/${item.assignmentId}`,
+        `${API}/submissions/${sessionGroup._id}/${item.assignmentId}`,
         {
           method: 'POST',
           headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}` },
@@ -1670,7 +1686,7 @@ function AssignmentItemView({ item, sessionId, sessionGroup, studentId, token })
             <div className="vc-assignment-files">
               <strong>Task files:</strong>
               {assignment.taskFiles.map((f, i) => (
-                <a key={i} href={`http://localhost:4040${f.url}`}
+                <a key={i} href={`${toHttps(process.env.REACT_APP_API_URL?.replace('/api','') || 'https://localhost:4040')}${f.url}`}
                   className="vc-dl-link ms-2" target="_blank" rel="noopener noreferrer">
                   <i className="bi bi-download me-1"></i>{f.originalName || f.filename}
                 </a>

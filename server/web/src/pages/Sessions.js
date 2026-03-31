@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import { UtilityModal } from "../components/UtilityModal";
 
 const API = process.env.REACT_APP_API_URL + "";
@@ -105,16 +105,15 @@ function Sessions({ data, onLogout }) {
     };
 
     if (loading) return (
-        <><Navbar data={data} onLogout={onLogout} />
-        <div className="flex-grow-1 d-flex align-items-center justify-content-center">
+    <AppLayout data={data} onLogout={onLogout} title="Sessions">
+<div className="flex-grow-1 d-flex align-items-center justify-content-center">
             <div className="spinner-border text-primary" />
-        </div></>
+        </div></AppLayout>
     );
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+    <AppLayout data={data} onLogout={onLogout} title="Sessions">
+<div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
 
                 {/* Header */}
                 <div className="row mb-4">
@@ -276,7 +275,7 @@ function Sessions({ data, onLogout }) {
                 danger={modal.danger}
                 onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
                 onCancel={modal.onCancel || closeModal} onClose={modal.onClose || closeModal} />
-        </>
+        </AppLayout>
     );
 }
 

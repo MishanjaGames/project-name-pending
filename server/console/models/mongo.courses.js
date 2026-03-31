@@ -102,6 +102,13 @@ const courseSchema = new Schema({
             type: String,
             required: false
         }],
+        // Per-language course structure (volumes/chapters/items)
+        // If empty, falls back to the top-level volumes array (base language)
+        volumes: {
+            type: Schema.Types.Mixed,
+            required: false,
+            default: []
+        }
     }],
     volumes: [{
         vid: {

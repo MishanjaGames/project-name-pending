@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
+import { toHttps } from '../utils/utils';
 
-const API_BASE = process.env.REACT_APP_API_URL
-  ? process.env.REACT_APP_API_URL.replace('/api', '')
-  : 'http://localhost:4040';
+const API_BASE = toHttps(
+  process.env.REACT_APP_API_URL
+    ? process.env.REACT_APP_API_URL.replace('/api', '')
+    : 'https://localhost:4040'
+);
 
 /**
  * Fetches images with Authorization headers to avoid 401 errors

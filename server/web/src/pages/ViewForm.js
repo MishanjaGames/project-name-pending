@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import { FORM_CONFIGS } from "../config/config.forms";
 import { useStatusEmail } from "../components/sendEmail";
 import { UtilityModal } from '../components/UtilityModal';
@@ -307,9 +307,8 @@ function ViewForm({ data, onLogout }) {
 
     if (loading) {
         return (
-            <>
-                <Navbar data={data} onLogout={onLogout} />
-                <div className="min-vh-100 d-flex align-items-center justify-content-center">
+    <AppLayout data={data} onLogout={onLogout} title="View Submission">
+<div className="min-vh-100 d-flex align-items-center justify-content-center">
                     <div className="text-center">
                         <div className="spinner-border text-primary mb-3" role="status">
                             <span className="visually-hidden">Loading…</span>
@@ -317,7 +316,7 @@ function ViewForm({ data, onLogout }) {
                         <p className="text-muted">Loading submission…</p>
                     </div>
                 </div>
-            </>
+            </AppLayout>
         );
     }
 
@@ -329,10 +328,8 @@ function ViewForm({ data, onLogout }) {
     const email = getEmail(submission, config);
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-
-            <div className="min-vh-100 bg-light p-3 p-md-4">
+    <AppLayout data={data} onLogout={onLogout} title="View Submission">
+<div className="min-vh-100 bg-light p-3 p-md-4">
 
                 {/* Header */}
                 <div className="row mb-4">
@@ -522,7 +519,7 @@ function ViewForm({ data, onLogout }) {
                 onCancel={modal.onCancel || closeModal}
                 onClose={modal.onClose || closeModal}
             />
-        </>
+        </AppLayout>
 
 
     );

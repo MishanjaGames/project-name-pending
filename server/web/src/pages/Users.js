@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import AuthImage from "../components/AuthImage";
 import { extendSession } from "../utils/utils";
 import { UtilityModal } from '../components/UtilityModal';
@@ -208,23 +208,20 @@ function Users({ data, onLogout }) {
 
     if (loading) {
         return (
-            <>
-                <Navbar data={data} onLogout={onLogout} />
-                <div className="flex-grow-1 d-flex align-items-center justify-content-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
+    <AppLayout data={data} onLogout={onLogout} title="Users">
+<div className="flex-grow-1 d-flex align-items-center justify-content-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
                     <div className="text-center">
                         <div className="spinner-border text-primary mb-3" style={{ width: '2.5rem', height: '2.5rem' }}></div>
                         <p className="text-muted small mb-0">Loading users…</p>
                     </div>
                 </div>
-            </>
+            </AppLayout>
         );
     }
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+    <AppLayout data={data} onLogout={onLogout} title="Users">
+<div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
                 <div className="row mb-4">
                     <div className="col-12">
                         <div className="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-2">
@@ -492,7 +489,7 @@ function Users({ data, onLogout }) {
                 onCancel={modal.onCancel || closeModal}
                 onClose={modal.onClose || closeModal}
             />
-        </>
+        </AppLayout>
     );
 }
 

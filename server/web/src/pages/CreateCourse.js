@@ -1,6 +1,7 @@
+import { toHttps } from '../utils/utils';
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import { UtilityModal } from '../components/UtilityModal';
 
 // ── Language registry — add new languages here ──────────────────────────────
@@ -54,12 +55,12 @@ function CreateCourse({ data, onLogout }) {
             ? { Authorization: `${token.split(" ")[0]} ${token.split(" ")[1]}`, "Content-Type": "application/json" }
             : { "Content-Type": "application/json" };
         if (token) {
-            fetch("http://localhost:4040/api/manage/users", { headers: ah })
+            fetch((toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')) + "/manage/users", { headers: ah })
                 .then(r => r.ok ? r.json() : null).then(d => d && setUsers(d.data || d)).catch(console.error);
         }
-        fetch("http://localhost:4040/api/directions", { headers: ah })
+        fetch((toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')) + "/directions", { headers: ah })
             .then(r => r.ok ? r.json() : null).then(d => d && setDirections(d.data || [])).catch(console.error);
-        fetch("http://localhost:4040/api/levels", { headers: ah })
+        fetch((toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')) + "/levels", { headers: ah })
             .then(r => r.ok ? r.json() : null).then(d => d && setLevels(d.data || [])).catch(console.error);
     }, []);
 
@@ -128,7 +129,7 @@ function CreateCourse({ data, onLogout }) {
             const ah = { Authorization: `${token.split(" ")[0]} ${token.split(" ")[1]}`, "Content-Type": "application/json" };
             const mh = { Authorization: `${token.split(" ")[0]} ${token.split(" ")[1]}` };
 
-            const res = await fetch("http://localhost:4040/api/manage/courses", {
+            const res = await fetch((toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')) + "/manage/courses", {
                 method: "POST", headers: ah,
                 body: JSON.stringify({
                     userId: formData.userId, status: "editing",
@@ -146,13 +147,13 @@ function CreateCourse({ data, onLogout }) {
                 const blob = thumbnailFile.slice(0, thumbnailFile.size, thumbnailFile.type);
                 const renamed = new File([blob], `thumbnail.${ext}`, { type: thumbnailFile.type });
                 const fd = new FormData(); fd.append("file", renamed);
-                await fetch(`http://localhost:4040/api/manage/courses/${cd._id}/files`, { method: "POST", headers: mh, body: fd });
+                await fetch(`${toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')}/manage/courses/${cd._id}/files`, { method: "POST", headers: mh, body: fd });
             }
             // Upload per-language files
             for (const [lang, files] of Object.entries(langFiles)) {
                 if (!files.length) continue;
                 const fd = new FormData(); files.forEach(f => fd.append("files", f));
-                await fetch(`http://localhost:4040/api/manage/courses/${cd._id}/files/multiple?lang=${lang}`, { method: "POST", headers: mh, body: fd });
+                await fetch(`${toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')}/manage/courses/${cd._id}/files/multiple?lang=${lang}`, { method: "POST", headers: mh, body: fd });
             }
             showInfo('Success', 'Course created successfully!');
             navigate("/manage/courses");
@@ -161,9 +162,8 @@ function CreateCourse({ data, onLogout }) {
     };
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+    <AppLayout data={data} onLogout={onLogout} title="Create Course">
+<div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
                 <div className="row mb-4">
                     <div className="col-12">
                         <button className="btn btn-outline-secondary btn-sm mb-2" onClick={() => navigate("/manage/courses")}>← Back to Courses</button>
@@ -461,7 +461,7 @@ function CreateCourse({ data, onLogout }) {
                 onClose={modal.onClose || closeModal}
             />
 
-        </>
+        </AppLayout>
     );
 }
 

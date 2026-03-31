@@ -1,9 +1,10 @@
+import { toHttps } from '../utils/utils';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Navbar } from '../components/Navbar';
+import AppLayout from '../components/Layout';
 import './CoursePreview.css';
 import { UtilityModal } from '../components/UtilityModal';
-const BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:4040';
+const BASE_URL = toHttps(process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://localhost:4040');
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -398,10 +399,10 @@ function CoursePreview({ data, onLogout }) {
     return s;
   };
 
-  if (loading) return <><Navbar data={data} onLogout={onLogout} /><div className="course-preview-loading"><div className="spinner-border text-primary"></div></div></>;
+  if (loading) return <><div className="course-preview-loading"><div className="spinner-border text-primary"></div></div></>;
   if (!course) return (
-    <><Navbar data={data} onLogout={onLogout} />
-      <div className="course-preview-page">
+    <AppLayout data={data} onLogout={onLogout} title="">
+<div className="course-preview-page">
         <button className="btn btn-outline-secondary btn-sm mb-3" onClick={() => navigate('/manage/courses')}>← Back to Courses</button>
         <div className="course-preview-error"><h3>Course not found</h3></div>
       </div>
@@ -424,9 +425,8 @@ function CoursePreview({ data, onLogout }) {
   };
 
   return (
-    <>
-      <Navbar data={data} onLogout={onLogout} />
-      <div className="course-preview-page">
+    <AppLayout data={data} onLogout={onLogout} title="">
+<div className="course-preview-page">
         <div className="d-flex align-items-center gap-3 mb-2">
           <button className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" onClick={() => navigate('/manage/courses')}>
             <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fillRule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" /></svg>
@@ -1288,7 +1288,7 @@ function FormEditorModal({ isEditing, initialItem, uploadedFiles = [], onSave, o
             </div>
             <div className="form-add-question-row"><button key={QL.single} className="btn btn-sm btn-outline-primary" onClick={() => setQuestions(p => [...p, emptyQ('single')])}><i className="bi bi-plus me-1"></i>Add Qustion</button></div>
             {/* <div className="form-add-question-row">{Object.entries(QL).map(([t, l]) => <button key={t} className="btn btn-sm btn-outline-primary" onClick={() => setQuestions(p => [...p, emptyQ(t)])}><i className="bi bi-plus me-1"></i>{l.split(' (')[0]}</button>)}</div> */}
-          </>)}
+          </AppLAyout>)}
         </div>
         <div className="modal-footer"><button className="btn btn-secondary" onClick={onClose}>Cancel</button><button className="btn btn-primary" onClick={handleSave} disabled={loading}><i className="bi bi-save me-1"></i>{isEditing ? 'Update Form' : 'Save Form'}</button></div>
       </div>

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import { FORM_CONFIGS } from "../config/config.forms";
 import { UtilityModal } from '../components/UtilityModal';
 
@@ -425,10 +425,8 @@ function CreatorForm({ formType, data, onLogout }) {
     // ── Form ──────────────────────────────────────────────────────────────────
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-
-            <div className="min-vh-100 p-3 p-md-5" style={{ background: "#f0f4f8" }}>
+    <AppLayout data={data} onLogout={onLogout} title="">
+<div className="min-vh-100 p-3 p-md-5" style={{ background: "#f0f4f8" }}>
                 <div className="row justify-content-center">
                     <div className="col-12 col-lg-7 col-xl-6">
                         <div className="card border-0 shadow-sm">
@@ -536,7 +534,7 @@ function CreatorForm({ formType, data, onLogout }) {
                 onClose={modal.onClose || closeModal}
             />
 
-        </>
+        </AppLayout>
 
     );
 }

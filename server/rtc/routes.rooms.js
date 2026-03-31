@@ -172,3 +172,76 @@ router.get('/by-session/:sessionId', restAuth, async (req, res) => {
 })
 
 module.exports = router
+
+// ── GET /rooms — list all active in-memory rooms (admin) ─────────────────────
+router.get('/', restAuth, (req, res) => {
+    const rooms = require('./rooms')
+    const list = Array.from(rooms.listAll()).map(r => {
+        const room = rooms.get(r.id)
+        return {
+            roomId:      r.id,
+            peerCount:   r.peerCount,
+            createdAt:   r.createdAt,
+            peers:       room ? Array.from(room.peers.values()).map(p => ({
+                userId:    p.userId,
+                nickname:  p.nickname,
+                socketId:  p.socketId,
+                video:     p.video,
+                audio:     p.audio,
+                screen:    p.screen,
+                handRaised: p.handRaised,
+                joinedAt:  p.joinedAt
+            })) : [],
+            chatCount:   room?.chat?.length || 0,
+        }
+    })
+    res.json({ count: list.length, rooms: list })
+})
+
+// ── GET /rooms/:roomId/chat — get chat history ────────────────────────────────
+router.get('/:roomId/chat', restAuth, (req, res) => {
+    const rooms = require('./rooms')
+    const history = rooms.getChatHistory(req.params.roomId)
+    res.json({ roomId: req.params.roomId, count: history.length, messages: history })
+})
+
+// ── DELETE /rooms/:roomId — force-close a room (kick all peers) ───────────────
+router.delete('/:roomId', restAuth, async (req, res) => {
+    const rooms = require('./rooms')
+    const room  = rooms.get(req.params.roomId)
+    if (!room) return res.status(404).json({ error: 'Room not found' })
+
+    // Get the io instance from the app — it's attached in index.js
+    const io = req.app.get('io')
+    if (io) {
+        io.to(req.params.roomId).emit('error', { message: 'Room closed by administrator' })
+        io.in(req.params.roomId).socketsLeave(req.params.roomId)
+    }
+    // Clear from in-memory store
+    Array.from(room.peers.keys()).forEach(sid => rooms.removePeer(sid))
+
+    res.json({ message: `Room ${req.params.roomId} closed`, peersKicked: room.peers.size })
+})
+
+// ── DELETE /rooms/:roomId/peers/:socketId — kick a single peer ───────────────
+router.delete('/:roomId/peers/:socketId', restAuth, (req, res) => {
+    const rooms = require('./rooms')
+    const { roomId, socketId } = req.params
+    const peer = rooms.getPeerBySocket(socketId, roomId)
+    if (!peer) return res.status(404).json({ error: 'Peer not found' })
+
+    const io = req.app.get('io')
+    if (io) {
+        io.to(socketId).emit('error', { message: 'You were removed from the room by an administrator' })
+        io.to(socketId).disconnectSockets(true)
+    }
+    rooms.removePeer(socketId)
+    res.json({ message: `Peer ${socketId} (${peer.nickname}) removed from ${roomId}` })
+})
+
+// ── GET /logs — basic server log (last N lines from memory) ──────────────────
+router.get('/logs', restAuth, (req, res) => {
+    const log = global.__rtcLog || []
+    const n   = Math.min(parseInt(req.query.lines) || 100, 500)
+    res.json({ count: log.length, lines: log.slice(-n) })
+})

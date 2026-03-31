@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import { UtilityModal } from "../components/UtilityModal";
 
 function Promos({ data, onLogout }) {
@@ -118,16 +118,16 @@ function Promos({ data, onLogout }) {
     };
 
     if (loading) return (
-        <><Navbar data={data} onLogout={onLogout} />
-        <div className="flex-grow-1 d-flex align-items-center justify-content-center">
+    <AppLayout data={data} onLogout={onLogout} title="Promo Codes">
+<div className="flex-grow-1 d-flex align-items-center justify-content-center">
             <div className="spinner-border text-primary" />
-        </div></>
+        </div>
+        </AppLayout>
     );
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+    <AppLayout data={data} onLogout={onLogout} title="Promo Codes">
+<div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
 
                 {/* Header */}
                 <div className="row mb-4">
@@ -314,7 +314,7 @@ function Promos({ data, onLogout }) {
                 danger={modal.danger}
                 onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
                 onCancel={modal.onCancel || closeModal} onClose={modal.onClose || closeModal} />
-        </>
+        </AppLayout>
     );
 }
 

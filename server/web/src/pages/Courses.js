@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import { extendSession } from "../utils/utils";
 import AuthImage from "../components/AuthImage";
 import { UtilityModal } from '../components/UtilityModal';
@@ -204,9 +204,8 @@ function Courses({ data, onLogout }) {
     };
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="d-flex flex-column flex-lg-row min-vh-100 bg-light">
+    <AppLayout data={data} onLogout={onLogout} title="Courses">
+<div className="d-flex flex-column flex-lg-row min-vh-100 bg-light">
 
                 <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
                     {/* Page Header */}
@@ -542,7 +541,7 @@ function Courses({ data, onLogout }) {
                 onCancel={modal.onCancel || closeModal}
                 onClose={modal.onClose || closeModal}
             />
-        </>
+        </AppLayout>
     );
 }
 

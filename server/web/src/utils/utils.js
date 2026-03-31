@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4040/api';
+/**
+ * Converts any URL to use https://.
+ * Works for both localhost (self-signed cert) and production domains.
+ */
+export const toHttps = (url) => {
+  if (!url) return url;
+  return url.replace(/^http:\/\//i, 'https://');
+};
+
+const API_URL = toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api');
 
 // Hook: runs callback after `delay` ms, with reset/clear controls
 export function useTimeout(callback, delay) {

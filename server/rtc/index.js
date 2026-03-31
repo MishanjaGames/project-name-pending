@@ -35,6 +35,23 @@ const io = new Server(server, {
 // JWT auth for every socket connection
 io.use(socketAuth)
 
+// Attach io to express app so route handlers can access it
+app.set('io', io)
+
+// In-memory circular log (last 500 lines)
+global.__rtcLog = []
+const origLog  = console.log.bind(console)
+const origWarn = console.warn.bind(console)
+const origErr  = console.error.bind(console)
+const pushLog  = (level, ...args) => {
+    const line = { ts: new Date().toISOString(), level, msg: args.map(String).join(' ') }
+    global.__rtcLog.push(line)
+    if (global.__rtcLog.length > 500) global.__rtcLog.shift()
+}
+console.log   = (...a) => { pushLog('info',  ...a); origLog(...a)  }
+console.warn  = (...a) => { pushLog('warn',  ...a); origWarn(...a) }
+console.error = (...a) => { pushLog('error', ...a); origErr(...a)  }
+
 // Register all signaling event handlers
 registerHandlers(io)
 

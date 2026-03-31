@@ -1,7 +1,8 @@
+import { toHttps } from '../utils/utils';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import JSZip from 'jszip';
-import { Navbar } from '../components/Navbar';
+import AppLayout from '../components/Layout';
 import { extendSession } from "../utils/utils";
 import './CoursePreview.css';
 import { UtilityModal } from '../components/UtilityModal';
@@ -34,7 +35,7 @@ const typeColor = (t) => ({
   other: 'text-muted',
 })[t] || 'text-muted';
 
-const BASE = 'http://localhost:4040';
+const BASE = toHttps(process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://localhost:4040');
 const fu = (url) => (!url || url.startsWith('http') ? url : `${BASE}${url}`);
 const isYouTube = url => url && (/youtu\.be\/|youtube\.com\/(watch|shorts|embed)/.test(url));
 
@@ -187,6 +188,21 @@ function CoursePreview({ data, onLogout }) {
   // ── Language switcher (preview mode only) ──────────────────────────────────
   const [previewLangIdx, setPreviewLangIdx] = useState(0);
   const pt = (field) => course?.trans?.[previewLangIdx]?.[field] || course?.trans?.[0]?.[field] || '';
+
+  // Resolve volumes for a given lang index: use trans[idx].volumes if non-empty, else base volumes
+  const resolveVolumesForLang = (courseData, volsBase, langIdx) => {
+    const raw = langIdx > 0 && courseData?.trans?.[langIdx]?.volumes?.length
+      ? courseData.trans[langIdx].volumes
+      : volsBase;
+    return raw.map(v => ({
+      ...v, type: v.type || 'container',
+      chapters: (v.chapters || []).map(c => ({ ...c, type: c.type || 'container' }))
+    }));
+  };
+
+  // previewVolumes: what the sidebar shows in preview mode (lang-aware)
+  // In edit mode, `volumes` (base lang) is always used
+  const [previewVolumes, setPreviewVolumes] = useState([]);
   const [textRefreshKey, setTextRefreshKey] = useState(0);
   const [localTextContent, setLocalTextContent] = useState({});
   const [textFilesToUpload, setTextFilesToUpload] = useState({});
@@ -219,6 +235,13 @@ function CoursePreview({ data, onLogout }) {
   const [cpRatingSubmitting, setCpRatingSubmitting] = useState(false);
 
   useEffect(() => { fetchData(); setRole(data.role); }, [id]);
+
+  // When language switcher changes in preview mode, resolve the correct volumes
+  useEffect(() => {
+    if (!course) return;
+    setPreviewVolumes(resolveVolumesForLang(course, volumes, previewLangIdx));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewLangIdx, course]);
   useEffect(() => { if (course) { fetchUserData(); fetchCpComments(); fetchCpRating(); } }, [course?._id]);
   useEffect(() => {
     const h = e => { if (hasChanges) { e.preventDefault(); e.returnValue = 'Unsaved changes!'; } };
@@ -334,12 +357,12 @@ function CoursePreview({ data, onLogout }) {
         if (d) {
           setCourse(d);
           setEditableCourse({ ...d });
-          setVolumes(
-            (d.volumes || []).map(v => ({
-              ...v, type: v.type || 'container',
-              chapters: (v.chapters || []).map(c => ({ ...c, type: c.type || 'container' }))
-            }))
-          );
+          const baseVols = (d.volumes || []).map(v => ({
+            ...v, type: v.type || 'container',
+            chapters: (v.chapters || []).map(c => ({ ...c, type: c.type || 'container' }))
+          }));
+          setVolumes(baseVols);
+          setPreviewVolumes(baseVols); // start at base lang
           await checkCCourse(d); // ← pass course data directly, no race condition
         }
       }
@@ -767,7 +790,7 @@ function CoursePreview({ data, onLogout }) {
     setPromoLoading(true); setPromoResult(null);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:4040/api/promos/validate', {
+      const res = await fetch((toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')) + '/promos/validate', {
         method: 'POST',
         headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: promoCode.trim().toUpperCase(), courseId: id })
@@ -783,7 +806,7 @@ function CoursePreview({ data, onLogout }) {
     setApplyingPromo(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:4040/api/promos/apply', {
+      const res = await fetch((toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')) + '/promos/apply', {
         method: 'POST',
         headers: { Authorization: `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: promoCode.trim().toUpperCase(), courseId: id })
@@ -807,21 +830,21 @@ function CoursePreview({ data, onLogout }) {
     return s;
   };
 
-  if (loading) return <><Navbar data={data} onLogout={onLogout} /><div className="course-preview-loading"><div className="spinner-border text-primary"></div></div></>;
+  if (loading) return <><div className="course-preview-loading"><div className="spinner-border text-primary"></div></div></>;
   if (!course) return (
-    <><Navbar data={data} onLogout={onLogout} />
+    <AppLayout data={data} onLogout={onLogout} title="">
       <div className="course-preview-page">
         <button className="btn btn-outline-secondary btn-sm mb-3" onClick={() => navigate('/manage/courses')}>← Back to Courses</button>
         <div className="course-preview-error"><h3>Course not found</h3></div>
       </div>
-    </>
+    </AppLayout>
   );
 
   const hasContent = volumes.length > 0;
 
   const sharedItemProps = {
     editMode, locked, expandedItems, setExpandedItems, editingTitle, setEditingTitle,
-    textRefreshKey, localTextContent, volumes, setExpandedChapters, setExpandedVolumes,
+    textRefreshKey, localTextContent, volumes: editMode ? volumes : previewVolumes, setExpandedChapters, setExpandedVolumes,
     onUpdateTitle: updateItemTitle,
     onEditItem: (vi, ci, ii) => setEditingItem({ vi, ci, ii, item: volumes[vi].chapters[ci].items[ii] }),
     onEditForm: (vi, ci, ii) => setEditingForm({ vi, ci, ii, item: volumes[vi].chapters[ci].items[ii] }),
@@ -845,8 +868,7 @@ function CoursePreview({ data, onLogout }) {
   };
 
   return (
-    <>
-      <Navbar data={data} onLogout={onLogout} />
+    <AppLayout data={data} onLogout={onLogout} title="">
       <div className="course-preview-page">
         <div className="d-flex align-items-center gap-3 mb-2">
           <button className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" onClick={() => navigate('/manage/courses')}>
@@ -899,7 +921,7 @@ function CoursePreview({ data, onLogout }) {
                       <option value="MENTORED">Mentored</option>
                       <option value="HOSTED">Hosted</option>
                     </select></>
-                  : <><span className="badge badge-direction">{course.direction}</span><span className="badge badge-level">{course.level}</span><span className="badge" style={{background:'#0dcaf0',color:'#000'}}>{course.courseType || 'SELF_TAUGHT'}</span></>}
+                  : <><span className="badge badge-direction">{course.direction}</span><span className="badge badge-level">{course.level}</span><span className="badge" style={{ background: '#0dcaf0', color: '#000' }}>{course.courseType || 'SELF_TAUGHT'}</span></>}
               </div>
 
               <div className="description-box">
@@ -918,7 +940,7 @@ function CoursePreview({ data, onLogout }) {
               <div className="ratings-section">
                 <span className="rating-number">{cpAvgRating > 0 ? cpAvgRating.toFixed(1) : (course.ratings || 0)}</span>
                 <div className="stars">
-                  {[1,2,3,4,5].map(n => (
+                  {[1, 2, 3, 4, 5].map(n => (
                     <i key={n} className={`bi ${(cpAvgRating || course.ratings) >= n ? 'bi-star-fill' : (cpAvgRating || course.ratings) >= n - 0.5 ? 'bi-star-half' : 'bi-star'} text-warning`}></i>
                   ))}
                 </div>
@@ -929,7 +951,7 @@ function CoursePreview({ data, onLogout }) {
                 <div className="cp-inline-rate">
                   <span className="cp-rate-label">{cpMyRating ? 'Your rating:' : 'Rate:'}</span>
                   <div className="cp-stars-interactive">
-                    {[1,2,3,4,5].map(n => (
+                    {[1, 2, 3, 4, 5].map(n => (
                       <button key={n} className={`cp-star-btn${(cpRatingHover || cpMyRating) >= n ? ' active' : ''}`}
                         onMouseEnter={() => setCpRatingHover(n)} onMouseLeave={() => setCpRatingHover(null)}
                         onClick={() => handleCpRate(n)} disabled={cpRatingSubmitting} title={`${n} star${n > 1 ? 's' : ''}`}>
@@ -1092,7 +1114,7 @@ function CoursePreview({ data, onLogout }) {
                 </div>
               ) : (
                 <div className="volumes-list">
-                  {volumes.map((volume, vi) =>
+                  {(editMode ? volumes : previewVolumes).map((volume, vi) =>
                     isContainer(volume)
                       ? (
                         <div key={volume.vid} id={`volume-${volume.vid}`}
@@ -1234,8 +1256,8 @@ function CoursePreview({ data, onLogout }) {
               {cpCommentPreview
                 ? <div className="cp-comment-preview" dangerouslySetInnerHTML={{ __html: parseTextSyntax(cpCommentText) }} />
                 : <textarea className="cp-comment-textarea" rows={4}
-                    placeholder={"Write a comment…\nSupports: # headings, **bold**, *italic*, `(code)` or ~(lang)[…]~, etc."}
-                    value={cpCommentText} onChange={e => setCpCommentText(e.target.value)} maxLength={4000} />
+                  placeholder={"Write a comment…\nSupports: # headings, **bold**, *italic*, `(code)` or ~(lang)[…]~, etc."}
+                  value={cpCommentText} onChange={e => setCpCommentText(e.target.value)} maxLength={4000} />
               }
               <div className="cp-compose-footer">
                 <span className="cp-char-count">{cpCommentText.length} / 4000</span>
@@ -1309,7 +1331,7 @@ function CoursePreview({ data, onLogout }) {
       )}
       <UtilityModal show={modal.show} type={modal.type} title={modal.title} message={modal.message}
         onConfirm={() => { modal.onConfirm?.(); closeModal(); }} onCancel={modal.onCancel || closeModal} onClose={closeModal} />
-    </>
+    </AppLayout>
   );
 }
 
@@ -1742,7 +1764,7 @@ const SYNTAX_GROUPS = [
       { format: 'Paragraph', syntax: '`{text}`' },
       { format: 'Numbered list', syntax: '1. Item' },
       { format: 'Bullet list', syntax: '- Item  or  • Item' },
-      { format: 'Code Line', syntax: '`(code)`'},
+      { format: 'Code Line', syntax: '`(code)`' },
       { format: 'Code Snippet', syntax: '~(language)[code]~', note: 'JS, TS, Python, Java, C, C++, C#, Go, Rust, SQL, Bash, PHP, Swift, CSS, HTML…' },
     ]
   },
@@ -2038,7 +2060,7 @@ function FormItemDisplay({ url, refreshKey }) {
   const token = localStorage.getItem('token');
   const [shuffles] = useState({});
   const [_modal, _setModal] = useState({ show: false, type: 'confirm', title: '', message: '', onConfirm: null, onCancel: null });
-  const _closeModal  = () => _setModal(p => ({ ...p, show: false }));
+  const _closeModal = () => _setModal(p => ({ ...p, show: false }));
   const _showConfirm = (title, message, onConfirm) => _setModal({ show: true, type: 'confirm', title, message, onConfirm, onCancel: _closeModal });
   const getShuffled = (id, arr) => { if (!shuffles[id]) shuffles[id] = [...arr].sort(() => Math.random() - .5); return shuffles[id]; };
 

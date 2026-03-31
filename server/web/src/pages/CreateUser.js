@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import { UtilityModal } from '../components/UtilityModal';
 
 function CreateUser({ data, onLogout }) {
@@ -210,10 +210,8 @@ function CreateUser({ data, onLogout }) {
     };
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+    <AppLayout data={data} onLogout={onLogout} title="Create User">
+<div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
                 {/* Page Header */}
                 <div className="row mb-4">
                     <div className="col-12">
@@ -520,7 +518,7 @@ function CreateUser({ data, onLogout }) {
                 onCancel={modal.onCancel || closeModal}
                 onClose={modal.onClose || closeModal}
             />
-        </>
+        </AppLayout>
     );
 }
 

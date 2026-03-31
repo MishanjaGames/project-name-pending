@@ -55,10 +55,11 @@ module.exports.create = async (req, res) => {
 
         let trans
         if (Array.isArray(req.body.trans) && req.body.trans.length > 0) {
-            trans = req.body.trans.map(t => ({
+            trans = req.body.trans.map((t, i) => ({
                 title:       t.title || '',
                 description: t.description || '',
-                skills:      Array.isArray(t.skills) ? t.skills : []
+                skills:      Array.isArray(t.skills) ? t.skills : [],
+                ...(i > 0 && Array.isArray(t.volumes) ? { volumes: t.volumes } : {})
             }))
         } else {
             const baseTitle = req.body.title || ''
@@ -105,10 +106,12 @@ module.exports.update = async (req, res) => {
                     base_lang:  req.body.base_lang,
                     add_langs:  Array.isArray(req.body.add_langs) ? req.body.add_langs : [],
                     trans:      Array.isArray(req.body.trans)
-                        ? req.body.trans.map(t => ({
+                        ? req.body.trans.map((t, i) => ({
                             title:       t.title || '',
                             description: t.description || '',
-                            skills:      Array.isArray(t.skills) ? t.skills : []
+                            skills:      Array.isArray(t.skills) ? t.skills : [],
+                            // Base lang (idx 0) volumes live at top-level; non-base langs store their own
+                            ...(i > 0 && Array.isArray(t.volumes) ? { volumes: t.volumes } : {})
                           }))
                         : [],
                     ratings:   req.body.ratings,
@@ -207,7 +210,8 @@ module.exports.uploadCourseFiles = [
                 url:         `/api/manage/courses/${req.params.id}/files/${f.filename}`,
                 filename:    f.filename,
                 accessLevel: 'default',
-                description: f.originalname
+                description: f.originalname,
+                lang:        req.query.lang || req.body.lang || null
             }))
 
             const newLinks = [...(course.links || []), ...fileLinks]

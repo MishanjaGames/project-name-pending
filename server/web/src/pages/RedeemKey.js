@@ -1,7 +1,8 @@
+import { toHttps } from '../utils/utils';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
-const BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:4040';
+import AppLayout from '../components/Layout';
+const BASE_URL = toHttps(process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://localhost:4040');
 
 
 // Format code as user types: strip non-alnum, insert dashes every 5 chars
@@ -59,9 +60,8 @@ function RedeemKey({ data, onLogout }) {
     };
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="flex-grow-1 d-flex align-items-start justify-content-center p-3 p-md-5">
+    <AppLayout data={data} onLogout={onLogout} title="Redeem Key">
+<div className="flex-grow-1 d-flex align-items-start justify-content-center p-3 p-md-5">
                 <div className="w-100" style={{ maxWidth: 520 }}>
 
                     <div className="mb-4">
@@ -159,7 +159,7 @@ function RedeemKey({ data, onLogout }) {
                     </p>
                 </div>
             </div>
-        </>
+        </AppLayout>
     );
 }
 

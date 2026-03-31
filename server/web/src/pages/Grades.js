@@ -1,8 +1,9 @@
+import { toHttps } from '../utils/utils';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Navbar } from '../components/Navbar';
+import AppLayout from '../components/Layout';
 
-const API = 'http://localhost:4040/api';
+const API = toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api');
 
 const STATUS_META = {
     approved: { color: 'bg-success',           label: 'Approved' },
@@ -84,16 +85,14 @@ function Grades({ data, onLogout }) {
     const avgPct     = gradedCount ? Math.round((totalMark / gradedCount) * 100) : null;
 
     if (loading) return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="ap-loading"><div className="spinner-border text-primary" /><span>Loading grades…</span></div>
-        </>
+    <AppLayout data={data} onLogout={onLogout} title="My Grades">
+<div className="ap-loading"><div className="spinner-border text-primary" /><span>Loading grades…</span></div>
+        </AppLayout>
     );
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+    <AppLayout data={data} onLogout={onLogout} title="My Grades">
+<div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
 
                 {/* Header */}
                 <div className="mb-4">
@@ -216,7 +215,7 @@ function Grades({ data, onLogout }) {
                     )}
                 </div>
             </div>
-        </>
+        </AppLayout>
     );
 }
 

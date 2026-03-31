@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import { UtilityModal } from "../components/UtilityModal";
 
 function Keys({ data, onLogout }) {
@@ -122,18 +122,16 @@ function Keys({ data, onLogout }) {
     };
 
     if (loading) return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="flex-grow-1 d-flex align-items-center justify-content-center">
+    <AppLayout data={data} onLogout={onLogout} title="Product Keys">
+<div className="flex-grow-1 d-flex align-items-center justify-content-center">
                 <div className="spinner-border text-primary" /><span className="ms-2 text-muted">Loading…</span>
             </div>
-        </>
+        </AppLayout>
     );
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+    <AppLayout data={data} onLogout={onLogout} title="Product Keys">
+<div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
 
                 {/* Header */}
                 <div className="row mb-4">
@@ -305,7 +303,7 @@ function Keys({ data, onLogout }) {
                 onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
                 onCancel={modal.onCancel || closeModal} onClose={modal.onClose || closeModal}
             />
-        </>
+        </AppLayout>
     );
 }
 

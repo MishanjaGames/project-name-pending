@@ -1,6 +1,7 @@
+import { toHttps } from '../utils/utils';
 import { useState } from 'react';
 
-const API = 'http://localhost:4040/api';
+const API = toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api');
 
 export function PaymentModal({ course, onClose, onSuccess }) {
     const token = localStorage.getItem('token');

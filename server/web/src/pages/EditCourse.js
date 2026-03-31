@@ -1,6 +1,7 @@
+import { toHttps } from '../utils/utils';
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import AuthImage from "../components/AuthImage";
 import { UtilityModal } from '../components/UtilityModal';
 
@@ -12,7 +13,7 @@ const LANG_LABELS = {
     tr: "Turkish", nl: "Dutch", sv: "Swedish", cs: "Czech",
 };
 const ALL_LANGS = Object.keys(LANG_LABELS);
-const emptyTrans  = () => ({ title: "", description: "", skills: [] });
+const emptyTrans  = () => ({ title: "", description: "", skills: [], volumes: [] });
 
 function EditCourse({ data, onLogout }) {
     const { id } = useParams();
@@ -72,11 +73,11 @@ function EditCourse({ data, onLogout }) {
         const fetchAll = async () => {
             try {
                 const [courseRes, usersRes, dirsRes, lvlsRes, filesRes] = await Promise.all([
-                    fetch(`http://localhost:4040/api/manage/courses/${id}`, { headers: ah }),
-                    fetch("http://localhost:4040/api/manage/users", { headers: ah }),
-                    fetch("http://localhost:4040/api/directions", { headers: ah }),
-                    fetch("http://localhost:4040/api/levels", { headers: ah }),
-                    fetch(`http://localhost:4040/api/manage/courses/${id}/files`, { headers: ah })
+                    fetch(`${toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')}/manage/courses/${id}`, { headers: ah }),
+                    fetch((toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')) + "/manage/users", { headers: ah }),
+                    fetch((toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')) + "/directions", { headers: ah }),
+                    fetch((toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')) + "/levels", { headers: ah }),
+                    fetch(`${toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')}/manage/courses/${id}/files`, { headers: ah })
                 ]);
 
                 if (!courseRes.ok) { showInfo('Error', 'Failed to fetch course details'); navigate("/manage/courses"); return; }
@@ -91,9 +92,13 @@ function EditCourse({ data, onLogout }) {
                     ? langs.map((_, i) => ({
                         title:       course.trans[i]?.title       || "",
                         description: course.trans[i]?.description || "",
-                        skills:      Array.isArray(course.trans[i]?.skills) ? course.trans[i].skills : []
+                        skills:      Array.isArray(course.trans[i]?.skills) ? course.trans[i].skills : [],
+                        // For base lang (idx 0) use top-level volumes; for others use trans[i].volumes
+                        volumes:     i === 0
+                            ? (course.volumes || [])
+                            : (Array.isArray(course.trans[i]?.volumes) ? course.trans[i].volumes : [])
                       }))
-                    : langs.map(() => emptyTrans());
+                    : langs.map((_, i) => ({ ...emptyTrans(), volumes: i === 0 ? (course.volumes || []) : [] }));
                 setTrans(loadedTrans);
                 setSkillInputs(langs.map(() => ""));
 
@@ -111,7 +116,15 @@ function EditCourse({ data, onLogout }) {
                 if (dirsRes.ok)  { const d = await dirsRes.json();  setDirections(d.data || []); }
                 if (lvlsRes.ok)  { const d = await lvlsRes.json();  setLevels(d.data || []); }
 
-                if (filesRes.ok) {
+                // Use course.links (from MongoDB) — the disk /files endpoint doesn't carry lang metadata
+                const fromLinks = (course.links || []).filter(f => {
+                    const fn = (f.description || f.filename || "").toLowerCase();
+                    return !fn.includes("thumbnail") && !isSystemTextFile(f.description || f.filename || "");
+                }).map(f => ({ ...f, originalName: f.description || f.filename, lang: f.lang || null }));
+                if (fromLinks.length > 0) {
+                    setExistingFiles(fromLinks);
+                } else if (filesRes.ok) {
+                    // Fallback to disk listing for courses that predate the links schema
                     const d = await filesRes.json();
                     const all = d.data || d.files || [];
                     setExistingFiles(all.filter(f => {
@@ -175,7 +188,7 @@ function EditCourse({ data, onLogout }) {
         const file = existingFiles[idx];
         showConfirm('Delete File', `Delete "${file.originalName || file.filename}"?`, async () => {
             try {
-                const res = await fetch(`http://localhost:4040/api/manage/courses/${id}/files/${file.filename || file.originalName}`, { method: "DELETE", headers: ah });
+                const res = await fetch(`${toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')}/manage/courses/${id}/files/${file.filename || file.originalName}`, { method: "DELETE", headers: ah });
                 if (res.ok) { setExistingFiles(p => p.filter((_, i) => i !== idx)); showInfo('Deleted', 'File deleted successfully.'); }
                 else showInfo('Error', 'Failed to delete file.');
             } catch (err) { console.error(err); showInfo('Error', 'Error deleting file.'); }
@@ -199,7 +212,7 @@ function EditCourse({ data, onLogout }) {
         if (!validateForm()) return;
         setSaving(true);
         try {
-            // Rebuild links: thumbnail first (from formData.links), then existingFiles in sorted order
+            // Rebuild links: thumbnail first, then existingFiles in sorted order (preserving lang)
             const thumbnailLinks = (formData.links || []).filter(l =>
                 l.description && l.description.toLowerCase() === "course thumbnail"
             );
@@ -210,15 +223,24 @@ function EditCourse({ data, onLogout }) {
                     url:         f.url  || f.path,
                     filename:    f.filename    || f.originalName || "",
                     accessLevel: f.accessLevel || "default",
-                    description: f.originalName || f.filename || ""
+                    description: f.originalName || f.filename || "",
+                    lang:        f.lang || null
                 }));
             const mergedLinks = [...thumbnailLinks, ...reorderedFileLinks];
 
-            const res = await fetch(`http://localhost:4040/api/manage/courses/${id}`, {
+            // Build trans for saving: strip volumes from base lang (stored at top level),
+            // keep volumes for non-base langs inside their trans entry
+            const transToSave = trans.map((t, i) => {
+                const { volumes: _, ...rest } = t;
+                if (i === 0) return rest; // base lang: volumes saved separately at top level
+                return { ...rest, volumes: t.volumes || [] };
+            });
+
+            const res = await fetch(`${toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')}/manage/courses/${id}`, {
                 method: "PATCH", headers: ah,
                 body: JSON.stringify({
                     userId: formData.userId, status: formData.status,
-                    base_lang: baseLang, add_langs: addLangs, trans,
+                    base_lang: baseLang, add_langs: addLangs, trans: transToSave,
                     direction: formData.direction, level: formData.level,
                     courseType: formData.courseType || "SELF_TAUGHT",
                     price: formData.price ? parseFloat(formData.price) : 0,
@@ -229,17 +251,17 @@ function EditCourse({ data, onLogout }) {
 
             if (thumbnail) {
                 const fd = new FormData(); fd.append("file", thumbnail);
-                await fetch(`http://localhost:4040/api/manage/courses/${id}/files?thumbnail=true`, { method: "POST", headers: mh, body: fd });
+                await fetch(`${toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')}/manage/courses/${id}/files?thumbnail=true`, { method: "POST", headers: mh, body: fd });
             }
 
             if (courseFiles && Object.keys(courseFiles).some(k => courseFiles[k]?.length)) {
                 for (const [lang, files] of Object.entries(courseFiles)) {
                     if (!files.length) continue;
                     const fd = new FormData(); files.forEach(f => fd.append("files", f));
-                    const fr = await fetch(`http://localhost:4040/api/manage/courses/${id}/files/multiple?lang=${lang}`, { method: "POST", headers: mh, body: fd });
+                    const fr = await fetch(`${toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')}/manage/courses/${id}/files/multiple?lang=${lang}`, { method: "POST", headers: mh, body: fd });
                     if (!fr.ok) { const err = await fr.json(); showInfo('Error', `File upload failed: ${err.message || "Unknown error"}`); }
                 }
-                const refreshRes = await fetch(`http://localhost:4040/api/manage/courses/${id}/files`, { headers: ah });
+                const refreshRes = await fetch(`${toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')}/manage/courses/${id}/files`, { headers: ah });
                 if (refreshRes.ok) {
                     const d = await refreshRes.json();
                     const all = d.data || d.files || [];
@@ -260,20 +282,18 @@ function EditCourse({ data, onLogout }) {
     const getStatusBadge = (s) => ({ deployed: "bg-success", "on-check": "bg-warning text-dark", editing: "bg-secondary" }[s] || "bg-light text-dark");
 
     if (loading) return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="flex-grow-1 d-flex align-items-center justify-content-center">
+    <AppLayout data={data} onLogout={onLogout} title="Edit Course">
+<div className="flex-grow-1 d-flex align-items-center justify-content-center">
                 <div className="text-center">
                     <div className="spinner-border text-primary mb-3" /><p className="text-muted">Loading course details...</p>
                 </div>
             </div>
-        </>
+        </AppLayout>
     );
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+    <AppLayout data={data} onLogout={onLogout} title="Edit Course">
+<div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
                 <div className="row mb-4">
                     <div className="col-12">
                         <button className="btn btn-outline-secondary btn-sm mb-2" onClick={() => navigate("/manage/courses")}>← Back to Courses</button>
@@ -393,10 +413,37 @@ function EditCourse({ data, onLogout }) {
                                                 </ul>
                                             )}
                                             {allLangs.map((lang, idx) => (
-                                                <div key={lang} className="border rounded p-3 bg-light" style={{ display: activeLang === idx ? "block" : "none" }}>
-                                                    <div className="d-flex gap-2 mb-3">
+                                                <div key={lang} className="border rounded p-3 bg-light" style={{ display: activeLang === idx ? "block" : "none", borderTopLeftRadius: allLangs.length > 1 && idx === 0 ? 0 : undefined }}>
+                                                    <div className="d-flex gap-2 mb-3 align-items-center flex-wrap">
                                                         <span className="badge bg-secondary">{LANG_LABELS[lang]}</span>
                                                         {idx === 0 && <span className="badge bg-primary">Base Language</span>}
+                                                        {idx > 0 && (
+                                                            <div className="ms-auto d-flex align-items-center gap-2">
+                                                                <small className="text-muted">
+                                                                    Course structure: {(trans[idx]?.volumes?.length || 0) > 0
+                                                                        ? <span className="text-success fw-semibold">{trans[idx].volumes.length} volume(s) — custom</span>
+                                                                        : <span className="text-muted fst-italic">using base language structure</span>}
+                                                                </small>
+                                                                <button type="button" className="btn btn-sm btn-outline-secondary"
+                                                                    title="Copy structure from base language for translation"
+                                                                    onClick={() => setTrans(p => p.map((t, i) => i === idx
+                                                                        ? { ...t, volumes: JSON.parse(JSON.stringify(p[0].volumes || [])) }
+                                                                        : t
+                                                                    ))}>
+                                                                    <i className="bi bi-copy me-1"></i>Copy from base
+                                                                </button>
+                                                                {(trans[idx]?.volumes?.length || 0) > 0 && (
+                                                                    <button type="button" className="btn btn-sm btn-outline-danger"
+                                                                        title="Remove custom structure — will fall back to base"
+                                                                        onClick={() => setTrans(p => p.map((t, i) => i === idx ? { ...t, volumes: [] } : t))}>
+                                                                        <i className="bi bi-x-lg me-1"></i>Reset
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        {idx === 0 && (
+                                                            <small className="text-muted ms-auto fst-italic">Course structure is edited in the Course Preview editor</small>
+                                                        )}
                                                     </div>
                                                     <div className="mb-3">
                                                         <label className="form-label fw-semibold">Title {idx === 0 && <span className="text-danger">*</span>}</label>
@@ -414,7 +461,7 @@ function EditCourse({ data, onLogout }) {
                                                             onChange={e => handleTransChange(idx, "description", e.target.value)}
                                                             placeholder={`Course description in ${LANG_LABELS[lang]}`} />
                                                     </div>
-                                                    <div>
+                                                    <div className="mb-3">
                                                         <label className="form-label fw-semibold">Skills</label>
                                                         <div className="input-group mb-2">
                                                             <input type="text" className="form-control"
@@ -437,177 +484,223 @@ function EditCourse({ data, onLogout }) {
                                                             </div>
                                                         )}
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </div>
 
-                                        {/* ── File Manager ── */}
-                                        <div className="col-12">
-                                            <div className="card border-0 shadow-sm">
-                                                <div className="card-header bg-white d-flex align-items-center justify-content-between">
-                                                    <span className="fw-semibold">
-                                                        <i className="bi bi-folder2-open me-2 text-primary"></i>
-                                                        Course Files <small className="text-muted fw-normal ms-1">({LANG_LABELS[allLangs[activeLang]]})</small>
-                                                    </span>
-                                                    <span className="badge bg-light text-dark border">
-                                                        {existingFiles.filter(f => !f.lang || f.lang === allLangs[activeLang]).length} uploaded · {(courseFiles[allLangs[activeLang]] || []).length} pending
-                                                    </span>
-                                                </div>
-                                                <div className="card-body p-3">
-
-                                                    {/* Filter bar */}
-                                                    {existingFiles.length > 0 && (
-                                                        <div className="d-flex gap-2 flex-wrap align-items-center mb-3 p-2 bg-light rounded border">
-                                                            <input type="text" className="form-control form-control-sm"
-                                                                style={{ maxWidth: 180 }} placeholder="Search files…"
-                                                                value={fileSearch} onChange={e => setFileSearch(e.target.value)} />
-                                                            <select className="form-select form-select-sm" style={{ maxWidth: 130 }}
-                                                                value={fileTypeFilter} onChange={e => setFileTypeFilter(e.target.value)}>
-                                                                <option value="all">All types</option>
-                                                                <option value="image">Images</option>
-                                                                <option value="video">Videos</option>
-                                                                <option value="audio">Audio</option>
-                                                                <option value="document">Documents</option>
-                                                                <option value="archive">Archives</option>
-                                                                <option value="other">Other</option>
-                                                            </select>
-                                                            <select className="form-select form-select-sm" style={{ maxWidth: 140 }}
-                                                                value={fileSortBy} onChange={e => setFileSortBy(e.target.value)}>
-                                                                <option value="date">Order: saved</option>
-                                                                <option value="name">Sort: Name ↑</option>
-                                                                <option value="type">Sort: Type</option>
-                                                                <option value="size">Sort: Size ↓</option>
-                                                            </select>
-                                                            {(fileSearch || fileTypeFilter !== 'all' || fileSortBy !== 'date') && (
-                                                                <button type="button" className="btn btn-sm btn-outline-secondary"
-                                                                    onClick={() => { setFileSearch(''); setFileTypeFilter('all'); setFileSortBy('date'); }}>
-                                                                    <i className="bi bi-x-lg"></i> Clear
-                                                                </button>
-                                                            )}
-                                                            {fileSortBy === 'date' && !fileSearch && fileTypeFilter === 'all' && (
-                                                                <small className="text-muted ms-auto">Drag ▲▼ to reorder</small>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Existing files list */}
-                                                    {existingFiles.filter(f => !f.lang || f.lang === allLangs[activeLang]).length > 0 && (
-                                                        <div className="mb-3" style={{ maxHeight: 320, overflowY: 'auto' }}>
-                                                            {(() => {
-                                                                const activeLangCode = allLangs[activeLang];
-                                                                const langFiles = existingFiles.filter(f => !f.lang || f.lang === activeLangCode);
-                                                                const isFiltered = fileSearch || fileTypeFilter !== 'all';
-                                                                const isSorted   = fileSortBy !== 'date';
-                                                                const reorderDisabled = isFiltered || isSorted;
-                                                                return [...langFiles]
-                                                                    .filter(file => {
-                                                                        if (fileSearch && !file.filename?.toLowerCase().includes(fileSearch.toLowerCase()) &&
-                                                                            !file.url?.toLowerCase().includes(fileSearch.toLowerCase())) return false;
-                                                                        if (fileTypeFilter !== 'all' && (file.type || 'other') !== fileTypeFilter) return false;
-                                                                        return true;
-                                                                    })
-                                                                    .sort((a, b) => {
-                                                                        if (fileSortBy === 'name') return (a.filename || '').localeCompare(b.filename || '');
-                                                                        if (fileSortBy === 'type') return (a.type || '').localeCompare(b.type || '');
-                                                                        if (fileSortBy === 'size') return (b.size || 0) - (a.size || 0);
-                                                                        return 0;
-                                                                    })
-                                                                    .map((file) => {
-                                                                        const realIdx = existingFiles.indexOf(file);
-                                                                        const fn = file.originalName || file.filename || `File ${realIdx + 1}`;
-                                                                        const mime = file.mimetype || file.mimeType || '';
-                                                                        const ext = fn.split('.').pop().toLowerCase();
-                                                                        const isImg = mime.startsWith('image/') || ['jpg','jpeg','png','gif','webp'].includes(ext);
-                                                                        const isVid = mime.startsWith('video/') || ['mp4','webm','mov'].includes(ext);
-                                                                        const isAud = mime.startsWith('audio/') || ['mp3','wav','aac','flac'].includes(ext);
-                                                                        const isDoc = ['pdf','doc','docx','ppt','pptx'].includes(ext);
-                                                                        const isZip = ['zip','rar','7z'].includes(ext);
-                                                                        const typeLabel = isImg ? 'image' : isVid ? 'video' : isAud ? 'audio' : isDoc ? 'doc' : isZip ? 'archive' : 'file';
-                                                                        const typeColors = { image:'#198754', video:'#0d6efd', audio:'#fd7e14', doc:'#dc3545', archive:'#6f42c1', file:'#6c757d' };
-                                                                        const typeIcon = { image:'bi-image', video:'bi-camera-video', audio:'bi-music-note', doc:'bi-file-pdf', archive:'bi-file-zip', file:'bi-file-earmark' };
-                                                                        return (
-                                                                            <div key={realIdx} className="d-flex align-items-center gap-2 bg-white p-2 rounded mb-1 border">
-                                                                                {/* Reorder */}
-                                                                                <div className="d-flex flex-column" style={{ gap: 1 }}>
-                                                                                    <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
-                                                                                        style={{ width: 20, height: 18, fontSize: '.6rem' }}
-                                                                                        disabled={reorderDisabled || realIdx === 0}
-                                                                                        onClick={() => moveItem(setExistingFiles, realIdx, -1)}
-                                                                                        title={reorderDisabled ? 'Clear filters to reorder' : 'Move up'}>▲</button>
-                                                                                    <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
-                                                                                        style={{ width: 20, height: 18, fontSize: '.6rem' }}
-                                                                                        disabled={reorderDisabled || realIdx === existingFiles.length - 1}
-                                                                                        onClick={() => moveItem(setExistingFiles, realIdx, 1)}
-                                                                                        title={reorderDisabled ? 'Clear filters to reorder' : 'Move down'}>▼</button>
+                                                    {/* ── Per-lang structure translation (non-base langs only) ── */}
+                                                    {idx > 0 && (trans[idx]?.volumes?.length || 0) > 0 && (
+                                                        <div className="card border-0 shadow-sm mb-3">
+                                                            <div className="card-header bg-white fw-semibold d-flex align-items-center gap-2">
+                                                                <i className="bi bi-translate text-primary"></i>
+                                                                Course Structure — Translated Titles
+                                                                <small className="text-muted fw-normal ms-1">Edit volume/chapter/item titles for {LANG_LABELS[lang]}</small>
+                                                            </div>
+                                                            <div className="card-body p-3" style={{ maxHeight: 400, overflowY: 'auto' }}>
+                                                                {(trans[idx].volumes || []).map((vol, vi) => (
+                                                                    <div key={vol.vid || vi} className="mb-3">
+                                                                        <div className="d-flex align-items-center gap-2 mb-1">
+                                                                            <i className="bi bi-folder text-warning" style={{ fontSize: '.85rem' }}></i>
+                                                                            <input type="text" className="form-control form-control-sm fw-semibold"
+                                                                                value={vol.title || ""}
+                                                                                placeholder={`Volume ${vi + 1} title`}
+                                                                                onChange={e => setTrans(p => {
+                                                                                    const next = JSON.parse(JSON.stringify(p));
+                                                                                    next[idx].volumes[vi].title = e.target.value;
+                                                                                    return next;
+                                                                                })} />
+                                                                        </div>
+                                                                        {(vol.chapters || []).map((ch, ci) => (
+                                                                            <div key={ch.cid || ci} className="ms-3 mb-1">
+                                                                                <div className="d-flex align-items-center gap-2 mb-1">
+                                                                                    <i className="bi bi-journal text-info" style={{ fontSize: '.85rem' }}></i>
+                                                                                    <input type="text" className="form-control form-control-sm"
+                                                                                        value={ch.title || ""}
+                                                                                        placeholder={`Chapter ${ci + 1} title`}
+                                                                                        onChange={e => setTrans(p => {
+                                                                                            const next = JSON.parse(JSON.stringify(p));
+                                                                                            next[idx].volumes[vi].chapters[ci].title = e.target.value;
+                                                                                            return next;
+                                                                                        })} />
                                                                                 </div>
-                                                                                {/* Icon */}
-                                                                                <i className={`bi ${typeIcon[typeLabel]}`} style={{ color: typeColors[typeLabel], fontSize: '1.1rem', width: 20, textAlign:'center' }}></i>
-                                                                                {/* Info */}
-                                                                                <div className="flex-grow-1 overflow-hidden">
-                                                                                    <div className="small fw-semibold text-truncate" title={fn}>{fn}</div>
-                                                                                    <div className="d-flex align-items-center gap-2" style={{ fontSize: '.72rem', color: '#6c757d' }}>
-                                                                                        <span className="badge" style={{ background: typeColors[typeLabel] + '22', color: typeColors[typeLabel], fontSize: '.65rem' }}>{typeLabel}</span>
-                                                                                        {file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : ''}
-                                                                                        {reorderDisabled && <span className="text-warning"><i className="bi bi-lock"></i> reorder off</span>}
+                                                                                {(ch.items || []).map((item, ii) => (
+                                                                                    <div key={item.iid || ii} className="ms-3 d-flex align-items-center gap-2 mb-1">
+                                                                                        <i className="bi bi-file-text text-secondary" style={{ fontSize: '.8rem' }}></i>
+                                                                                        <input type="text" className="form-control form-control-sm"
+                                                                                            value={item.title || ""}
+                                                                                            placeholder={`Item ${ii + 1} title`}
+                                                                                            onChange={e => setTrans(p => {
+                                                                                                const next = JSON.parse(JSON.stringify(p));
+                                                                                                next[idx].volumes[vi].chapters[ci].items[ii].title = e.target.value;
+                                                                                                return next;
+                                                                                            })} />
                                                                                     </div>
-                                                                                </div>
-                                                                                {/* Actions */}
-                                                                                <a href={`http://localhost:4040${file.url || file.path}`} target="_blank" rel="noopener noreferrer"
-                                                                                    className="btn btn-sm btn-outline-secondary" title="Open"><i className="bi bi-box-arrow-up-right"></i></a>
-                                                                                <button type="button" className="btn btn-sm btn-outline-danger"
-                                                                                    onClick={() => deleteExistingFile(realIdx)} title="Delete">
-                                                                                    <i className="bi bi-trash"></i>
-                                                                                </button>
+                                                                                ))}
                                                                             </div>
-                                                                        );
-                                                                    });
-                                                            })()}
+                                                                        ))}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         </div>
                                                     )}
-                                                    {existingFiles.filter(f => !f.lang || f.lang === allLangs[activeLang]).length === 0 && (
-                                                        <p className="text-muted small text-center py-2">No uploaded files for this language yet.</p>
-                                                    )}
 
-                                                    {/* Upload section — tied to active language tab */}
-                                                    <div className="border-top pt-3">
-                                                        <div className="d-flex align-items-center justify-content-between mb-2">
-                                                            <span className="fw-semibold small">
-                                                                <i className="bi bi-cloud-upload me-1 text-success"></i>
-                                                                Upload new files <span className="text-muted fw-normal">({LANG_LABELS[allLangs[activeLang]]})</span>
+                                                    {/* ── Per-language Course Files ── */}
+                                                    <div className="card border-0 shadow-sm">
+                                                        <div className="card-header bg-white d-flex align-items-center justify-content-between">
+                                                            <span className="fw-semibold">
+                                                                <i className="bi bi-folder2-open me-2 text-primary"></i>
+                                                                Course Files <small className="text-muted fw-normal ms-1">({LANG_LABELS[lang]})</small>
                                                             </span>
-                                                            <small className="text-muted">Max 512 MB per file</small>
+                                                            <span className="badge bg-light text-dark border">
+                                                                {existingFiles.filter(f => !f.lang || f.lang === lang).length} uploaded · {(courseFiles[lang] || []).length} pending
+                                                            </span>
                                                         </div>
+                                                        <div className="card-body p-3">
 
-                                                        {(() => {
-                                                            const lang = allLangs[activeLang];
-                                                            const pending = courseFiles[lang] || [];
-                                                            return (
-                                                                <>
-                                                                    <input type="file" id={`courseFiles-${lang}`} className="d-none" multiple
-                                                                        onChange={e => {
-                                                                            const files = Array.from(e.target.files).filter(f => {
-                                                                                if (f.size > 512 * 1024 * 1024) { showInfo('File Too Large', `${f.name} exceeds 512 MB limit.`); return false; }
+                                                            {/* Filter bar */}
+                                                            {existingFiles.filter(f => !f.lang || f.lang === lang).length > 0 && (
+                                                                <div className="d-flex gap-2 flex-wrap align-items-center mb-3 p-2 bg-light rounded border">
+                                                                    <input type="text" className="form-control form-control-sm"
+                                                                        style={{ maxWidth: 180 }} placeholder="Search files…"
+                                                                        value={fileSearch} onChange={e => setFileSearch(e.target.value)} />
+                                                                    <select className="form-select form-select-sm" style={{ maxWidth: 130 }}
+                                                                        value={fileTypeFilter} onChange={e => setFileTypeFilter(e.target.value)}>
+                                                                        <option value="all">All types</option>
+                                                                        <option value="image">Images</option>
+                                                                        <option value="video">Videos</option>
+                                                                        <option value="audio">Audio</option>
+                                                                        <option value="document">Documents</option>
+                                                                        <option value="archive">Archives</option>
+                                                                        <option value="other">Other</option>
+                                                                    </select>
+                                                                    <select className="form-select form-select-sm" style={{ maxWidth: 140 }}
+                                                                        value={fileSortBy} onChange={e => setFileSortBy(e.target.value)}>
+                                                                        <option value="date">Order: saved</option>
+                                                                        <option value="name">Sort: Name ↑</option>
+                                                                        <option value="type">Sort: Type</option>
+                                                                        <option value="size">Sort: Size ↓</option>
+                                                                    </select>
+                                                                    {(fileSearch || fileTypeFilter !== 'all' || fileSortBy !== 'date') && (
+                                                                        <button type="button" className="btn btn-sm btn-outline-secondary"
+                                                                            onClick={() => { setFileSearch(''); setFileTypeFilter('all'); setFileSortBy('date'); }}>
+                                                                            <i className="bi bi-x-lg"></i> Clear
+                                                                        </button>
+                                                                    )}
+                                                                    {fileSortBy === 'date' && !fileSearch && fileTypeFilter === 'all' && (
+                                                                        <small className="text-muted ms-auto">Drag ▲▼ to reorder</small>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            {/* Existing files for this lang */}
+                                                            {existingFiles.filter(f => !f.lang || f.lang === lang).length > 0 && (
+                                                                <div className="mb-3" style={{ maxHeight: 320, overflowY: 'auto' }}>
+                                                                    {(() => {
+                                                                        const langExisting = existingFiles.filter(f => !f.lang || f.lang === lang);
+                                                                        const isFiltered = fileSearch || fileTypeFilter !== 'all';
+                                                                        const isSorted = fileSortBy !== 'date';
+                                                                        const reorderDisabled = isFiltered || isSorted;
+                                                                        return [...langExisting]
+                                                                            .filter(file => {
+                                                                                if (fileSearch && !file.filename?.toLowerCase().includes(fileSearch.toLowerCase()) &&
+                                                                                    !file.url?.toLowerCase().includes(fileSearch.toLowerCase())) return false;
+                                                                                if (fileTypeFilter !== 'all' && (file.type || 'other') !== fileTypeFilter) return false;
                                                                                 return true;
+                                                                            })
+                                                                            .sort((a, b) => {
+                                                                                if (fileSortBy === 'name') return (a.filename || '').localeCompare(b.filename || '');
+                                                                                if (fileSortBy === 'type') return (a.type || '').localeCompare(b.type || '');
+                                                                                if (fileSortBy === 'size') return (b.size || 0) - (a.size || 0);
+                                                                                return 0;
+                                                                            })
+                                                                            .map((file) => {
+                                                                                const realIdx = existingFiles.indexOf(file);
+                                                                                const fn = file.originalName || file.filename || `File ${realIdx + 1}`;
+                                                                                const mime = file.mimetype || file.mimeType || '';
+                                                                                const ext = fn.split('.').pop().toLowerCase();
+                                                                                const isImg = mime.startsWith('image/') || ['jpg','jpeg','png','gif','webp'].includes(ext);
+                                                                                const isVid = mime.startsWith('video/') || ['mp4','webm','mov'].includes(ext);
+                                                                                const isAud = mime.startsWith('audio/') || ['mp3','wav','aac','flac'].includes(ext);
+                                                                                const isDoc = ['pdf','doc','docx','ppt','pptx'].includes(ext);
+                                                                                const isZip = ['zip','rar','7z'].includes(ext);
+                                                                                const typeLabel = isImg ? 'image' : isVid ? 'video' : isAud ? 'audio' : isDoc ? 'doc' : isZip ? 'archive' : 'file';
+                                                                                const typeColors = { image:'#198754', video:'#0d6efd', audio:'#fd7e14', doc:'#dc3545', archive:'#6f42c1', file:'#6c757d' };
+                                                                                const typeIcon = { image:'bi-image', video:'bi-camera-video', audio:'bi-music-note', doc:'bi-file-pdf', archive:'bi-file-zip', file:'bi-file-earmark' };
+                                                                                return (
+                                                                                    <div key={realIdx} className="d-flex align-items-center gap-2 bg-white p-2 rounded mb-1 border">
+                                                                                        <div className="d-flex flex-column" style={{ gap: 1 }}>
+                                                                                            <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
+                                                                                                style={{ width: 20, height: 18, fontSize: '.6rem' }}
+                                                                                                disabled={reorderDisabled || realIdx === 0}
+                                                                                                onClick={() => moveItem(setExistingFiles, realIdx, -1)}
+                                                                                                title={reorderDisabled ? 'Clear filters to reorder' : 'Move up'}>▲</button>
+                                                                                            <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
+                                                                                                style={{ width: 20, height: 18, fontSize: '.6rem' }}
+                                                                                                disabled={reorderDisabled || realIdx === existingFiles.length - 1}
+                                                                                                onClick={() => moveItem(setExistingFiles, realIdx, 1)}
+                                                                                                title={reorderDisabled ? 'Clear filters to reorder' : 'Move down'}>▼</button>
+                                                                                        </div>
+                                                                                        <i className={`bi ${typeIcon[typeLabel]}`} style={{ color: typeColors[typeLabel], fontSize: '1.1rem', width: 20, textAlign:'center' }}></i>
+                                                                                        <div className="flex-grow-1 overflow-hidden">
+                                                                                            <div className="small fw-semibold text-truncate" title={fn}>{fn}</div>
+                                                                                            <div className="d-flex align-items-center gap-2" style={{ fontSize: '.72rem', color: '#6c757d' }}>
+                                                                                                <span className="badge" style={{ background: typeColors[typeLabel] + '22', color: typeColors[typeLabel], fontSize: '.65rem' }}>{typeLabel}</span>
+                                                                                                {file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                                                                                                {reorderDisabled && <span className="text-warning"><i className="bi bi-lock"></i> reorder off</span>}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <a href={`${toHttps(process.env.REACT_APP_API_URL?.replace('/api','') || 'https://localhost:4040')}${file.url || file.path}`} target="_blank" rel="noopener noreferrer"
+                                                                                            className="btn btn-sm btn-outline-secondary" title="Open"><i className="bi bi-box-arrow-up-right"></i></a>
+                                                                                        <button type="button" className="btn btn-sm btn-outline-danger"
+                                                                                            onClick={() => deleteExistingFile(realIdx)} title="Delete">
+                                                                                            <i className="bi bi-trash"></i>
+                                                                                        </button>
+                                                                                    </div>
+                                                                                );
                                                                             });
-                                                                            setCourseFiles(p => ({ ...p, [lang]: [...(p[lang] || []), ...files] }));
-                                                                            e.target.value = '';
-                                                                        }}
-                                                                        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xlsx,.xls,.zip" />
-                                                                    <label htmlFor={`courseFiles-${lang}`} className="btn btn-sm btn-outline-success mb-2">
-                                                                        <i className="bi bi-plus-lg me-1"></i>Choose files…
-                                                                    </label>
+                                                                    })()}
+                                                                </div>
+                                                            )}
+                                                            {existingFiles.filter(f => !f.lang || f.lang === lang).length === 0 && (
+                                                                <p className="text-muted small text-center py-2">No uploaded files for this language yet.</p>
+                                                            )}
 
-                                                                    {pending.length > 0 && (
-                                                                        <div>
-                                                                            <div className="d-flex justify-content-between align-items-center mb-2">
-                                                                                <span className="small fw-semibold text-success">
-                                                                                    <i className="bi bi-clock-history me-1"></i>{pending.length} file(s) pending upload
-                                                                                </span>
-                                                                                <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setCourseFiles(p => ({ ...p, [lang]: [] }))}>
-                                                                                    <i className="bi bi-x-lg me-1"></i>Clear
-                                                                                </button>
-                                                                            </div>
-                                                                            {pending.map((f, i) => (
+                                                            {/* Pending uploads for this lang */}
+                                                            <div className="border-top pt-3">
+                                                                <div className="d-flex align-items-center justify-content-between mb-2">
+                                                                    <span className="fw-semibold small">
+                                                                        <i className="bi bi-cloud-upload me-1 text-success"></i>
+                                                                        Upload new files
+                                                                    </span>
+                                                                    <small className="text-muted">Max 512 MB per file</small>
+                                                                </div>
+                                                                <input type="file" id={`courseFiles-${lang}`} className="d-none" multiple
+                                                                    onChange={e => {
+                                                                        const files = Array.from(e.target.files).filter(f => {
+                                                                            if (f.size > 512 * 1024 * 1024) { showInfo('File Too Large', `${f.name} exceeds 512 MB limit.`); return false; }
+                                                                            return true;
+                                                                        });
+                                                                        setCourseFiles(p => ({ ...p, [lang]: [...(p[lang] || []), ...files] }));
+                                                                        e.target.value = '';
+                                                                    }}
+                                                                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xlsx,.xls,.zip" />
+                                                                {!(courseFiles[lang]?.length) ? (
+                                                                    <label htmlFor={`courseFiles-${lang}`}
+                                                                        className="d-flex flex-column align-items-center justify-content-center gap-2 border border-2 border-dashed rounded p-4 text-muted"
+                                                                        style={{ cursor: 'pointer', borderStyle: 'dashed' }}>
+                                                                        <i className="bi bi-cloud-upload" style={{ fontSize: '2rem', color: '#3b5bdb' }}></i>
+                                                                        <span className="fw-semibold small">Click to choose files for {LANG_LABELS[lang]}</span>
+                                                                        <span style={{ fontSize: '.75rem' }}>Images, videos, PDFs, docs, archives · Max 512 MB each</span>
+                                                                    </label>
+                                                                ) : (
+                                                                    <>
+                                                                        <div className="d-flex justify-content-between align-items-center mb-2">
+                                                                            <label htmlFor={`courseFiles-${lang}`} className="btn btn-sm btn-outline-success" style={{ cursor: 'pointer' }}>
+                                                                                <i className="bi bi-plus-lg me-1"></i>Add more
+                                                                            </label>
+                                                                            <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setCourseFiles(p => ({ ...p, [lang]: [] }))}>
+                                                                                <i className="bi bi-x-lg me-1"></i>Clear all
+                                                                            </button>
+                                                                        </div>
+                                                                        <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+                                                                            {(courseFiles[lang] || []).map((f, i) => (
                                                                                 <div key={i} className="d-flex align-items-center gap-2 bg-white p-2 rounded mb-1 border border-success border-opacity-50">
                                                                                     <div className="d-flex flex-column" style={{ gap: 1 }}>
                                                                                         <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
@@ -616,7 +709,7 @@ function EditCourse({ data, onLogout }) {
                                                                                             onClick={() => setCourseFiles(p => { const arr = [...p[lang]]; [arr[i-1],arr[i]]=[arr[i],arr[i-1]]; return {...p,[lang]:arr}; })}>▲</button>
                                                                                         <button type="button" className="btn btn-sm btn-outline-secondary p-0 lh-1"
                                                                                             style={{ width: 20, height: 18, fontSize: '.6rem' }}
-                                                                                            disabled={i === pending.length - 1}
+                                                                                            disabled={i === courseFiles[lang].length - 1}
                                                                                             onClick={() => setCourseFiles(p => { const arr = [...p[lang]]; [arr[i],arr[i+1]]=[arr[i+1],arr[i]]; return {...p,[lang]:arr}; })}>▼</button>
                                                                                     </div>
                                                                                     <i className="bi bi-file-earmark text-success" style={{ fontSize: '1.1rem', width: 20, textAlign: 'center' }}></i>
@@ -631,13 +724,13 @@ function EditCourse({ data, onLogout }) {
                                                                                 </div>
                                                                             ))}
                                                                         </div>
-                                                                    )}
-                                                                </>
-                                                            );
-                                                        })()}
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            ))}
                                         </div>
 
                                         {/* Direction */}
@@ -707,7 +800,7 @@ function EditCourse({ data, onLogout }) {
                 onClose={modal.onClose || closeModal}
             />
 
-        </>
+        </AppLayout>
     );
 }
 
