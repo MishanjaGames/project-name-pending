@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { getUser, clearUser } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
 
+const API_URL = process.env.REACT_APP_API_URL || 'https://localhost:4040/api';
+
 function AccountPage() {
   const navigate = useNavigate();
   const { t } = useContext(SettingsContext);
@@ -16,7 +18,7 @@ function AccountPage() {
   useEffect(() => {
     if (user && ['teacher', 'admin', 'manage', 'create', 'root'].includes(user.role)) {
       const token = localStorage.getItem('token');
-      fetch('http://localhost:4040/api/manage/courses', {
+      fetch(`${API_URL}/manage/courses`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       })

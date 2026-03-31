@@ -1,9 +1,11 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { SettingsContext } from '../../contexts/SettingsContext';
-import AuthImage from '../../components/AuthImage'; // Компонент для картинок
-import { getUser } from '../../utils/auth'; // Авторизация
-import './CoursePage.css'; // Стили для страницы курса
+import AuthImage from '../../components/AuthImage';
+import { getUser } from '../../utils/auth';
+import './CoursePage.css';
+
+const API_URL = process.env.REACT_APP_API_URL || 'https://localhost:4040/api';
 
 function CoursePage() {
 
@@ -68,7 +70,7 @@ function CoursePage() {
     }
 
     try {
-      const response = await fetch(`http://localhost:4040/api/users/${currentUser.id || currentUser._id}`, {
+      const response = await fetch(`${API_URL}/users/${currentUser.id || currentUser._id}`, {
         method: 'GET',
         headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
       });
@@ -95,10 +97,10 @@ function CoursePage() {
       const courseEndpoint = isAdmin ? `/api/manage/courses/${id}` : `/api/courses/${id}`;
 
       const [courseRes, directionsRes, levelsRes, filesRes] = await Promise.all([
-        fetch(`http://localhost:4040${courseEndpoint}`, { headers: { 'Authorization': authHeader } }).catch(() => null),
-        fetch('http://localhost:4040/api/directions').catch(() => null),
-        fetch('http://localhost:4040/api/levels').catch(() => null),
-        fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
+        fetch(`https://localhost:4040${courseEndpoint}`, { headers: { 'Authorization': authHeader } }).catch(() => null),
+        fetch(`${API_URL}/directions`).catch(() => null),
+        fetch(`${API_URL}/levels`).catch(() => null),
+        fetch(`${API_URL}/manage/courses/${id}/files`, {
           headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' }
         }).catch(() => null),
       ]);
@@ -157,7 +159,7 @@ function CoursePage() {
     if (!isAdmin) return;
     try {
       const uId = course.userId?._id || course.userId;
-      const response = await fetch(`http://localhost:4040/api/manage/users/${uId}`, {
+      const response = await fetch(`${API_URL}/manage/users/${uId}`, {
         headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
       });
       if (response.ok) {
@@ -475,7 +477,7 @@ function CoursePage() {
             const formData = new FormData();
             formData.append('file', fileData.file);
             try {
-              const res = await fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
+              const res = await fetch(`${API_URL}/manage/courses/${id}/files`, {
                 method: 'POST', headers: { 'Authorization': authHeader }, body: formData
               });
               if (res.ok) {
@@ -504,7 +506,7 @@ function CoursePage() {
         }))
       }));
 
-      const response = await fetch(`http://localhost:4040/api/manage/courses/${id}`, {
+      const response = await fetch(`${API_URL}/manage/courses/${id}`, {
         method: 'PUT',
         headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...editableCourse, volumes: newVolumes })
@@ -880,7 +882,8 @@ function TextItemDisplay({ url, parseTextSyntax, refreshKey, localContent }) {
     if (!url) { setLoading(false); return; }
     const fetchContent = async () => {
       try {
-        const response = await fetch(`http://localhost:4040${url}?_=${refreshKey || Date.now()}`, {
+        const API_BASE = (API_URL).replace('/api', '');
+        const response = await fetch(`${API_BASE}${url}?_=${refreshKey || Date.now()}`, {
           headers: { 'Authorization': token ? `Bearer ${token}` : '' }
         });
         if (response.ok) setContent(await response.text());
@@ -923,7 +926,8 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
     if (fileId) {
       const selectedFile = uploadedFiles.find(f => f.path === fileId || f.url === fileId);
       if (selectedFile) {
-        const fileUrl = (selectedFile.url || selectedFile.path).startsWith('http') ? selectedFile.url : `http://localhost:4040${selectedFile.url || selectedFile.path}`;
+        const API_BASE = (API_URL).replace('/api', '');
+        const fileUrl = (selectedFile.url || selectedFile.path).startsWith('http') ? selectedFile.url : `${API_BASE}${selectedFile.url || selectedFile.path}`;
         setUrl(fileUrl); setPreview(fileUrl); setFile(null);
       }
     } else { setUrl(''); setPreview(''); }

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { SettingsContext } from '../contexts/SettingsContext';
 import { getUser } from '../utils/auth';
 
+const API_URL = process.env.REACT_APP_API_URL || 'https://localhost:4040/api';
+
 export default function AddCourseForm() {
     const { t } = useContext(SettingsContext);
     const navigate = useNavigate();
@@ -117,7 +119,7 @@ export default function AddCourseForm() {
             const authHeader = `Bearer ${token}`; 
 
             // ЭТАП 1: Создаем курс
-            const response = await fetch('http://localhost:4040/api/manage/courses', {
+            const response = await fetch(`${API_URL}/manage/courses`, {
                 method: 'POST',
                 headers: {
                     'Authorization': authHeader,
@@ -152,7 +154,7 @@ export default function AddCourseForm() {
                 const thumbnailFormData = new FormData();
                 thumbnailFormData.append('file', renamedFile);
 
-                await fetch(`http://localhost:4040/api/manage/courses/${courseId}/files`, {
+                await fetch(`${API_URL}/manage/courses/${courseId}/files`, {
                     method: 'POST',
                     headers: { 'Authorization': authHeader },
                     body: thumbnailFormData
@@ -166,7 +168,7 @@ export default function AddCourseForm() {
                     contentFormData.append('files', file);
                 });
 
-                await fetch(`http://localhost:4040/api/manage/courses/${courseId}/files/multiple`, {
+                await fetch(`${API_URL}/manage/courses/${courseId}/files/multiple`, {
                     method: 'POST',
                     headers: { 'Authorization': authHeader },
                     body: contentFormData

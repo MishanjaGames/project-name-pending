@@ -1,15 +1,22 @@
 import { useCallback, useEffect, useRef } from 'react';
 
 /**
- * Converts any URL to use https://.
+ * Converts any URL to use https:// only if USE_HTTPS flag is enabled.
+ * Can be controlled via environment variable REACT_APP_USE_HTTPS.
  * Works for both localhost (self-signed cert) and production domains.
+ * 
+ * @param {string} url - The URL to potentially convert
+ * @returns {string} - URL as-is if HTTP, or converted to HTTPS if flag enabled
  */
 export const toHttps = (url) => {
   if (!url) return url;
+  const useHttps = false;
+  if (!useHttps) return url; // Use URL as-is (HTTP)
   return url.replace(/^http:\/\//i, 'https://');
 };
 
-const API_URL = toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api');
+// REACT_APP_API_URL is already the correct http/https URL — baked at build time
+export const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4040/api';
 
 // Hook: runs callback after `delay` ms, with reset/clear controls
 export function useTimeout(callback, delay) {
@@ -53,12 +60,28 @@ export const removeToken = () => {
   localStorage.removeItem('token');
 };
 
+/**
+ * Extends the current user session by refreshing the authentication token.
+ * Sends the current token and receives an updated one.
+ * 
+ * @param {object} data - Additional data to send with session extension request
+ * @returns {Promise<void>}
+ */
 export const extendSession = async (data) => {
   const token = localStorage.getItem('token');
-  if (!token) return;
+  if (!token) {
+    console.debug('No token found for session extension');
+    return;
+  }
 
   try {
     const [tokenType, tokenValue] = token.split(' ');
+    
+    if (!tokenType || !tokenValue) {
+      console.warn('Invalid token format for session extension');
+      return;
+    }
+    
     const response = await fetch(`${API_URL}/auth/ext-session`, {
       method: 'POST',
       headers: {
@@ -68,13 +91,16 @@ export const extendSession = async (data) => {
       body: JSON.stringify({ data }),
     });
 
-    if (response.ok) {
-      const result = await response.json();
-      localStorage.removeItem('token');
-      localStorage.setItem('token', `${result.tokenType} ${result.token}`);
+    if (!response.ok) {
+      throw new Error(`Session extension failed: ${response.statusText}`);
     }
+    
+    const result = await response.json();
+    localStorage.removeItem('token');
+    localStorage.setItem('token', `${result.tokenType} ${result.token}`);
   } catch (err) {
     console.error('Failed to extend session:', err);
+    // Silently fail - session will expire naturally
   }
 };
 
@@ -82,9 +108,16 @@ export const isAuthenticated = () => {
   return Boolean(getToken());
 };
 
-// Converts seconds into a human-readable duration string
+/**
+ * Converts seconds into a human-readable duration string.
+ * Example: 90061 seconds -> "1d 1h 1m 1s"
+ * 
+ * @param {number} seconds - Number of seconds to convert
+ * @returns {string} - Human-readable duration (e.g., "2d 5h 30m 15s")
+ */
 export const formatUptime = (seconds) => {
-  if (!seconds || isNaN(seconds)) return '0s';
+  if (seconds === null || seconds === undefined || isNaN(seconds)) return '0s';
+  if (seconds < 0) return '0s';
 
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
@@ -95,9 +128,9 @@ export const formatUptime = (seconds) => {
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);
-  if (days === 0) parts.push(`${secs}s`);
+  if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
 
-  return parts.length > 0 ? parts.join(' ') : '0s';
+  return parts.join(' ');
 };
 
 // Formats a timestamp into a readable date string

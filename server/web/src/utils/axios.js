@@ -1,8 +1,12 @@
 import axios from 'axios';
-import { getToken, removeToken, toHttps } from './utils';
+import { getToken, removeToken } from './utils';
+
+// REACT_APP_API_URL is baked at build time with the correct http/https URL
+// based on USE_HTTPS in .env — no runtime transformation needed.
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4040/api';
 
 const apiClient = axios.create({
-  baseURL: toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api'),
+  baseURL: BASE_URL,
   withCredentials: true,
 });
 

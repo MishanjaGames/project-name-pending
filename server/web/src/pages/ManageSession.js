@@ -627,7 +627,10 @@ function ManageSession({ data, onLogout }) {
 
     // ── Override rank restriction ───────────────────────────────────────────
     const overrideRank = async () => {
-        const res = await fetch(`${API}/sessions/${id}/override-rank`, { method: "POST", headers: ah });
+        const res = await fetch(`${API}/sessions/${id}/override-rank`, {
+            method: "POST", headers: ah,
+            body: JSON.stringify({ tutorId: data._id })
+        });
         if (res.ok) { showInfo("Done", "Rank restriction overridden."); fetchSession(); }
         else { const d = await res.json(); showInfo("Error", d.message); }
     };

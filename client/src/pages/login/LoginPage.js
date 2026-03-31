@@ -17,7 +17,8 @@ function LoginPage() {
     try {
       // Отправляем на бэкенд. 
       // Пока что шлем под ключом email, так как бэкенд Миши, скорее всего, ждет именно его.
-      const response = await fetch('http://localhost:4040/api/auth/login', {
+      const API_URL = process.env.REACT_APP_API_URL || 'https://localhost:4040/api';
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginId, password }) 

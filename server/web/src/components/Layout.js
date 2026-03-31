@@ -22,33 +22,15 @@ const lvl = (a) => ACCESS[a] ?? 0;
 
 // ── Navigation definition ─────────────────────────────────────────────────────
 const NAV = [
-  {
-    section: 'Learning',
-    minLvl: 0,
-    items: [
-      { to: '/my-courses',  icon: 'bi-collection-play',   label: 'My Courses' },
-      { to: '/my-grades',   icon: 'bi-award',              label: 'My Grades' },
-      { to: '/redeem',      icon: 'bi-key',                label: 'Redeem Key' },
-    ],
-  },
-  {
-    section: 'Applications',
-    minLvl: 0,
-    items: [
-      { to: '/creator/apply',       icon: 'bi-pen',           label: 'Apply as Creator',  maxLvl: 2 },
-      { to: '/tutor/apply',         icon: 'bi-mortarboard',   label: 'Apply as Tutor',    maxLvl: 2 },
-      { to: '/support/open-ticket', icon: 'bi-headset',       label: 'Support Ticket' },
-      { to: '/manage/forms',        icon: 'bi-ui-checks',     label: 'Review Forms',      minLvl: 2 },
-    ],
-  },
-  {
-    section: 'Tutor',
-    minLvl: 1.5,
-    items: [
-      { to: '/manage/sessions', icon: 'bi-people',     label: 'Sessions' },
-      { to: '/manage/courses',  icon: 'bi-book',       label: 'Courses' },
-    ],
-  },
+  // {
+  //   section: 'Learning',
+  //   minLvl: 0,
+  //   items: [
+  //     { to: '/my-courses',  icon: 'bi-collection-play',   label: 'My Courses' },
+  //     { to: '/my-grades',   icon: 'bi-award',              label: 'My Grades' },
+  //     { to: '/redeem',      icon: 'bi-key',                label: 'Redeem Key' },
+  //   ],
+  // },
   {
     section: 'Management',
     minLvl: 3,
@@ -60,6 +42,24 @@ const NAV = [
       { to: '/manage/keys',       icon: 'bi-key-fill',        label: 'Product Keys' },
       { to: '/manage/directions', icon: 'bi-compass',         label: 'Directions' },
       { to: '/manage/levels',     icon: 'bi-bar-chart-steps', label: 'Levels' },
+    ],
+  },
+  {
+    section: 'Tutor',
+    minLvl: 1.5,
+    items: [
+      { to: '/manage/sessions', icon: 'bi-people',     label: 'Sessions' },
+      { to: '/manage/courses',  icon: 'bi-book',       label: 'Courses' },
+    ],
+  },
+  {
+    section: 'Support',
+    minLvl: 0,
+    items: [
+      { to: '/creator/apply',       icon: 'bi-pen',           label: 'Apply as Creator',  maxLvl: 2 },
+      { to: '/tutor/apply',         icon: 'bi-mortarboard',   label: 'Apply as Tutor',    maxLvl: 2 },
+      { to: '/support/open-ticket', icon: 'bi-headset',       label: 'Support Ticket' },
+      { to: '/manage/forms',        icon: 'bi-ui-checks',     label: 'Review Forms',      minLvl: 2 },
     ],
   },
   {

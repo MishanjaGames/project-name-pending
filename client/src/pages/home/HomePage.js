@@ -4,6 +4,8 @@ import { SettingsContext } from '../../contexts/SettingsContext';
 import { useCart } from '../../contexts/CartContext';
 import { courseService } from '../../api/courseService';
 
+const API_BASE = (process.env.REACT_APP_API_URL || 'https://localhost:4040/api').replace('/api', '');
+
 function HomePage() {
   const navigate = useNavigate();
   const { t } = useContext(SettingsContext);
@@ -24,7 +26,7 @@ function HomePage() {
             if (imageLink && imageLink.url) {
               let cleanUrl = imageLink.url.replace(/\\/g, '/');
               cleanUrl = cleanUrl.replace('/api/manage/courses', '/api/courses');
-              imgSrc = cleanUrl.startsWith('http') ? cleanUrl : `http://localhost:4040${cleanUrl}`;
+              imgSrc = cleanUrl.startsWith('http') ? cleanUrl : `${API_BASE}${cleanUrl}`;
             }
           }
 

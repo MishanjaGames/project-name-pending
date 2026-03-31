@@ -10,7 +10,7 @@ services:
     env_file:
       - .env
     environment:
-      - MONGODB_URI=mongodb://mongo:27017/${DB_NAME:-P_01}
+      - MONGODB_URI=mongodb+srv://mishanja:qwerty123@cluster0.oewbabf.mongodb.net/?appName=Cluster0/${DB_NAME:-P_01}
     depends_on:
       mongo:
         condition: service_healthy

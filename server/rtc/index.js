@@ -83,7 +83,17 @@ app.use('/rooms', roomsRouter)
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 server.listen(config.PORT, () => {
-    console.log(`RTC signaling server listening on port ${config.PORT}`)
-    console.log(`Allowed origins: ${config.ALLOWED_ORIGINS.join(', ')}`)
-    console.log(`Mongo: ${config.MONGO_URI ? 'enabled' : 'disabled (in-memory only)'}`)
+    const protocol = config.USE_HTTPS ? 'HTTPS' : 'HTTP';
+    const url = config.USE_HTTPS 
+        ? `wss://localhost:${config.PORT}`
+        : `ws://localhost:${config.PORT}`;
+    
+    console.log(`\n${'═'.repeat(70)}`);
+    console.log(`RTC signaling server listening on ${url}`);
+    console.log(`Protocol: ${protocol} | Port: ${config.PORT}`);
+    console.log(`API URL: ${config.SERVICE_URLS.API}`);
+    console.log(`RTC URL: ${config.SERVICE_URLS.RTC}`);
+    console.log(`Allowed origins: ${config.ALLOWED_ORIGINS.join(', ')}`);
+    console.log(`Mongo: ${config.MONGO_URI ? 'enabled' : 'disabled (in-memory only)'}`);
+    console.log(`${'═'.repeat(70)}\n`);
 })

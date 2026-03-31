@@ -33,8 +33,10 @@ import ManageSession from './pages/ManageSession';
 import StudentDashboard from './pages/StudentDashboard';
 import Grades from './pages/Grades';
 import { VideoConference } from './components/VideoConference';
+import MeetingPage from './pages/MeetingPage';
+import RoomPage from './pages/RoomPage';
 
-const API = toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api');
+const API = toHttps(process.env.REACT_APP_API_URL || 'http://localhost:4040/api');
 
 const DEFAULT_USER = { id:'', nickname:'', email:'', role:'', tutorRank: null, accessLevel: 'default' };
 
@@ -112,7 +114,7 @@ function App() {
 
   // ── Shorthand auth route ──────────────────────────────────────────────────
   const R = (Component, extra = {}) =>
-    isLoggedIn ? <Component data={userData} onLogout={handleLogout} {...meetingProps} {...extra} /> : <Navigate to="/login" />;
+    isLoggedIn ? <Component data={userData} onLogout={handleLogout} {...meetingProps} {...extra} /> : <Login onLogin={handleLogin} />;
 
   return (
     <>
@@ -179,6 +181,9 @@ function App() {
 
         <Route path="/my-courses" element={R(StudentDashboard)} />
         <Route path="/my-grades"  element={R(Grades)} />
+
+        <Route path="/meeting" element={R(MeetingPage)} />
+        <Route path="/room/:roomId" element={R(RoomPage)} />
 
         <Route path="*" element={<Navigate to={isLoggedIn ? '/' : '/login'} />} />
       </Routes>

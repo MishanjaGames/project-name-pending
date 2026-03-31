@@ -24,13 +24,14 @@ function AuthImage({ src, alt, className, style, fallback }) {
                     'Authorization': `Bearer ${token}`
                 };
 
+                const API_BASE = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://localhost:4040';
                 let imageUrl;
                 if (src.startsWith('http://') || src.startsWith('https://')) {
                     imageUrl = src;
                 } else if (src.startsWith('/')) {
-                    imageUrl = `http://localhost:4040${src}`;
+                    imageUrl = `${API_BASE}${src}`;
                 } else {
-                    imageUrl = `http://localhost:4040/${src}`;
+                    imageUrl = `${API_BASE}/${src}`;
                 }
 
                 const response = await fetch(imageUrl, { headers });

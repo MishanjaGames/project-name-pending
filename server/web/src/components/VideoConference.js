@@ -1,7 +1,8 @@
 import { toHttps } from '../utils/utils';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-const RTC_URL = toHttps(process.env.REACT_APP_RTC_URL || 'https://localhost:5050');
+// REACT_APP_RTC_URL is already the correct http/https URL — baked at build time
+const RTC_URL = process.env.REACT_APP_RTC_URL || 'http://localhost:5050';
 
 // ── Socket loader ─────────────────────────────────────────────────────────────
 let _io = null;
