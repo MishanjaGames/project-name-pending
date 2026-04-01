@@ -1,263 +1,118 @@
-const fs = require('fs');
-const path = require('path');
-const fileHandler = require('../utils/fileHandler');
-const errorHandler = require('../utils/errorHandler');
+const fs = require('fs')
+const path = require('path')
+const fileHandler = require('../utils/fileHandler')
+const errorHandler = require('../utils/errorHandler')
 
-// ============================================================================
-// USER PROFILE PICTURES
-// ============================================================================
+// ── User profile pictures ─────────────────────────────────────────────────────
 
-/**
- * GET - Download user profile picture
- * GET /api/files/users/:userId/:filename
- */
 module.exports.getUserProfilePicture = (req, res) => {
     try {
-        const { userId, filename } = req.params;
+        const { userId, filename } = req.params
+        const filePath = path.join(fileHandler.paths.userProfiles, userId, filename)
 
-        if (!userId || !filename) {
-            return res.status(400).json({
-                success: false,
-                message: 'User ID and filename are required'
-            });
-        }
+        if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'Profile picture not found' })
 
-        const filePath = path.join(fileHandler.paths.userProfiles, userId, filename);
-
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({
-                success: false,
-                message: 'Profile picture not found'
-            });
-        }
-
-        // Set cache headers for images
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-        res.sendFile(filePath);
-
-    } catch (error) {
-        console.error('Error sending profile picture:', error);
-        errorHandler(res, 500, error);
+        res.setHeader('Cache-Control', 'public, max-age=86400')
+        res.sendFile(filePath)
+    } catch (e) {
+        errorHandler(res, 500, e)
     }
-};
+}
 
-/**
- * DELETE - Delete user profile picture
- * DELETE /api/files/users/:userId/:filename
- * Requires authentication
- */
 module.exports.deleteUserProfilePicture = (req, res) => {
     try {
-        const { userId, filename } = req.params;
+        const { userId, filename } = req.params
+        const filePath = path.join(fileHandler.paths.userProfiles, userId, filename)
 
-        if (!userId || !filename) {
-            return res.status(400).json({
-                success: false,
-                message: 'User ID and filename are required'
-            });
-        }
+        if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'File not found' })
 
-        const filePath = path.join(fileHandler.paths.userProfiles, userId, filename);
-
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({
-                success: false,
-                message: 'File not found'
-            });
-        }
-
-        fs.unlinkSync(filePath);
-
-        res.status(200).json({
-            success: true,
-            message: 'File deleted successfully',
-            data: { userId, filename }
-        });
-
-    } catch (error) {
-        console.error('Error deleting profile picture:', error);
-        errorHandler(res, 500, error);
+        fs.unlinkSync(filePath)
+        res.status(200).json({ message: 'File deleted successfully', data: { userId, filename } })
+    } catch (e) {
+        errorHandler(res, 500, e)
     }
-};
+}
 
-// ============================================================================
-// COURSE FILES
-// ============================================================================
+// ── Course files ──────────────────────────────────────────────────────────────
 
-/**
- * GET - Download course file
- * GET /api/files/courses/:courseId/:filename
- */
 module.exports.getCourseFile = (req, res) => {
     try {
-        const { courseId, filename } = req.params;
+        const { courseId, filename } = req.params
+        const filePath = path.join(fileHandler.paths.courseFiles, courseId, filename)
 
-        if (!courseId || !filename) {
-            return res.status(400).json({
-                success: false,
-                message: 'Course ID and filename are required'
-            });
-        }
+        if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'File not found' })
 
-        const filePath = path.join(fileHandler.paths.courseFiles, courseId, filename);
-
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({
-                success: false,
-                message: 'File not found'
-            });
-        }
-
-        // Check if download or inline display
-        const disposition = req.query.download === 'true' ? 'attachment' : 'inline';
-        res.setHeader('Content-Disposition', `${disposition}; filename="${filename}"`);
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-
-        res.sendFile(filePath);
-
-    } catch (error) {
-        console.error('Error sending course file:', error);
-        errorHandler(res, 500, error);
+        const disposition = req.query.download === 'true' ? 'attachment' : 'inline'
+        res.setHeader('Content-Disposition', `${disposition}; filename="${filename}"`)
+        res.setHeader('Cache-Control', 'public, max-age=3600')
+        res.sendFile(filePath)
+    } catch (e) {
+        errorHandler(res, 500, e)
     }
-};
+}
 
-/**
- * DELETE - Delete course file
- * DELETE /api/files/courses/:courseId/:filename
- * Requires authentication
- */
 module.exports.deleteCourseFile = (req, res) => {
     try {
-        const { courseId, filename } = req.params;
+        const { courseId, filename } = req.params
+        const filePath = path.join(fileHandler.paths.courseFiles, courseId, filename)
 
-        if (!courseId || !filename) {
-            return res.status(400).json({
-                success: false,
-                message: 'Course ID and filename are required'
-            });
-        }
+        if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'File not found' })
 
-        const filePath = path.join(fileHandler.paths.courseFiles, courseId, filename);
-
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({
-                success: false,
-                message: 'File not found'
-            });
-        }
-
-        fs.unlinkSync(filePath);
-
-        res.status(200).json({
-            success: true,
-            message: 'File deleted successfully',
-            data: { courseId, filename }
-        });
-
-    } catch (error) {
-        console.error('Error deleting course file:', error);
-        errorHandler(res, 500, error);
+        fs.unlinkSync(filePath)
+        res.status(200).json({ message: 'File deleted successfully', data: { courseId, filename } })
+    } catch (e) {
+        errorHandler(res, 500, e)
     }
-};
+}
 
-/**
- * GET - List all files in course directory
- * GET /api/files/courses/:courseId/list
- */
 module.exports.listCourseFiles = (req, res) => {
     try {
-        const { courseId } = req.params;
-
-        if (!courseId) {
-            return res.status(400).json({
-                success: false,
-                message: 'Course ID is required'
-            });
-        }
-
-        const courseDir = path.join(fileHandler.paths.courseFiles, courseId);
+        const { courseId } = req.params
+        const courseDir = path.join(fileHandler.paths.courseFiles, courseId)
 
         if (!fs.existsSync(courseDir)) {
-            return res.status(200).json({
-                success: true,
-                courseId,
-                count: 0,
-                files: []
-            });
+            return res.status(200).json({ courseId, count: 0, files: [] })
         }
 
         const files = fs.readdirSync(courseDir).map(filename => {
-            const filePath = path.join(courseDir, filename);
-            const stats = fs.statSync(filePath);
+            const stats = fs.statSync(path.join(courseDir, filename))
             return {
                 filename,
-                size: stats.size,
-                created: stats.birthtime,
+                size:     stats.size,
+                created:  stats.birthtime,
                 modified: stats.mtime,
-                url: `/api/files/courses/${courseId}/${filename}`
-            };
-        });
+                url:      `/api/files/courses/${courseId}/${filename}`
+            }
+        })
 
-        res.status(200).json({
-            success: true,
-            courseId,
-            count: files.length,
-            files
-        });
-
-    } catch (error) {
-        console.error('Error listing course files:', error);
-        errorHandler(res, 500, error);
+        res.status(200).json({ courseId, count: files.length, files })
+    } catch (e) {
+        errorHandler(res, 500, e)
     }
-};
+}
 
-/**
- * GET - List all files in user profile directory
- * GET /api/files/users/:userId/list
- */
 module.exports.listUserFiles = (req, res) => {
     try {
-        const { userId } = req.params;
-
-        if (!userId) {
-            return res.status(400).json({
-                success: false,
-                message: 'User ID is required'
-            });
-        }
-
-        const userDir = path.join(fileHandler.paths.userProfiles, userId);
+        const { userId } = req.params
+        const userDir = path.join(fileHandler.paths.userProfiles, userId)
 
         if (!fs.existsSync(userDir)) {
-            return res.status(200).json({
-                success: true,
-                userId,
-                count: 0,
-                files: []
-            });
+            return res.status(200).json({ userId, count: 0, files: [] })
         }
 
         const files = fs.readdirSync(userDir).map(filename => {
-            const filePath = path.join(userDir, filename);
-            const stats = fs.statSync(filePath);
+            const stats = fs.statSync(path.join(userDir, filename))
             return {
                 filename,
-                size: stats.size,
-                created: stats.birthtime,
+                size:     stats.size,
+                created:  stats.birthtime,
                 modified: stats.mtime,
-                url: `/api/files/users/${userId}/${filename}`
-            };
-        });
+                url:      `/api/files/users/${userId}/${filename}`
+            }
+        })
 
-        res.status(200).json({
-            success: true,
-            userId,
-            count: files.length,
-            files
-        });
-
-    } catch (error) {
-        console.error('Error listing user files:', error);
-        errorHandler(res, 500, error);
+        res.status(200).json({ userId, count: files.length, files })
+    } catch (e) {
+        errorHandler(res, 500, e)
     }
-};
+}

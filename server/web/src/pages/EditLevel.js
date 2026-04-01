@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Navbar } from '../components/Navbar';
+import AppLayout from '../components/Layout';
+import { UtilityModal } from '../components/UtilityModal';
 
 function EditLevel({ data, onLogout }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const [levelName, setLevelName] = useState('');
   const [directionName, setDirectionName] = useState('');
+  const [minTutorRank, setMinTutorRank] = useState('assistant');
   const [directions, setDirections] = useState([]);
   const [loading, setLoading] = useState(true);
+  // ── Modal state ──────────────────────────────────────────────────────────
+  const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+  const closeModal = () => setModal(p => ({ ...p, show: false }));
+  const showInfo = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+  const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+  const showDelete = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -20,16 +28,17 @@ function EditLevel({ data, onLogout }) {
     try {
       // Fetch both the level and all directions
       const [levelRes, directionsRes] = await Promise.all([
-        fetch(`http://localhost:4040/api/levels/${id}`),
-        fetch('http://localhost:4040/api/directions')
+        fetch(`${process.env.REACT_APP_API_URL}/levels/${id}`),
+        fetch(process.env.REACT_APP_API_URL + '/directions')
       ]);
 
       if (levelRes.ok) {
-        const levelData = await levelRes.json();
-        setLevelName(levelData.levelName);
-        setDirectionName(levelData.directionName);
+        const {data} = await levelRes.json();
+        setLevelName(data.levelName);
+        setDirectionName(data.directionName);
+        setMinTutorRank(data.minTutorRank || 'assistant');
       } else {
-        alert('Level not found');
+        showInfo('Error', 'Level not found');
         navigate('/manage/levels');
         return;
       }
@@ -51,7 +60,7 @@ function EditLevel({ data, onLogout }) {
     } catch (err) {
       console.error('Error fetching data:', err);
       setDirections([]);
-      alert('Failed to load data. Please check your connection.');
+      showInfo('Error', 'Failed to load data. Please check your connection.');
       navigate('/manage/levels');
     } finally {
       setLoading(false);
@@ -62,19 +71,19 @@ function EditLevel({ data, onLogout }) {
     e.preventDefault();
 
     if (!levelName.trim()) {
-      alert('Please enter a level name');
+      showInfo('Validation', 'Please enter a level name');
       return;
     }
 
     if (!directionName) {
-      alert('Please select a direction');
+      showInfo('Validation', 'Please select a direction');
       return;
     }
 
     setSaving(true);
 
     try {
-      const response = await fetch(`http://localhost:4040/api/levels/${id}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/levels/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -82,20 +91,21 @@ function EditLevel({ data, onLogout }) {
         body: JSON.stringify({
           levelName: levelName.trim(),
           directionName: directionName,
+          minTutorRank: minTutorRank,
           updatedAt: new Date()
         })
       });
 
       if (response.ok) {
-        alert('Level updated successfully');
+        showInfo('Success', 'Level updated successfully');
         navigate('/manage/levels');
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to update level');
+        showInfo('Error', error.message || 'Failed to update level');
       }
     } catch (err) {
       console.error('Error updating level:', err);
-      alert('Failed to update level');
+      showInfo('Error', 'Failed to update level');
     } finally {
       setSaving(false);
     }
@@ -103,21 +113,19 @@ function EditLevel({ data, onLogout }) {
 
   if (loading) {
     return (
-      <>
-        <Navbar data={data} onLogout={onLogout} />
-        <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
+    <AppLayout data={data} onLogout={onLogout} title="Edit Level">
+<div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
           <div className="text-center py-5">
             <div className="spinner-border text-primary"></div>
           </div>
         </div>
-      </>
+      </AppLayout>
     );
   }
 
   return (
-    <>
-      <Navbar data={data} onLogout={onLogout} />
-      <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
+    <AppLayout data={data} onLogout={onLogout} title="Edit Level">
+<div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="mb-0">Edit Level</h2>
           <button
@@ -138,19 +146,14 @@ function EditLevel({ data, onLogout }) {
                     <label className="form-label fw-bold">
                       Direction <span className="text-danger">*</span>
                     </label>
-                    <select
-                      className="form-select"
+                    <input
+                      className="form-control"
                       value={directionName}
                       onChange={(e) => setDirectionName(e.target.value)}
                       required
+                      disabled
                     >
-                      <option value="">Select a direction</option>
-                      {directions.map((dir) => (
-                        <option key={dir._id} value={dir.directionName}>
-                          {dir.directionName}
-                        </option>
-                      ))}
-                    </select>
+                    </input>
                     <small className="text-muted">
                       Change the direction this level belongs to
                     </small>
@@ -170,6 +173,22 @@ function EditLevel({ data, onLogout }) {
                     />
                     <small className="text-muted">
                       Update the level name
+                    </small>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="form-label fw-bold">Minimum Tutor Sub-Rank</label>
+                    <select
+                      className="form-select"
+                      value={minTutorRank}
+                      onChange={(e) => setMinTutorRank(e.target.value)}
+                    >
+                      {['assistant','teacher','lecturer','instructor','tutor','professor'].map(r => (
+                        <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                      ))}
+                    </select>
+                    <small className="text-muted">
+                      Tutors must have at least this sub-rank to host courses at this level
                     </small>
                   </div>
 
@@ -212,7 +231,22 @@ function EditLevel({ data, onLogout }) {
           </div>
         </div>
       </div>
-    </>
+
+      <UtilityModal
+        show={modal.show}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        danger={modal.danger}
+        confirmToken={modal.confirmToken}
+        tokenLabel={modal.tokenLabel}
+        deleteLabel={modal.deleteLabel || 'Delete'}
+        onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+        onDelete={() => { modal.onDelete?.(); closeModal(); }}
+        onCancel={modal.onCancel || closeModal}
+        onClose={modal.onClose || closeModal}
+      />
+    </AppLayout>
   );
 }
 

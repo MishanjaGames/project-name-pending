@@ -41,7 +41,7 @@ import { FORM_CONFIGS } from "../config/config.forms";
 
 const EMAILJS_CONFIG = {
     serviceId:  "service_qkrj62k",   // EmailJS → Email Services → Service ID
-    publicKey:  "Nvm4o7f3CGBjRYtZ5",   // EmailJS → Account → Public Key
+    publicKey:  process.env.REACT_APP_EMAILJS_PUBLIC_KEY || '',   // Set via REACT_APP_EMAILJS_PUBLIC_KEY in .env
     appName:    "project-name-pending Automtic Response System",     // Shown inside email body as {{app_name}}
 };
 
@@ -73,7 +73,7 @@ const EMAIL_TEMPLATES = {
         templateId: "template_other",   // or null to skip
         subject:    (name) => `Your application is under review, ${name}`,
         message:    (name, formLabel) =>
-            `Hi ${name}, we have received your ${formLabel} and it is currently under review. ` +
+            `Hi ${name}, we have received your ${formLabel}, and it is currently under review. ` +
             `We will notify you once a decision has been made. We'll do our best to process it within month. `,
     },
     pending: {

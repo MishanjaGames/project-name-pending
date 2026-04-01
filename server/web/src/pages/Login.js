@@ -1,172 +1,123 @@
-import { useState } from "react";
-import axios from 'axios';
+import { toHttps } from '../utils/utils';
+import { useState } from 'react';
+import { useTheme } from '../components/Layout';
 
-function Login({ onLogin }) {
-    const [formData, setFormData] = useState({
-        login: '',
-        password: '',
-        memo: false
-    });
-    const [error, setError] = useState('');
+const API = toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api');
 
-    const handleChange = (e) => {
-        const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-        setFormData({
-            ...formData,
-            [e.target.name]: value
-        });
-        //console.log(formData)
-        setError('');
-    };
+export default function Login({ onLogin }) {
+  const { theme, toggle } = useTheme();
+  const [form, setForm]     = useState({ login: '', password: '', memo: false });
+  const [error, setError]   = useState('');
+  const [loading, setLoading] = useState(false);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+  const handleChange = (e) => {
+    const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setForm(p => ({ ...p, [e.target.name]: v }));
+    setError('');
+  };
 
-        if (!formData.login || !formData.password) {
-            setError('Please fill in all fields');
-            return;
-        }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.login || !form.password) { setError('Please fill in all fields'); return; }
+    if (form.password.length < 6) { setError('Password must be at least 6 characters'); return; }
+    setLoading(true);
+    try {
+      const r1 = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.login, password: form.password })
+      });
+      if (!r1.ok) {
+        const d = await r1.json().catch(() => ({}));
+        setError(d.message || 'Invalid email or password');
+        return;
+      }
+      const { token, tokenType } = await r1.json();
+      const fullToken = `${tokenType} ${token}`;
+      if (form.memo) localStorage.setItem('token', fullToken);
 
-        if (formData.password.length < 6) {
-            setError('Password must be at least 6 characters');
-            return;
-        }
+      const r2 = await fetch(`${API}/users/c`, {
+        headers: { Authorization: fullToken }
+      });
+      if (!r2.ok) { setError('Failed to load user profile'); return; }
+      const { user } = await r2.json();
+      onLogin(user);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        try {
-            const loginResponse = await fetch('http://localhost:4040/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ email: formData.login, password: formData.password })
-            });
+  return (
+    <div className="login-page">
+      {/* Theme toggle top-right */}
+      <button
+        className="theme-toggle"
+        onClick={toggle}
+        title="Toggle theme"
+        style={{ position: 'absolute', top: 16, right: 16 }}
+      >
+        <i className={`bi ${theme === 'dark' ? 'bi-sun' : 'bi-moon'}`} />
+      </button>
 
-            if (!loginResponse.ok) {
-                console.warn(loginResponse.status, loginResponse.json())
-                setError('Login failed. Please check your credentials.');
-                return;
-            }
-
-            const loginData = await loginResponse.json();
-
-            if (formData.memo) {
-                localStorage.setItem('token', `${loginData.tokenType} ${loginData.token}`)
-            }
-
-            const userResponse = await fetch('http://localhost:4040/api/users/c', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `${loginData.tokenType} ${loginData.token}`,
-                    'Content-Type': 'application/json'
-                },
-            });
-
-            if (!userResponse.ok) {
-                console.warn(userResponse.status, userResponse.json())
-                setError('ERROR: 1');
-                return;
-            }
-
-            const userData = await userResponse.json();
-
-            const roleResponse = await fetch('http://localhost:4040/api/auth/validate', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `${loginData.tokenType} ${loginData.token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(userData.user)
-            });
-
-            if (!roleResponse.ok) {
-                console.warn(roleResponse.status, roleResponse.json())
-                setError('ERROR: 2');
-                return;
-            }
-
-            onLogin(userData.user);
-        } catch (error) {
-            console.warn('ERROR:', error);
-            setError('ERROR: 0', error);
-        }
-    };
-
-    return (
-        <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
-            <div className="container">
-                <div className="row justify-content-center">
-                    <div className="col-md-6 col-lg-4">
-                        <div className="card shadow-lg border-0">
-                            <div className="card-body p-5">
-                                <div className="text-center mb-4">
-                                    <h2 className="fw-bold text-secondary">Authorization</h2>
-                                </div>
-
-                                {error && (
-                                    <div className="alert alert-danger alert-dismissible fade show" role="alert">
-                                        {error}
-                                    </div>
-                                )}
-
-                                <form onSubmit={handleSubmit}>
-                                    <div className="mb-3">
-                                        <label htmlFor="login" className="form-label">
-                                            Login
-                                        </label>
-                                        <input
-                                            type="text"
-                                            className="form-control form-control-lg"
-                                            id="login"
-                                            name="login"
-                                            value={formData.login}
-                                            onChange={handleChange}
-                                            placeholder=""
-                                        />
-                                    </div>
-
-                                    <div className="mb-4">
-                                        <label htmlFor="password" className="form-label">
-                                            Password
-                                        </label>
-                                        <input
-                                            type="password"
-                                            className="form-control form-control-lg"
-                                            id="password"
-                                            name="password"
-                                            value={formData.password}
-                                            onChange={handleChange}
-                                            placeholder=""
-                                        />
-                                    </div>
-
-                                    <div className="mb-3 form-check">
-                                        <input
-                                            type="checkbox"
-                                            className="form-check-input"
-                                            id="memo"
-                                            name="memo"
-                                            checked={formData.memo}
-                                            onChange={handleChange}
-                                        />
-                                        <label className="form-check-label" htmlFor="memo">
-                                            Remember me
-                                        </label>
-                                    </div>
-
-                                    <button
-                                        type="submit"
-                                        className="btn btn-primary btn-lg w-100 mb-3"
-                                    >
-                                        Login
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+      <div className="login-card">
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ width: 52, height: 52, borderRadius: 12, background: 'var(--accent)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '1.5rem', marginBottom: '.75rem' }}>🎓</div>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text)', margin: 0 }}>EduPanel</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '.875rem', margin: '.25rem 0 0' }}>Sign in to your account</p>
         </div>
-    );
-}
 
-export default Login;
+        {error && (
+          <div className="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3" role="alert">
+            <i className="bi bi-exclamation-triangle-fill" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="mb-3">
+            <label className="form-label">Email / Login</label>
+            <div className="input-group">
+              <span className="input-group-text" style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-muted)' }}>
+                <i className="bi bi-envelope" />
+              </span>
+              <input type="text" className="form-control" name="login"
+                value={form.login} onChange={handleChange}
+                placeholder="your@email.com" autoComplete="username" />
+            </div>
+          </div>
+
+          <div className="mb-3">
+            <label className="form-label">Password</label>
+            <div className="input-group">
+              <span className="input-group-text" style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--text-muted)' }}>
+                <i className="bi bi-lock" />
+              </span>
+              <input type="password" className="form-control" name="password"
+                value={form.password} onChange={handleChange}
+                placeholder="••••••••" autoComplete="current-password" />
+            </div>
+          </div>
+
+          <div className="mb-4 form-check">
+            <input className="form-check-input" type="checkbox"
+              id="memo" name="memo" checked={form.memo} onChange={handleChange} />
+            <label className="form-check-label" htmlFor="memo">Remember me</label>
+          </div>
+
+          <button type="submit" className="btn btn-primary w-100 fw-semibold" disabled={loading}>
+            {loading ? (
+              <><span className="spinner-border spinner-border-sm me-2" />Signing in…</>
+            ) : (
+              <><i className="bi bi-box-arrow-in-right me-2" />Sign In</>
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import AuthImage from "../components/AuthImage";
+import { jwtDecode } from 'jwt-decode';
+import { UtilityModal } from '../components/UtilityModal';
+
 
 function EditUser({ data, onLogout }) {
     const { id } = useParams();
@@ -13,9 +16,17 @@ function EditUser({ data, onLogout }) {
         nickname: '',
         email: '',
         role: '',
+        tutorRank: null,
         links: []
     });
+    const [isCurrent, setIsCurrent] = useState(false)
     const [errors, setErrors] = useState({});
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete  = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
 
     // Profile picture state
     const [profilePicture, setProfilePicture] = useState(null);
@@ -24,9 +35,9 @@ function EditUser({ data, onLogout }) {
     // Password reset state
     const [showPasswordSection, setShowPasswordSection] = useState(false);
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-    const [autoGeneratePassword, setAutoGeneratePassword] = useState(true);
+    const [autoGeneratePassword, setAutoGeneratePassword] = useState(false);
     const [newPassword, setNewPassword] = useState('');
-    const [currentPasswordHash, setCurrentPasswordHash] = useState('');
+    const [currentPassword, setCurrentPassword] = useState('');
     const [hasChanges, setHasChanges] = useState(false);
 
     useEffect(() => {
@@ -40,27 +51,30 @@ function EditUser({ data, onLogout }) {
 
             const fetchUser = async () => {
                 try {
-                    const response = await fetch(`http://localhost:4040/api/manage/users/${id}`, {
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/manage/users/${id}`, {
                         method: 'GET',
                         headers
                     });
                     if (response.ok) {
                         const res = await response.json();
                         const user = res.data || res;
+                        setIsCurrent(data.role.roleName === 'root' || data._id === user._id)
                         setFormData({
                             nickname: user.nickname || '',
                             email: user.email || '',
                             role: user.role || '',
+                            tutorRank: user.tutorRank || null,
                             links: user.links || []
                         });
-                        setCurrentPasswordHash(user.password || '');
+                        const {_} = await jwtDecode('Bearer '+user.password)
+                        setCurrentPassword(_ || '');
                     } else {
-                        alert('Failed to fetch user details');
+                        showInfo('Error', 'Failed to fetch user details');
                         navigate('/manage/users');
                     }
                 } catch (error) {
                     console.error('Error fetching user:', error);
-                    alert('Error loading user details');
+                    showInfo('Error', 'Error loading user details');
                     navigate('/manage/users');
                 } finally {
                     setLoading(false);
@@ -69,7 +83,7 @@ function EditUser({ data, onLogout }) {
 
             const fetchRoles = async () => {
                 try {
-                    const response = await fetch('http://localhost:4040/api/manage/roles', {
+                    const response = await fetch(process.env.REACT_APP_API_URL + '/manage/roles', {
                         method: 'GET',
                         headers
                     });
@@ -143,7 +157,8 @@ function EditUser({ data, onLogout }) {
             const updatePayload = {
                 nickname: formData.nickname,
                 email: formData.email,
-                role: formData.role
+                role: formData.role,
+                tutorRank: formData.tutorRank || null
             };
 
             // Add password if being reset
@@ -151,7 +166,7 @@ function EditUser({ data, onLogout }) {
                 updatePayload.password = newPassword;
             }
 
-            const response = await fetch(`http://localhost:4040/api/manage/users/${id}`, {
+            const response = await fetch(`${process.env.REACT_APP_API_URL}/manage/users/${id}`, {
                 method: 'PATCH',
                 headers: {
                     ...headers,
@@ -162,7 +177,7 @@ function EditUser({ data, onLogout }) {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                alert(`Failed to update user: ${errorData.message || 'Unknown error'}`);
+                showInfo('Error', `Failed to update user: ${errorData.message || 'Unknown error'}`);
                 setSaving(false);
                 return;
             }
@@ -172,7 +187,7 @@ function EditUser({ data, onLogout }) {
                 const profileFormData = new FormData();
                 profileFormData.append('profilePicture', profilePicture);
 
-                const uploadResponse = await fetch(`http://localhost:4040/api/manage/users/${id}/profile-picture`, {
+                const uploadResponse = await fetch(`${process.env.REACT_APP_API_URL}/manage/users/${id}/profile-picture`, {
                     method: 'PUT',
                     headers,
                     body: profileFormData
@@ -184,23 +199,21 @@ function EditUser({ data, onLogout }) {
                 }
             }
 
-            alert('User updated successfully!');
+            showInfo('Success', 'User updated successfully!');
             setHasChanges(false);
             setProfilePicture(null);
             setProfilePreview(null);
             navigate('/manage/users');
         } catch (error) {
             console.error('Error updating user:', error);
-            alert('Error updating user. Please try again.');
+            showInfo('Error', 'Error updating user. Please try again.');
         } finally {
             setSaving(false);
         }
     };
 
     const handleCancel = () => {
-        if (window.confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
-            navigate('/manage/users');
-        }
+        showConfirm('Cancel', 'Are you sure you want to cancel? Any unsaved changes will be lost.', () => navigate('/manage/users'));
     };
 
     const getRoleName = (roleId) => {
@@ -225,9 +238,9 @@ function EditUser({ data, onLogout }) {
     };
 
     const generatePassword = () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
         let password = '';
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 16; i++) {
             password += chars.charAt(Math.floor(Math.random() * chars.length));
         }
         return password;
@@ -263,9 +276,8 @@ function EditUser({ data, onLogout }) {
 
     if (loading) {
         return (
-            <>
-                <Navbar data={data} onLogout={onLogout} />
-                <div className="flex-grow-1 d-flex align-items-center justify-content-center">
+    <AppLayout data={data} onLogout={onLogout} title="Edit User">
+<div className="flex-grow-1 d-flex align-items-center justify-content-center">
                     <div className="text-center">
                         <div className="spinner-border text-primary mb-3" role="status">
                             <span className="visually-hidden">Loading...</span>
@@ -273,15 +285,13 @@ function EditUser({ data, onLogout }) {
                         <p className="text-muted">Loading user details...</p>
                     </div>
                 </div>
-            </>
+            </AppLayout>
         );
     }
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+    <AppLayout data={data} onLogout={onLogout} title="Edit User">
+<div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
                 {/* Page Header */}
                 <div className="row mb-4">
                     <div className="col-12">
@@ -359,6 +369,7 @@ function EditUser({ data, onLogout }) {
                                                 className="d-none"
                                                 accept="image/*"
                                                 onChange={handleProfilePictureChange}
+                                                disabled={!isCurrent}
                                             />
 
                                             {!profilePreview && !getProfilePictureUrl() ? (
@@ -382,42 +393,32 @@ function EditUser({ data, onLogout }) {
                                                     <button
                                                         type="button"
                                                         className="btn btn-sm btn-danger"
-                                                        onClick={async () => {
-                                                            if (!window.confirm('Are you sure you want to delete this profile picture?')) {
-                                                                return;
-                                                            }
-
+                                                        onClick={() => showConfirm('Delete Profile Picture', 'Are you sure you want to delete this profile picture?', async () => {
                                                             try {
                                                                 const token = localStorage.getItem('token');
                                                                 const headers = {
                                                                     'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`
                                                                 };
-
-                                                                // Call DELETE API endpoint
-                                                                const response = await fetch(`http://localhost:4040/api/manage/users/${id}/profile-picture`, {
+                                                                const response = await fetch(`${process.env.REACT_APP_API_URL}/manage/users/${id}/profile-picture`, {
                                                                     method: 'DELETE',
                                                                     headers
                                                                 });
-
                                                                 if (response.ok) {
-                                                                    // Clear local state
                                                                     setProfilePicture(null);
                                                                     setProfilePreview(null);
-                                                                    setFormData(prev => ({
-                                                                        ...prev,
-                                                                        links: []
-                                                                    }));
-                                                                    setHasChanges(false); // No changes since we already saved
-                                                                    alert('Profile picture deleted successfully');
+                                                                    setFormData(prev => ({ ...prev, links: [] }));
+                                                                    setHasChanges(false);
+                                                                    showInfo('Success', 'Profile picture deleted successfully');
                                                                 } else {
                                                                     const errorData = await response.json();
-                                                                    alert(`Failed to delete profile picture: ${errorData.message || 'Unknown error'}`);
+                                                                    showInfo('Error', `Failed to delete profile picture: ${errorData.message || 'Unknown error'}`);
                                                                 }
                                                             } catch (error) {
                                                                 console.error('Error deleting profile picture:', error);
-                                                                alert('Error deleting profile picture. Please try again.');
+                                                                showInfo('Error', 'Error deleting profile picture. Please try again.');
                                                             }
-                                                        }}
+                                                        }, true)}
+                                                        disabled={!isCurrent}
                                                     >
                                                         <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
                                                             <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z" />
@@ -446,6 +447,7 @@ function EditUser({ data, onLogout }) {
                                             value={formData.nickname}
                                             onChange={handleChange}
                                             placeholder="Enter nickname"
+                                            disabled={!isCurrent}
                                         />
                                         {errors.nickname && (
                                             <div className="invalid-feedback">{errors.nickname}</div>
@@ -476,9 +478,25 @@ function EditUser({ data, onLogout }) {
                                         )}
                                         {formData.role && (
                                             <small className="text-muted">
-                                                Selected: <span className="fw-semibold">{getRoleName(formData.role)}</span>
+                                                Selected: <span className="fw-semibold">{([].includes(getRoleName(formData.role)))?'':''}</span>
                                             </small>
                                         )}
+                                    </div>
+
+                                    {/* Tutor Sub-Rank */}
+                                    <div className="col-12 col-md-6">
+                                        <label className="form-label fw-semibold">Tutor Sub-Rank</label>
+                                        <select
+                                            className="form-select"
+                                            value={formData.tutorRank || ''}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, tutorRank: e.target.value || null }))}
+                                        >
+                                            <option value="">None (not a tutor)</option>
+                                            {['assistant','teacher','lecturer','instructor','tutor','professor'].map(r => (
+                                                <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                                            ))}
+                                        </select>
+                                        <small className="text-muted">Only applies if user has tutor access level</small>
                                     </div>
 
                                     {/* Email Field */}
@@ -494,64 +512,67 @@ function EditUser({ data, onLogout }) {
                                             value={formData.email}
                                             onChange={handleChange}
                                             placeholder="Enter email address"
+                                            disabled={!isCurrent}
                                         />
                                         {errors.email && (
                                             <div className="invalid-feedback">{errors.email}</div>
                                         )}
                                     </div>
 
-                                    {/* Current Password Field */}
-                                    <div className="mb-3">
-                                        <label htmlFor="currentPassword" className="form-label fw-semibold">
-                                            Current Password
-                                        </label>
-                                        <div className="input-group">
-                                            <input
-                                                type={showCurrentPassword ? "text" : "password"}
-                                                className="form-control bg-light"
-                                                id="currentPassword"
-                                                value={showCurrentPassword ? currentPasswordHash : '••••••••'}
-                                                disabled
-                                            />
-                                            <button
-                                                type="button"
-                                                className="btn btn-outline-secondary"
-                                                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                                                title={showCurrentPassword ? "Hide password" : "Reveal password"}
-                                            >
-                                                {showCurrentPassword ? (
-                                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                                        <path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 1 0-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7 7 0 0 0 2.79-.588zM5.21 2.088A7 7 0 0 1 8 2.5c5 0 8-5.5 8-5.5s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l2.06 2.06a3.5 3.5 0 0 1 4.474 4.474L5.21 2.089z" />
-                                                        <path d="M5.525 7.646a2.5 2.5 0 1 1 3.536 3.536 2.5 2.5 0 0 1-3.536-3.536Zm6-6a6 6 0 0 1 .708 11.97l1.5 1.5A7 7 0 0 0 15 8s-3-5.5-8-5.5a6.98 6.98 0 0 0-1.293.12l1.508 1.508z" />
-                                                    </svg>
-                                                ) : (
-                                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                                        <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8a13 13 0 0 1-1.66 2.043C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z" />
-                                                        <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" />
-                                                    </svg>
-                                                )}
-                                            </button>
-                                        </div>
-                                        <small className="text-muted">Protected - use password reset below to change</small>
-                                    </div>
-
                                     {/* Password Reset Section */}
                                     <div className="mb-4">
                                         <div className="card border-0 bg-white">
-                                            <div className="card-header bg-transparent border-bottom">
+                                            <div className={`card-header bg-transparent border ${showPasswordSection ? '' : 'rounded'}`}>
                                                 <button
                                                     type="button"
                                                     className="btn btn-link text-decoration-none text-start w-100 p-0 fw-semibold"
                                                     onClick={() => setShowPasswordSection(!showPasswordSection)}
+                                                    disabled={!isCurrent}
                                                 >
                                                     <svg width="16" height="16" fill="currentColor" className="me-2" viewBox="0 0 16 16">
                                                         <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z" />
                                                     </svg>
-                                                    {showPasswordSection ? 'Hide' : 'Show'} Password Reset
+                                                    {showPasswordSection ? 'Hide' : 'Show'} Password Settings
                                                 </button>
                                             </div>
                                             {showPasswordSection && (
-                                                <div className="card-body pt-3">
+                                                <div className="card-body pt-3 border border-top-0 rounded-bottom">
+
+                                                    {/* Current Password Field */}
+                                                    <div className="mb-3">
+                                                        <label htmlFor="currentPassword" className="form-label fw-semibold">
+                                                            Current Password
+                                                        </label>
+                                                        <div className="input-group">
+                                                            <input
+                                                                type={showCurrentPassword ? "text" : "password"}
+                                                                className="form-control bg-light"
+                                                                id="currentPassword"
+                                                                value={currentPassword}
+                                                                disabled
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-outline-secondary"
+                                                                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                                                title={showCurrentPassword ? "Hide password" : "Reveal password"}
+                                                            >
+                                                                {showCurrentPassword ? (
+                                                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                                                        <path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 1 0-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7 7 0 0 0 2.79-.588zM5.21 2.088A7 7 0 0 1 8 2.5c5 0 8-5.5 8-5.5s-3-5.5-8-5.5a7 7 0 0 0-2.79.588l2.06 2.06a3.5 3.5 0 0 1 4.474 4.474L5.21 2.089z" />
+                                                                        <path d="M5.525 7.646a2.5 2.5 0 1 1 3.536 3.536 2.5 2.5 0 0 1-3.536-3.536Zm6-6a6 6 0 0 1 .708 11.97l1.5 1.5A7 7 0 0 0 15 8s-3-5.5-8-5.5a6.98 6.98 0 0 0-1.293.12l1.508 1.508z" />
+                                                                    </svg>
+                                                                ) : (
+                                                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                                                        <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8a13 13 0 0 1-1.66 2.043C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z" />
+                                                                        <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" />
+                                                                    </svg>
+                                                                )}
+                                                            </button>
+                                                        </div>
+                                                        <small className="text-muted">Protected - use password reset below to change</small>
+                                                    </div>
+
                                                     <div className="form-check mb-3">
                                                         <input
                                                             className="form-check-input"
@@ -559,6 +580,7 @@ function EditUser({ data, onLogout }) {
                                                             id="autoGenerateNewPassword"
                                                             checked={autoGeneratePassword}
                                                             onChange={handleAutoGeneratePasswordChange}
+                                                            disabled={!isCurrent}
                                                         />
                                                         <label className="form-check-label fw-semibold" htmlFor="autoGenerateNewPassword">
                                                             Auto-generate new password
@@ -581,6 +603,7 @@ function EditUser({ data, onLogout }) {
                                                                     type="button"
                                                                     className="btn btn-outline-secondary"
                                                                     onClick={() => setNewPassword(generatePassword())}
+                                                                    disabled={!isCurrent}
                                                                 >
                                                                     <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                                                                         <path fillRule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z" />
@@ -599,6 +622,7 @@ function EditUser({ data, onLogout }) {
                                                                     setHasChanges(true);
                                                                 }}
                                                                 placeholder="Enter new password"
+                                                                disabled={!isCurrent}
                                                             />
                                                         )}
                                                         <small className="text-muted">{autoGeneratePassword ? 'Click refresh to generate a new password' : 'Minimum 6 characters'}</small>
@@ -610,11 +634,12 @@ function EditUser({ data, onLogout }) {
                                                             className="btn btn-warning"
                                                             onClick={() => {
                                                                 if (!newPassword) {
-                                                                    alert('Please enter or generate a new password');
+                                                                    showInfo('Validation', 'Please enter or generate a new password');
                                                                     return;
                                                                 }
                                                                 setHasChanges(true);
                                                             }}
+                                                            disabled={!isCurrent}
                                                         >
                                                             <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
                                                                 <path d="M5.338 1.59a61 61 0 0 0-2.837.856.48.48 0 0 0-.328.39c-.045.1.028.2.11.255l.212.212a.5.5 0 0 0 .334.157 61 61 0 0 0 2.928.16.5.5 0 0 0 .314-.154l.216-.216c.11-.11.252-.126.355-.079.1.046.172.146.172.276v1.803a.5.5 0 0 0 .828.372l2.35-1.758a.5.5 0 0 0 0-.792L9.172.428A.5.5 0 0 0 8.5.9v1.803c0 .13-.072.23-.172.276-.103.048-.244.031-.355-.079l-.216-.216a.5.5 0 0 0-.314-.154 61 61 0 0 0-2.928.16.5.5 0 0 0-.334.157l-.212.212c-.083.054-.156.046-.11-.255a61 61 0 0 0 2.837-.856.48.48 0 0 0 .328-.39c.045-.1-.028-.2-.11-.255l-.212-.212a.5.5 0 0 0-.334-.157 61 61 0 0 0-2.928-.16.5.5 0 0 0-.314.154l-.216.216c-.11.11-.252.126-.355.079-.1-.046-.172-.146-.172-.276V6.5a.5.5 0 0 0-.828-.372l-2.35 1.758a.5.5 0 0 0 0 .792l2.35 1.758a.5.5 0 0 0 .828-.372V9.3c0-.13.072-.23.172-.276.103-.048.244-.031.355.079l.216.216a.5.5 0 0 0 .314.154 61 61 0 0 0 2.928-.16.5.5 0 0 0 .334-.157l.212-.212c.083-.054.156-.046.11.255a61 61 0 0 0-2.837.856.48.48 0 0 0-.328.39c-.045.1.028.2.11.255l.212.212a.5.5 0 0 0 .334.157 61 61 0 0 0 2.928.16.5.5 0 0 0 .314-.154l.216-.216c.11-.11.252-.126.355-.079.1.046.172.146.172.276v1.803a.5.5 0 0 0 .828.372l2.35-1.758a.5.5 0 0 0 0-.792l-2.35-1.758a.5.5 0 0 0-.828.372v1.803c0 .13-.072.23-.172.276-.103.047-.244.03-.355-.08l-.216-.215a.5.5 0 0 0-.314-.154 61 61 0 0 0-2.928.16.5.5 0 0 0-.334-.157l-.212-.212c-.083-.054-.156-.046-.11.255a61 61 0 0 0 2.837.856.48.48 0 0 0 .328.39c.045.1-.028.2-.11.255l-.212.212a.5.5 0 0 0-.334.157 61 61 0 0 0-2.928-.16.5.5 0 0 0-.314.154l-.216.216c-.11.11-.252.126-.355.079-.1-.047-.172-.147-.172-.277V3.5a.5.5 0 0 0-.828-.372l-2.35 1.758a.5.5 0 0 0 0 .792l2.35 1.758a.5.5 0 0 0 .828-.372V3.3c0-.13.072-.23.172-.276.103-.048.244-.031.355.079l.216.216a.5.5 0 0 0 .314.154 61 61 0 0 0 2.928-.16.5.5 0 0 0 .334-.157l.212-.212c.083-.054.156-.046.11.255a61 61 0 0 0-2.837-.856.48.48 0 0 0-.328-.39zm-7.141 2.267a.5.5 0 0 1 .431.866c-.1.168-.19.339-.273.514a.5.5 0 1 1-.906-.329c.09-.188.186-.371.29-.55a.5.5 0 0 1 .458-.501z" />
@@ -683,7 +708,23 @@ function EditUser({ data, onLogout }) {
                     </div>
                 </div>
             </div>
-        </>
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
+        </AppLayout>
+
     );
 }
 

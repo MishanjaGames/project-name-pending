@@ -1,18 +1,34 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
 import { extendSession } from "../utils/utils";
 import AuthImage from "../components/AuthImage";
+import { UtilityModal } from '../components/UtilityModal';
+import { ItemModal } from '../components/ItemModal';
 
 function Courses({ data, onLogout }) {
     const [courses, setCourses] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [users, setUsers] = useState([]);
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    // closeItemModal  — closes the "View Details" ItemModal
+    const closeItemModal = () => setShowModal(false);
+    // closeUtilityModal — closes UtilityModal (confirm/delete/info dialogs)
+    const closeUtilityModal = () => setModal(p => ({ ...p, show: false }));
+    // Legacy alias used in older code paths
+    const closeModal = closeUtilityModal;
+    const showInfo = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeUtilityModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeUtilityModal });
+    const showDelete = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeUtilityModal, deleteLabel: 'Delete' });
     const [searchText, setSearchText] = useState('');
     const [selectedStatus, setSelectedStatus] = useState(''); // filter by status
     const [selectedDirection, setSelectedDirection] = useState(''); // filter by direction
+    const [selectedCourseType, setSelectedCourseType] = useState(''); // filter by courseType
+    const [sortBy, setSortBy] = useState('');  // 'title'|'price'|'date'|'level'
+    const [sortDir, setSortDir] = useState('asc');
     const navigate = useNavigate();
 
     const token = localStorage.getItem('token');
@@ -32,8 +48,9 @@ function Courses({ data, onLogout }) {
     }
 
     const fetchCourses = async () => {
+        setLoading(true);
         try {
-            const response = await fetch('http://localhost:4040/api/manage/courses', {
+            const response = await fetch(process.env.REACT_APP_API_URL + '/manage/courses', {
                 method: 'GET',
                 headers: {
                     'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
@@ -49,12 +66,14 @@ function Courses({ data, onLogout }) {
             }
         } catch (error) {
             console.error('Error fetching courses:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
     const fetchUsers = async () => {
         try {
-            const response = await fetch('http://localhost:4040/api/manage/users', {
+            const response = await fetch(process.env.REACT_APP_API_URL + '/manage/users', {
                 method: 'GET',
                 headers: {
                     'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
@@ -76,7 +95,7 @@ function Courses({ data, onLogout }) {
     // Helper: find user by userId from the users array
     const getUserInfo = (userId) => {
         const found = users.find((u) => u._id === userId);
-        return found ? { nickname: found.nickname, email: found.email } : { nickname: 'Unknown', email: '—' };
+        return found ? { nickname: found.nickname, email: found.email } : { nickname: 'BADLYCODED.EDU', email: 'badlycoded.edu@local.com' };
     };
 
     // Helper to get the first course thumbnail URL from links array
@@ -100,65 +119,61 @@ function Courses({ data, onLogout }) {
     const uniqueDirections = [...new Set(courses.map(c => c.direction))].filter(Boolean);
 
     // Derived filtered list
-    const filteredCourses = courses.filter((c) => {
+    const filteredCourses = (() => {
+        let result = courses.filter((c) => {
         const text = searchText.toLowerCase();
         const userInfo = getUserInfo(c.userId);
         const matchesText =
             !text ||
-            (c.title || '').toLowerCase().includes(text) ||
+            (c.trans?.[0]?.title || '').toLowerCase().includes(text) ||
             (userInfo.nickname || '').toLowerCase().includes(text) ||
             (userInfo.email || '').toLowerCase().includes(text) ||
             (c.direction || '').toLowerCase().includes(text) ||
             (c.level || '').toLowerCase().includes(text);
         const matchesStatus = !selectedStatus || c.status === selectedStatus;
         const matchesDirection = !selectedDirection || c.direction === selectedDirection;
-        return matchesText && matchesStatus && matchesDirection;
-    });
+        const matchesCourseType = !selectedCourseType || (c.courseType || 'SELF_TAUGHT') === selectedCourseType;
+        return matchesText && matchesStatus && matchesDirection && matchesCourseType;
+        });
+        if (sortBy) {
+            result = [...result].sort((a, b) => {
+                let av, bv;
+                if (sortBy === 'title') { av = a.trans?.[0]?.title || ''; bv = b.trans?.[0]?.title || ''; }
+                else if (sortBy === 'price') { av = a.price || 0; bv = b.price || 0; }
+                else if (sortBy === 'date') { av = new Date(a.createdAt); bv = new Date(b.createdAt); }
+                else if (sortBy === 'level') { av = a.level || ''; bv = b.level || ''; }
+                else { av = 0; bv = 0; }
+                const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
+                return sortDir === 'asc' ? cmp : -cmp;
+            });
+        }
+        return result;
+    })();
 
     const openModal = (course) => {
         setSelectedCourse(course);
         setShowModal(true);
     };
 
-    const closeModal = () => {
-        setShowModal(false);
-        setSelectedCourse(null);
-    };
-
     const handleEdit = (course) => {
         navigate(`/manage/course/${course._id}`);
     };
 
-    const handleDelete = async (course) => {
-        const confirmed = window.confirm(
-            `Are you sure you want to delete course "${course.title}" (${getUserInfo(course.userId).email})?\n\nThis action cannot be undone.`
-        );
-
-        if (confirmed) {
-            let i = prompt(`You confirmed to proceed deleting course "${course.title}" (${getUserInfo(course.userId).email}) \n\n This action cannot be undone.
-                \n Please enter course's author's email name to continue.`)
-            if (i === getUserInfo(course.userId).email) {
-                alert(`Course "${course.title}" (${getUserInfo(course.userId).email}) is DELETING. \n This action cannot be undone.`)
-
+    const handleDelete = (course) => {
+        const authorEmail = getUserInfo(course.userId).email;
+        showDelete('Delete Course',
+            `You are about to permanently delete course "${course.trans?.[0]?.title}" by ${authorEmail}. This cannot be undone.`,
+            authorEmail, "Type the author's email to confirm",
+            async () => {
                 try {
                     const token = localStorage.getItem('token');
-                    const response = await fetch(`http://localhost:4040/api/manage/courses/${course._id}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-                            'Content-Type': 'application/json'
-                        }
+                    const response = await fetch(`${process.env.REACT_APP_API_URL}/manage/courses/${course._id}`, {
+                        method: 'DELETE', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
                     });
-                    if (response.ok) {
-                        alert(`Course "${course.title}" (${getUserInfo(course.userId).email}) is DELETED.`)
-                        fetchCourses()
-                        fetchUsers()
-                    }
-                } catch (error) {
-                    console.error('Error deleting course:', error);
-                }
+                    if (response.ok) { showInfo('Deleted', `Course "${course.trans?.[0]?.title}" has been deleted.`); fetchCourses(); fetchUsers(); }
+                } catch (e) { showInfo('Error', 'Failed to delete course.'); }
             }
-        }
+        );
     };
 
     // Helper function to get badge color based on status
@@ -189,9 +204,8 @@ function Courses({ data, onLogout }) {
     };
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-            <div className="d-flex flex-column flex-lg-row min-vh-100 bg-light">
+    <AppLayout data={data} onLogout={onLogout} title="Courses">
+<div className="d-flex flex-column flex-lg-row min-vh-100 bg-light">
 
                 <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
                     {/* Page Header */}
@@ -203,13 +217,13 @@ function Courses({ data, onLogout }) {
                                     <p className="text-muted mb-0 small">Manage all courses and content</p>
                                 </div>
                                 <div className="d-flex align-items-center gap-2">
-                                    <button className="btn btn-primary btn-sm" onClick={() => navigate('/creator/apply')}>
-                                        <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
-                                            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
-                                        </svg>
-                                        Apply Form
-                                    </button>
+                                    <select className="form-select form-select-sm"
+                                        onChange={e => navigate(`${e.target.value}`)}>
+                                        <option value="#">Select Form</option>
+                                        <option value="/creator/apply">Creator Form</option>
+                                        <option value="/tutor/apply">Tutor Form</option>
+                                        <option value="/support/open-ticket">Support Ticket</option>
+                                    </select>
                                     <button className="btn btn-success btn-sm" onClick={() => navigate('/manage/courses/create')}>
                                         <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
                                             <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
@@ -301,6 +315,30 @@ function Courses({ data, onLogout }) {
                                         ))}
                                     </select>
                                 </div>
+                                <div className="col-12 col-sm-4 col-md-2">
+                                    <select className="form-select form-select-sm"
+                                        value={selectedCourseType} onChange={e => setSelectedCourseType(e.target.value)}>
+                                        <option value="">All types</option>
+                                        <option value="SELF_TAUGHT">Self-Taught</option>
+                                        <option value="MENTORED">Mentored</option>
+                                        <option value="HOSTED">Hosted</option>
+                                    </select>
+                                </div>
+                                <div className="col-12 col-sm-4 col-md-2">
+                                    <div className="input-group input-group-sm">
+                                        <select className="form-select form-select-sm" value={sortBy}
+                                            onChange={e => setSortBy(e.target.value)}>
+                                            <option value="">Sort by…</option>
+                                            <option value="title">Title</option>
+                                            <option value="price">Price</option>
+                                            <option value="date">Date</option>
+                                            <option value="level">Level</option>
+                                        </select>
+                                        <button className="btn btn-outline-secondary btn-sm" onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} title="Toggle sort direction">
+                                            {sortDir === 'asc' ? '↑' : '↓'}
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Active-filter chips */}
@@ -369,7 +407,7 @@ function Courses({ data, onLogout }) {
                                                                 return thumbnailUrl ? (
                                                                     <AuthImage
                                                                         src={thumbnailUrl}
-                                                                        alt={c.title}
+                                                                        alt={c.trans?.[0]?.title}
                                                                         className="rounded flex-shrink-0"
                                                                         style={{ width: '34px', height: '34px', objectFit: 'cover' }}
                                                                         fallback={
@@ -392,13 +430,26 @@ function Courses({ data, onLogout }) {
                                                                     </div>
                                                                 );
                                                             })()}
-                                                            <span className="fw-semibold">{c.title || 'Untitled'}</span>
+                                                            <span className="fw-semibold">
+                                                                {c.isPrivateCopy && <span className="badge bg-warning text-dark me-1" style={{ fontSize: '.68rem', verticalAlign: 'middle' }}><i className="bi bi-lock-fill me-1"></i>Private</span>}
+                                                                {c.trans?.[0]?.title || 'Untitled'}
+                                                            </span>
                                                         </div>
                                                     </td>
                                                     <td>
                                                         <div>
-                                                            <div className="fw-semibold small">{userInfo.nickname}</div>
-                                                            <div className="text-muted small">{userInfo.email}</div>
+                                                            <div className="fw-semibold small">
+                                                                {(userInfo.nickname === 'root')
+                                                                    ? 'BADLYCODED.EDU'
+                                                                    : userInfo.nickname
+                                                                }
+                                                            </div>
+                                                            <div className="text-muted small">
+                                                                {(userInfo.nickname === 'root')
+                                                                    ? 'badlycoded.edu@local.com'
+                                                                    : userInfo.email
+                                                                }
+                                                            </div>
                                                         </div>
                                                     </td>
                                                     <td>
@@ -411,11 +462,14 @@ function Courses({ data, onLogout }) {
                                                     <td className="text-muted fw-semibold">{c.price ? `$${c.price}` : '—'}</td>
                                                     <td className="text-end" onClick={(e) => e.stopPropagation()}>
                                                         <div className="btn-group btn-group-sm" role="group">
-                                                            <button type="button" className="btn btn-outline-primary" onClick={() => openModal(c)} title="View details">
+                                                            <button type="button" className="btn btn-outline-secondary" onClick={() => openModal(c)} title="View details">
                                                                 <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                                                                     <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
                                                                     <path d="M7.002 11a1 1 0 1 0 2 0 1 1 0 0 0-2 0zM7.1 4.995a.905.905 0 1 0 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z" />
                                                                 </svg>
+                                                            </button>
+                                                            <button type="button" className="btn btn-outline-primary" onClick={() => navigate(`/course/preview/${c._id}${c.isPrivateCopy ? '?private=1' : ''}`)} title="View course">
+                                                                <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z" /><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" /></svg>
                                                             </button>
                                                             <button type="button" className="btn btn-outline-warning" onClick={() => handleEdit(c)} title="Edit course">
                                                                 <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
@@ -464,167 +518,30 @@ function Courses({ data, onLogout }) {
             </div>
 
             {/* Details Modal */}
-            {showModal && selectedCourse && (
-                <>
-                    <div className="modal-backdrop fade show" onClick={closeModal} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1040 }}></div>
-                    <div className="modal fade show d-block" tabIndex="-1" role="dialog" aria-modal="true" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                        <div className="modal-dialog modal-dialog-centered modal-lg" role="document" style={{ pointerEvents: 'auto' }}>
-                            <div className="card border-0 shadow-lg rounded-3 overflow-hidden">
-                                <div className="card-header bg-primary text-white border-0 d-flex align-items-center justify-content-between py-3 px-4">
-                                    <h5 className="mb-0 fw-semibold">Course Details</h5>
-                                    <button type="button" className="btn-close btn-close-white btn-sm" onClick={closeModal} aria-label="Close"></button>
-                                </div>
-
-                                <div className="card-body p-4">
-                                    <div className="text-center mb-4">
-                                        {(() => {
-                                            const thumbnailUrl = getCourseThumbnailUrl(selectedCourse);
-                                            return thumbnailUrl ? (
-                                                <AuthImage
-                                                    src={thumbnailUrl}
-                                                    alt={selectedCourse.title}
-                                                    className="rounded flex-shrink-0"
-                                                    style={{ width: '96px', height: '96px', objectFit: 'cover' }}
-                                                    fallback={
-                                                        <div className="rounded bg-primary bg-opacity-10 d-flex align-items-center justify-content-center text-primary flex-shrink-0"
-                                                            style={{ width: '96px', height: '96px', fontSize: '0.9rem' }}>
-                                                            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                                                                <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 6.464V13.5a.5.5 0 0 0 1 0V6.236a.5.5 0 0 0-.053-.224l-7.5-3.5z" />
-                                                                <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032z" />
-                                                            </svg>
-                                                        </div>
-                                                    }
-                                                />
-                                            ) : (
-                                                <div className="rounded bg-primary bg-opacity-10 d-flex align-items-center justify-content-center text-primary flex-shrink-0"
-                                                    style={{ width: '96px', height: '96px', fontSize: '0.9rem' }}>
-                                                    <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                                                        <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 6.464V13.5a.5.5 0 0 0 1 0V6.236a.5.5 0 0 0-.053-.224l-7.5-3.5z" />
-                                                        <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032z" />
-                                                    </svg>
-                                                </div>
-                                            );
-                                        })()}
-                                        <h5 className="fw-bold mb-2">{selectedCourse.title || 'Untitled'}</h5>
-                                        <span className={`badge rounded-pill ${getStatusBadgeColor(selectedCourse.status)}`}>
-                                            {selectedCourse.status || '—'}
-                                        </span>
-                                    </div>
-
-                                    <div className="row g-3">
-                                        <div className="col-12">
-                                            <table className="table table-sm table-borderless mb-0">
-                                                <tbody>
-                                                    <tr>
-                                                        <td className="text-muted fw-semibold small text-uppercase py-2" style={{ width: '30%' }}>Owner</td>
-                                                        <td className="py-2">
-                                                            {(() => {
-                                                                const userInfo = getUserInfo(selectedCourse.userId);
-                                                                return (
-                                                                    <div>
-                                                                        <div className="fw-semibold">{userInfo.nickname}</div>
-                                                                        <div className="text-muted small">{userInfo.email}</div>
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                        </td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="text-muted fw-semibold small text-uppercase py-2">Title</td>
-                                                        <td className="py-2">{selectedCourse.title || '—'}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="text-muted fw-semibold small text-uppercase py-2">Status</td>
-                                                        <td className="py-2">
-                                                            <span className={`badge rounded-pill ${getStatusBadgeColor(selectedCourse.status)}`}>
-                                                                {selectedCourse.status || '—'}
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="text-muted fw-semibold small text-uppercase py-2">Direction</td>
-                                                        <td className="py-2">{selectedCourse.direction || '—'}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="text-muted fw-semibold small text-uppercase py-2">Level</td>
-                                                        <td className="py-2">{selectedCourse.level || '—'}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="text-muted fw-semibold small text-uppercase py-2">Price</td>
-                                                        <td className="py-2 fw-semibold">{selectedCourse.price ? `$${selectedCourse.price}` : '—'}</td>
-                                                    </tr>
-                                                    {selectedCourse.description && (
-                                                        <tr>
-                                                            <td className="text-muted fw-semibold small text-uppercase py-2 align-top">Description</td>
-                                                            <td className="py-2">{selectedCourse.description}</td>
-                                                        </tr>
-                                                    )}
-                                                    {selectedCourse.skills && selectedCourse.skills.length > 0 && (
-                                                        <tr>
-                                                            <td className="text-muted fw-semibold small text-uppercase py-2 align-top">Skills</td>
-                                                            <td className="py-2">
-                                                                <div className="d-flex flex-wrap gap-1">
-                                                                    {selectedCourse.skills.map((skill, idx) => (
-                                                                        <span key={idx} className="badge bg-light text-dark border">
-                                                                            {skill}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                    {selectedCourse.createdAt && (
-                                                        <tr>
-                                                            <td className="text-muted fw-semibold small text-uppercase py-2">Created At</td>
-                                                            <td className="py-2 small">{formatDate(selectedCourse.createdAt)}</td>
-                                                        </tr>
-                                                    )}
-                                                    {selectedCourse.updatedAt && (
-                                                        <tr>
-                                                            <td className="text-muted fw-semibold small text-uppercase py-2">Updated At</td>
-                                                            <td className="py-2 small">{formatDate(selectedCourse.updatedAt)}</td>
-                                                        </tr>
-                                                    )}
-                                                    {selectedCourse._id && (
-                                                        <tr>
-                                                            <td className="text-muted fw-semibold small text-uppercase py-2">ID</td>
-                                                            <td className="py-2"><code className="small">{selectedCourse._id}</code></td>
-                                                        </tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="card-footer bg-white border-top d-flex justify-content-end gap-2 py-3 px-4">
-                                    <button type="button" className="btn btn-outline-secondary btn-sm" onClick={closeModal}>Close</button>
-                                    <button type="button" className="btn btn-primary btn-sm text-light" onClick={() => { closeModal(); navigate(`/manage/course/preview/${selectedCourse._id}`) }}>
-                                        <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-
-                                        </svg>
-                                        Preview
-                                    </button>
-                                    <button type="button" className="btn btn-warning btn-sm text-dark" onClick={() => { closeModal(); handleEdit(selectedCourse); }}>
-                                        <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                            <path d="M12.146.146a.5.5 0 0 1 .707 0l3 3a.5.5 0 0 1 0 .707l-10 10a.5.5 0 0 1-.203.134l-6 2a.5.5 0 0 1-.633-.633l2-6a.5.5 0 0 1 .134-.203l10-10z" />
-                                        </svg>
-                                        Edit
-                                    </button>
-                                    <button type="button" className="btn btn-danger btn-sm" onClick={() => { closeModal(); handleDelete(selectedCourse); }}>
-                                        <svg width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
-                                            <path d="M5.5 5.5a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5z" />
-                                            <path d="M5 0 4.5.5l-.5 1H2a1 1 0 0 0-1 1v1h12V2.5a1 1 0 0 0-1-1H10.5l-.5-1L9.5 0h-5zM3 14.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4H3v10.5zM4.5 3h7L11 2H5l-.5 1z" />
-                                        </svg>
-                                        Delete
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </>
-            )}
-        </>
+            <ItemModal
+                show={showModal}
+                type="course"
+                item={selectedCourse}
+                extraData={{ users }}
+                onClose={closeItemModal}
+                onEdit={selectedCourse ? () => navigate(`/manage/course/preview/${selectedCourse._id}`) : undefined}
+                onDelete={selectedCourse ? () => { closeItemModal(); handleDelete(selectedCourse); } : undefined}
+            />
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+        </AppLayout>
     );
 }
 

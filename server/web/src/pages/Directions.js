@@ -1,13 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Navbar } from '../components/Navbar';
+import AppLayout from '../components/Layout';
 import { extendSession } from "../utils/utils";
+import { UtilityModal } from '../components/UtilityModal';
 
 function Directions({ data, onLogout }) {
   const navigate = useNavigate();
   const [directions, setDirections] = useState([]);
   const [loading, setLoading] = useState(true);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete  = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('name');   // 'name' | 'created' | 'updated'
+  const [sortDir, setSortDir] = useState('asc');
 
   useEffect(() => {
     fetchDirections();
@@ -20,7 +29,7 @@ function Directions({ data, onLogout }) {
   const fetchDirections = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:4040/api/directions');
+      const response = await fetch(process.env.REACT_APP_API_URL + '/directions');
 
       if (response.status === 401) {
         await extendSession(data)
@@ -40,66 +49,58 @@ function Directions({ data, onLogout }) {
     } catch (err) {
       console.error('Error fetching directions:', err);
       setDirections([]); // Set to empty array on error
-      alert('Failed to load directions. Please check your connection.');
+      showInfo('Error', 'Failed to load directions. Please check your connection.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (directions) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete direction "${directions.directionName}"?\n\nThis action cannot be undone.`
-    );
-
-    if (confirmed) {
-      let i = prompt(`You confirmed to proceed deleting direction "${directions.directionName}" \n\n This action cannot be undone.
-                \n Please enter direction's name to continue.`)
-      if (i === directions.directionName) {
-        alert(`Role "${directions.directionName}" is DELETING. \n This action cannot be undone.`)
-
+  const handleDelete = (directions) => {
+    showDelete('Delete Direction',
+      `You are about to permanently delete direction "${directions.directionName}". This cannot be undone.`,
+      directions.directionName, "Type the direction's name to confirm",
+      async () => {
         try {
           const token = localStorage.getItem('token');
-          const response = await fetch(`http://localhost:4040/api/directions/${directions._id}`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-              'Content-Type': 'application/json'
-            }
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/directions/${directions._id}`, {
+            method: 'DELETE', headers: { 'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`, 'Content-Type': 'application/json' }
           });
-          if (response.ok) {
-            alert(`Direction "${directions.directionName}" is DELETED.`)
-            fetchDirections()
-          }
-        } catch (error) {
-          console.error('Error deleting direction:', error);
-        }
+          if (response.ok) { showInfo('Deleted', `Direction "${directions.directionName}" has been deleted.`); fetchDirections(); }
+        } catch (e) { showInfo('Error', 'Failed to delete direction.'); }
       }
-    }
+    );
   };
 
-  const filteredDirections = Array.isArray(directions)
-    ? directions.filter(direction =>
-      direction.directionName.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    : [];
+  const filteredDirections = (() => {
+    let result = Array.isArray(directions)
+      ? directions.filter(d => d.directionName.toLowerCase().includes(searchTerm.toLowerCase()))
+      : [];
+    result = [...result].sort((a, b) => {
+      let av, bv;
+      if (sortBy === 'name')    { av = a.directionName || ''; bv = b.directionName || ''; return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av); }
+      if (sortBy === 'created') { av = new Date(a.createdAt); bv = new Date(b.createdAt); }
+      else if (sortBy === 'updated') { av = new Date(a.updatedAt); bv = new Date(b.updatedAt); }
+      else { return 0; }
+      return sortDir === 'asc' ? av - bv : bv - av;
+    });
+    return result;
+  })();
 
   if (loading) {
     return (
-      <>
-        <Navbar data={data} onLogout={onLogout} />
-        <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
+    <AppLayout data={data} onLogout={onLogout} title="Directions">
+<div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
           <div className="text-center py-5">
             <div className="spinner-border text-primary"></div>
           </div>
         </div>
-      </>
+      </AppLayout>
     );
   }
 
   return (
-    <>
-      <Navbar data={data} onLogout={onLogout} />
-      <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
+    <AppLayout data={data} onLogout={onLogout} title="Directions">
+<div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="mb-0">Directions</h2>
 
@@ -137,7 +138,7 @@ function Directions({ data, onLogout }) {
         <div className="card shadow-sm mb-4">
           <div className="card-body">
             <div className="row g-3">
-              <div className="col-md-6">
+              <div className="col-md-5">
                 <input
                   type="text"
                   className="form-control"
@@ -145,6 +146,18 @@ function Directions({ data, onLogout }) {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
+              </div>
+              <div className="col-md-3">
+                <div className="input-group">
+                  <select className="form-select form-select-sm" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                    <option value="name">Sort: Name</option>
+                    <option value="created">Sort: Created</option>
+                    <option value="updated">Sort: Updated</option>
+                  </select>
+                  <button className="btn btn-outline-secondary btn-sm" onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} title="Toggle order">
+                    {sortDir === 'asc' ? '↑' : '↓'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -201,7 +214,23 @@ function Directions({ data, onLogout }) {
           <small>Total: {filteredDirections.length} direction(s)</small>
         </div>
       </div>
-    </>
+        <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
+    </AppLayout>
+
   );
 }
 

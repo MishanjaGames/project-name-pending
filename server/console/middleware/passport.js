@@ -1,29 +1,20 @@
-const JwtStrategy = require('passport-jwt').Strategy
-const ExtractJwt = require('passport-jwt').ExtractJwt
-
+const { Strategy: JwtStrategy, ExtractJwt } = require('passport-jwt')
 const config = require('../config/config')
-const User = require('../models/mongo.users')
- 
-const options = {
-    jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-    secretOrKey: config.JWT_SECRET//key.jwt
-}
- 
-module.exports = passport => {
-    passport.use(
-        new JwtStrategy(options, async (payLoad, done) => {
-            try{
-                const user = await (await User.findById(payLoad.userId)).isSelected('email id')
- 
-                if (user){
-                    done(null, user)
-                } else {
-                    done(null, false)
-                }
+const User   = require('../models/mongo.users')
+
+module.exports = (passport) => {
+    passport.use(new JwtStrategy(
+        {
+            jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+            secretOrKey:    config.JWT_SECRET
+        },
+        async (payload, done) => {
+            try {
+                const user = await User.findById(payload.userId).select('email id')
+                return done(null, user || false)
+            } catch (err) {
+                return done(err, false)
             }
-            catch(e){
-                console.log(e)
-            }
-        })
-    )
+        }
+    ))
 }

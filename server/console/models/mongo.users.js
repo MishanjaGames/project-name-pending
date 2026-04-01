@@ -85,6 +85,41 @@ const userSchema = new Schema({
             required: false
         }
     }],
+    // Tutor sub-rank (null if not a tutor)
+    tutorRank: {
+        type: String,
+        required: false,
+        default: null,
+        enum: [null, 'assistant', 'teacher', 'lecturer', 'instructor', 'tutor', 'professor']
+    },
+    // IDs of groups the user belongs to (as a student) or hosts (as a tutor)
+    groups: [{
+        type: require('mongoose').Schema.Types.ObjectId,
+        ref: 'groups'
+    }],
+    lib: [{
+        type: {
+            type: String,
+            required: false,
+            enum: ['promo', 'productKey']
+        },
+        id: {
+            type: Schema.Types.ObjectId,
+            required: false
+        },
+        title: {
+            type: String,
+            required: true
+        },
+        amount: {
+            type: Number,
+            requred: false
+        },
+        value: [{
+            type: String,
+            required: true
+        }]
+    }],
     createdAt: {
         type: Date,
         default: Date.now()

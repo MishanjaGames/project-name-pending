@@ -60,8 +60,8 @@ function NavBar() {
           <button 
             className="btn btn-outline-danger me-2 position-relative" 
             onClick={() => navigate('/wishlist')} 
-            aria-label="Wishlist"
-            title="Wishlist"
+            aria-label={t('common.wishlist')}
+            title={t('common.wishlist')}
           >
             <i className={wishlist.length > 0 ? "bi bi-heart-fill" : "bi bi-heart"}></i>
             {wishlist.length > 0 && (
@@ -88,7 +88,7 @@ function NavBar() {
               className="btn btn-link text-decoration-none p-0 me-3" 
               onClick={toggleTheme}
               style={{ color: theme === 'dark' ? '#f1c40f' : '#6c757d' }}
-              title="Toggle Theme"
+              title={t('common.toggleTheme')}
             >
               <i className={`bi fs-5 ${theme === 'dark' ? 'bi-sun-fill' : 'bi-moon-stars-fill'}`}></i>
             </button>
@@ -133,7 +133,6 @@ function NavBar() {
                       <i className="bi bi-person-circle"></i>
                     </button>
 
-                    {/* 🔥 ВЫПАДАЮЩЕЕ МЕНЮ С ПЕРЕВОДАМИ 🔥 */}
                     <ul className={`dropdown-menu dropdown-menu-end shadow-lg border-0 ${showDropdown ? 'show' : ''} ${theme === 'dark' ? 'dropdown-menu-dark' : ''}`} style={{ minWidth: '240px', borderRadius: '12px', overflow: 'hidden' }}>
                       <li>
                         <button className="dropdown-item py-2 d-flex align-items-center" onClick={() => { navigate('/account'); setShowDropdown(false); }}>

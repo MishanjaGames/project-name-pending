@@ -264,7 +264,7 @@ function SearchPage() {
                   type="button" 
                   className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-primary bg-white text-primary'}`} 
                   onClick={() => setViewMode('grid')}
-                  title="Grid view"
+                  title={t('common.gridView')}
                 >
                   <i className="bi bi-grid-fill"></i>
                 </button>
@@ -272,7 +272,7 @@ function SearchPage() {
                   type="button" 
                   className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-primary bg-white text-primary'}`} 
                   onClick={() => setViewMode('list')}
-                  title="List view"
+                  title={t('common.listView')}
                 >
                   <i className="bi bi-list-ul"></i>
                 </button>

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 function RedeemPage() {
+  const { t } = useTranslation();
   const [key, setKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -33,10 +35,10 @@ function RedeemPage() {
         setKey(''); // Очищаем инпут
       } else {
         // Если Мишин обработчик ошибок возвращает текст в поле message
-        setError(data.message || 'Ошибка активации ключа');
+        setError(data.message || t('redeem.apiError') || 'Ошибка активации ключа');
       }
     } catch (err) {
-      setError('Ошибка соединения с сервером. Проверьте подключение.');
+      setError('\u041eшибка соединения с сервером. Проверьте подключение.');
     } finally {
       setLoading(false);
     }
@@ -46,14 +48,14 @@ function RedeemPage() {
     <div className="min-vh-100 d-flex align-items-center justify-content-center py-5 page-bg">
       <div className="container" style={{ maxWidth: '600px' }}>
         <div className="text-center mb-5">
-          <h2 className="fw-bold mb-3">Redeem a Product Key</h2>
-          <p className="text-muted">Enter your key code to unlock courses in your library.</p>
+          <h2 className="fw-bold mb-3">{t('redeem.title')}</h2>
+          <p className="text-muted">{t('redeem.subtitle')}</p>
         </div>
 
         <div className="card shadow-sm border-0 p-4 p-md-5 mb-4">
           <form onSubmit={handleRedeem}>
             <div className="mb-4">
-              <label className="form-label fw-bold text-muted small text-uppercase">Key Code</label>
+              <label className="form-label fw-bold text-muted small text-uppercase">{t('redeem.keyCode')}</label>
               <input 
                 type="text" 
                 className={`form-control form-control-lg text-center fw-bold text-uppercase ${error ? 'is-invalid' : ''}`} 
@@ -68,7 +70,7 @@ function RedeemPage() {
                 disabled={loading}
               />
               {error && <div className="invalid-feedback text-center mt-2 fw-medium">{error}</div>}
-              {!error && <div className="form-text mt-2 text-center">Keys are case-insensitive.</div>}
+              {!error && <div className="form-text mt-2 text-center">{t('redeem.hint')}</div>}
             </div>
 
             <button 
@@ -81,7 +83,7 @@ function RedeemPage() {
               ) : (
                 <i className="bi bi-key"></i>
               )}
-              {loading ? 'Verifying...' : 'Redeem Key'}
+              {loading ? t('redeem.btnLoading') : t('redeem.btnDefault')}
             </button>
           </form>
         </div>
@@ -90,11 +92,11 @@ function RedeemPage() {
         {successData && (
           <div className="alert alert-success border-0 shadow-sm rounded-4 p-4 mb-4">
             <h5 className="alert-heading fw-bold mb-3">
-              <i className="bi bi-check-circle-fill me-2"></i> Activation Successful!
+              <i className="bi bi-check-circle-fill me-2"></i> {t('redeem.successTitle')}
             </h5>
             <p className="mb-2">
-              Successfully unlocked <strong>{successData.newlyUnlocked}</strong> new course(s).
-              {successData.alreadyOwned > 0 && ` (${successData.alreadyOwned} were already in your library).`}
+              {t('redeem.unlockedText')} <strong>{successData.newlyUnlocked}</strong> {t('redeem.newCourses')}
+              {successData.alreadyOwned > 0 && ` (${successData.alreadyOwned} ${t('redeem.alreadyOwned')}).`}
             </p>
             
             {/* Список разблокированных курсов */}
@@ -118,14 +120,14 @@ function RedeemPage() {
               className="btn btn-success btn-sm mt-3 fw-bold"
               onClick={() => navigate('/account')}
             >
-              Go to My Courses <i className="bi bi-arrow-right"></i>
+              {t('redeem.goToCourses')} <i className="bi bi-arrow-right"></i>
             </button>
           </div>
         )}
 
         <div className="text-center mt-4">
           <p className="text-muted">
-            Looking for your course library? <span className="text-primary fw-bold" style={{ cursor: 'pointer' }} onClick={() => navigate('/account')}>Go to Courses</span>
+            {t('redeem.lookingForLibrary')} <span className="text-primary fw-bold" style={{ cursor: 'pointer' }} onClick={() => navigate('/account')}>{t('redeem.goToCourses')}</span>
           </p>
         </div>
       </div>

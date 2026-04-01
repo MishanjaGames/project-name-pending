@@ -1,18 +1,11 @@
 import { useWishlist } from '../contexts/WishlistContext';
 
-function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t }) {
-  const gridImageStyle = {
-    width: '100%',
-    height: '160px',
-    objectFit: 'cover'
-  };
+// ДОБАВЛЯЕМ ПРАВИЛЬНЫЙ БАЗОВЫЙ URL (как просил Миша в контракте)
+const BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:4040';
 
-  const listImageStyle = {
-    width: '100%',
-    height: '100%',
-    minHeight: '180px',
-    objectFit: 'cover'
-  };
+function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t }) {
+  const gridImageStyle = { width: '100%', height: '160px', objectFit: 'cover' };
+  const listImageStyle = { width: '100%', height: '100%', minHeight: '180px', objectFit: 'cover' };
 
   const getLevelBadgeClass = (level) => {
     switch (level?.toLowerCase()) {
@@ -35,55 +28,75 @@ function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t })
 
   const { toggleWishlist, isInWishlist } = useWishlist();
 
-  // Безопасный обработчик ошибки картинки
   const handleImageError = (e) => {
     e.target.onerror = null; 
     e.target.src = 'https://placehold.co/400x250/21262d/e6edf3?text=No+Image'; 
   };
+
+  // --- УМНАЯ ПОДСТАНОВКА ДАННЫХ ИЗ БАЗЫ МИШИ ---
+  
+  // 1. Достаем название и описание (учитываем, что они могут лежать внутри массива trans)
+  const displayTitle = course.title || (course.trans && course.trans[0]?.title) || 'Без названия';
+  const displayDesc = course.description || (course.trans && course.trans[0]?.description) || 'Описание недоступно.';
+  
+  // 2. Достаем картинку и клеим правильный URL
+  let displayImg = course.img || course.thumbnailUrl || course.thumbnail;
+  if (displayImg && displayImg.startsWith('/')) {
+    // Если путь относительный (начинается со слэша), добавляем BASE_URL
+    displayImg = `${BASE_URL}${displayImg.replace('/api/api', '/api')}`; 
+  }
+
+  // 3. Безопасная цена
+  const displayPrice = course.price !== undefined && course.price !== null ? course.price : 0;
 
   // ===================== РЕЖИМ СЕТКИ (GRID) =====================
   if (viewMode === 'grid') {
     return (
       <div 
         className="card h-100 course-card border-0 shadow-sm" 
-        onClick={() => onCardClick(course.id)} 
+        onClick={() => onCardClick(course._id || course.id)} 
         style={{ cursor: 'pointer' }} 
       >
-        {/* БЛОК С КАРТИНКОЙ И ИКОНКАМИ */}
         <div className="position-relative">
           <img 
-            src={course.img} 
+            src={displayImg} 
             className="card-img-top course-img" 
-            alt={course.title} 
+            alt={displayTitle} 
             style={gridImageStyle} 
             onError={handleImageError} 
           />
-          {/* Бейджик уровня (слева) */}
           <div className="position-absolute top-0 start-0 p-2">
-             <span className={`badge ${getLevelBadgeClass(course.level)} shadow-sm`}>{course.level}</span>
+             <span className={`badge ${getLevelBadgeClass(course.level)} shadow-sm`}>
+               {course.level || 'All levels'}
+             </span>
           </div>
           
-          {/* КНОПКА ИЗБРАННОГО (справа) */}
           <button
             className="btn btn-light rounded-circle shadow-sm position-absolute top-0 end-0 m-2 d-flex justify-content-center align-items-center"
             onClick={(e) => {
               e.preventDefault(); 
-              e.stopPropagation(); // Не даем клику провалиться и открыть страницу курса
+              e.stopPropagation(); 
               toggleWishlist(course); 
             }}
             style={{ zIndex: 10, width: '35px', height: '35px', padding: 0 }}
-            title="Add to Wishlist"
+            title={t('common.addToWishlist') || 'Add to Wishlist'}
           >
             <i className={isInWishlist(course._id || course.id) ? "bi bi-heart-fill text-danger" : "bi bi-heart text-secondary"}></i>
           </button>
         </div>
         
         <div className="card-body d-flex flex-column">
-          <h6 className="card-title fw-bold mb-1 text-truncate">{course.title}</h6>
-          <p className="text-muted small mb-2 text-truncate">{course.author}</p>
+          <h6 className="card-title fw-bold mb-1 text-truncate">{displayTitle}</h6>
+          
+          {/* Выводим описание даже в режиме сетки (раньше тут был автор) */}
+          <p className="text-muted small mb-2 text-truncate" title={displayDesc}>
+            {displayDesc}
+          </p>
           
           <div className="mb-3">
-            <span className={`badge ${getTypeBadgeClass(course.type)}`}>{course.type}</span>
+            <span className={`badge ${getTypeBadgeClass(course.direction || course.type)}`}>
+              {course.direction || course.type || 'Course'}
+            </span>
           </div>
           
           <div className="mt-auto d-flex justify-content-between align-items-center gap-2">
@@ -92,7 +105,6 @@ function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t })
                 className="btn btn-sm btn-primary rounded-pill px-3 text-truncate" 
                 style={{ flexShrink: 1, minWidth: 0 }}
                 onClick={(e) => onEnroll(e, course)}
-                title={t('enroll') || 'Enroll'}
               >
                 {t('enroll') || 'Enroll'}
               </button>
@@ -105,7 +117,7 @@ function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t })
               </button>
             </div>
             <div className="fw-bold fs-5 flex-shrink-0 text-nowrap">
-              ${course.price.toFixed(2)}
+              ${displayPrice.toFixed(2)}
             </div>
           </div>
         </div>
@@ -117,26 +129,24 @@ function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t })
   return (
     <div 
       className="card h-100 course-card border-0 shadow-sm"
-      onClick={() => onCardClick(course.id)}
+      onClick={() => onCardClick(course._id || course.id)}
       style={{ cursor: 'pointer' }}
     >
       <div className="row g-0 h-100">
-        
-        {/* БЛОК С КАРТИНКОЙ И ИКОНКАМИ */}
         <div className="col-md-4 col-lg-3 position-relative">
            <img 
-              src={course.img} 
-              alt={course.title} 
+              src={displayImg} 
+              alt={displayTitle} 
               style={listImageStyle} 
               className="rounded-start course-img" 
               onError={handleImageError}
            />
-           {/* Бейджик уровня (слева) */}
            <div className="position-absolute top-0 start-0 p-2">
-              <span className={`badge ${getLevelBadgeClass(course.level)} shadow-sm`}>{course.level}</span>
+              <span className={`badge ${getLevelBadgeClass(course.level)} shadow-sm`}>
+                {course.level || 'All levels'}
+              </span>
            </div>
 
-           {/* КНОПКА ИЗБРАННОГО (справа) */}
            <button
              className="btn btn-light rounded-circle shadow-sm position-absolute top-0 end-0 m-2 d-flex justify-content-center align-items-center"
              onClick={(e) => {
@@ -145,7 +155,6 @@ function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t })
                toggleWishlist(course); 
              }}
              style={{ zIndex: 10, width: '35px', height: '35px', padding: 0 }}
-             title="Add to Wishlist"
            >
              <i className={isInWishlist(course._id || course.id) ? "bi bi-heart-fill text-danger" : "bi bi-heart text-secondary"}></i>
            </button>
@@ -155,23 +164,25 @@ function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t })
           <div className="card-body d-flex flex-column h-100">
             <div className="d-flex justify-content-between align-items-start gap-2">
                <div style={{ minWidth: 0 }}>
-                 <h5 className="card-title fw-bold mb-1 text-truncate">{course.title}</h5>
-                 <p className="text-muted small mb-2 text-truncate">{course.author}</p>
-                 <span className={`badge ${getTypeBadgeClass(course.type)}`}>{course.type}</span>
+                 <h5 className="card-title fw-bold mb-1 text-truncate">{displayTitle}</h5>
+                 <span className={`badge ${getTypeBadgeClass(course.direction || course.type)}`}>
+                   {course.direction || course.type || 'Course'}
+                 </span>
                </div>
                <div className="fw-bold fs-4 text-primary flex-shrink-0 text-nowrap">
-                  ${course.price.toFixed(2)}
+                  ${displayPrice.toFixed(2)}
                </div>
             </div>
 
-            <p className="card-text text-muted mt-3 text-truncate" style={{ whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-               Comprehensive course covering all aspects of {course.title}.
+            {/* ВЫВОДИМ РЕАЛЬНОЕ ОПИСАНИЕ ИЗ БАЗЫ */}
+            <p className="card-text text-muted mt-3" style={{ whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+               {displayDesc}
             </p>
             
             <div className="mt-auto d-flex gap-2">
               <button className="btn btn-sm btn-primary rounded-pill px-4" onClick={(e) => onEnroll(e, course)}>{t('enroll') || 'Enroll'}</button>
               <button className="btn btn-sm btn-outline-secondary rounded-pill px-3 flex-shrink-0" onClick={(e) => onAddToCart(e, course)}>
-                <i className="bi bi-cart-plus me-1"></i> Add to cart
+                <i className="bi bi-cart-plus me-1"></i> {t('common.addToCart')}
               </button>
             </div>
           </div>

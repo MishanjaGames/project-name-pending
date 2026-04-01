@@ -29,7 +29,7 @@ function LoginPage() {
       });
 
       if (!response.ok) {
-        let errorMessage = 'Login failed';
+        let errorMessage = t('common.loginFailed');
         const text = await response.text();
         try {
           errorMessage = JSON.parse(text).message || errorMessage;

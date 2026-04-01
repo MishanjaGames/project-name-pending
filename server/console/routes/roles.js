@@ -1,12 +1,14 @@
-const router = require('express').Router()
+const router     = require('express').Router()
+const passport   = require('passport')
 const controller = require('../controllers/roles')
-const passport = require('passport')
 const { validate } = require('../utils/utils')
 
-router.get('/', passport.authenticate('jwt', { session: false }), validate('manage'), controller.getAll)
-router.get('/:id', passport.authenticate('jwt', { session: false }), validate('manage'), controller.getById)
-router.post('/', passport.authenticate('jwt', { session: false }), validate('manage'), controller.create)
-router.put('/:id', passport.authenticate('jwt', { session: false }), validate('manage'), controller.update)
-router.delete('/:id', passport.authenticate('jwt', { session: false }), validate('manage'), controller.remove)
+const auth = passport.authenticate('jwt', { session: false })
+
+router.get('/',    auth, validate('manage'), controller.getAll)
+router.get('/:id', auth, validate('manage'), controller.getById)
+router.post('/',   auth, validate('manage'), controller.create)
+router.put('/:id', auth, validate('manage'), controller.update)
+router.delete('/:id', auth, validate('manage'), controller.remove)
 
 module.exports = router

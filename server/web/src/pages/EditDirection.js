@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Navbar } from '../components/Navbar';
+import AppLayout from '../components/Layout';
+import { UtilityModal } from '../components/UtilityModal';
 
 function EditDirection({ data, onLogout }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const [directionName, setDirectionName] = useState('');
   const [loading, setLoading] = useState(true);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
   const [saving, setSaving] = useState(false);
 
   const token = localStorage.getItem('token');
@@ -18,17 +24,17 @@ function EditDirection({ data, onLogout }) {
   const fetchDirection = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:4040/api/directions/${id}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/directions/${id}`);
       if (response.ok) {
-        const data = await response.json();
+        const {data} = await response.json();
         setDirectionName(data.directionName);
       } else {
-        alert('Direction not found');
+        showInfo('Error', 'Direction not found');
         navigate('/manage/directions');
       }
     } catch (err) {
       console.error('Error fetching direction:', err);
-      alert('Failed to load direction');
+      showInfo('Error', 'Failed to load direction');
       navigate('/manage/directions');
     } finally {
       setLoading(false);
@@ -39,14 +45,14 @@ function EditDirection({ data, onLogout }) {
     e.preventDefault();
 
     if (!directionName.trim()) {
-      alert('Please enter a direction name');
+      showInfo('Validation', 'Please enter a direction name');
       return;
     }
 
     setSaving(true);
 
     try {
-      const response = await fetch(`http://localhost:4040/api/directions/${id}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/directions/${id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
@@ -59,15 +65,15 @@ function EditDirection({ data, onLogout }) {
       });
 
       if (response.ok) {
-        alert('Direction updated successfully');
+        showInfo('Success', 'Direction updated successfully');
         navigate('/manage/directions');
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to update direction');
+        showInfo('Error', error.message || 'Failed to update direction');
       }
     } catch (err) {
       console.error('Error updating direction:', err);
-      alert('Failed to update direction');
+      showInfo('Error', 'Failed to update direction');
     } finally {
       setSaving(false);
     }
@@ -75,21 +81,19 @@ function EditDirection({ data, onLogout }) {
 
   if (loading) {
     return (
-      <>
-        <Navbar data={data} onLogout={onLogout} />
-        <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
+    <AppLayout data={data} onLogout={onLogout} title="Edit Direction">
+<div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
           <div className="text-center py-5">
             <div className="spinner-border text-primary"></div>
           </div>
         </div>
-      </>
+      </AppLayout>
     );
   }
 
   return (
-    <>
-      <Navbar data={data} onLogout={onLogout} />
-      <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
+    <AppLayout data={data} onLogout={onLogout} title="Edit Direction">
+<div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="mb-0">Edit Direction</h2>
           <button
@@ -162,7 +166,19 @@ function EditDirection({ data, onLogout }) {
           </div>
         </div>
       </div>
-    </>
+        <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
+    </AppLayout>
+
   );
 }
 

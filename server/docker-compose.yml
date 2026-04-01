@@ -1,0 +1,181 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# HOW TO DEPLOY:
+#   1. Edit .env — set SERVER_HOST to your server IP or domain
+#   2. Set USE_HTTPS=false for HTTP, USE_HTTPS=true for HTTPS
+#   3. Run: docker-compose up -d --build
+#
+# Ports:
+#   HTTP  → Web :4000  |  API :4040  |  RTC :5050
+#   HTTPS → Web :4004  |  API :4043  |  RTC :5051
+# ═══════════════════════════════════════════════════════════════════════════════
+
+x-protocol: &protocol
+  # Derives protocol string from USE_HTTPS — used in URL construction below
+  USE_HTTPS: ${USE_HTTPS:-false}
+
+services:
+  # ── CONSOLE (Main REST API) ────────────────────────────────────────────────
+  app:
+    build:
+      context: ./console
+      dockerfile: Dockerfile
+    container_name: console_app
+    restart: unless-stopped
+    env_file:
+      - .env
+      - ./console/.env
+    environment:
+      USE_HTTPS: ${USE_HTTPS:-false}
+      API_PORT_HTTP: ${API_PORT_HTTP:-4040}
+      API_PORT_HTTPS: ${API_PORT_HTTPS:-4043}
+      DB_URL: ${DB_URL}
+      MONGODB_URI: ${MONGODB_URI}
+      MONGO_URI: ${MONGO_URI}
+      DB_NAME: ${DB_NAME:-P_01}
+      JWT_SECRET: ${JWT_SECRET}
+      SECRET: ${SECRET}
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
+      # CORS: allow both protocols on the actual server host + localhost fallback
+      ALLOWED_ORIGINS: >-
+        http://${SERVER_HOST:-localhost}:${WEB_PORT_HTTP:-4000},
+        https://${SERVER_HOST:-localhost}:${WEB_PORT_HTTPS:-4004},
+        http://${SERVER_HOST:-localhost}:${API_PORT_HTTP:-4040},
+        https://${SERVER_HOST:-localhost}:${API_PORT_HTTPS:-4043},
+        http://${SERVER_HOST:-localhost}:${RTC_PORT_HTTP:-5050},
+        https://${SERVER_HOST:-localhost}:${RTC_PORT_HTTPS:-5051},
+        http://localhost:3000,https://localhost:3000,
+        http://localhost:4000,https://localhost:4004
+    volumes:
+      - app_storage:/app/storage
+    networks:
+      - app-network
+
+  # ── NGINX proxy for Console API ────────────────────────────────────────────
+  nginx-api:
+    build:
+      context: ./console
+      dockerfile: Dockerfile.nginx
+    container_name: nginx-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT_HTTP:-4040}:80"
+      - "${API_PORT_HTTPS:-4043}:443"
+    depends_on:
+      - app
+    networks:
+      - app-network
+
+  # ── LOCAL MONGO (optional — app uses cloud Atlas by default) ───────────────
+  mongo:
+    image: mongo:7
+    container_name: console_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - app-network
+
+  # ── RTC signaling server ───────────────────────────────────────────────────
+  rtc:
+    build:
+      context: ./rtc
+      dockerfile: Dockerfile
+    container_name: rtc-server
+    restart: unless-stopped
+    env_file:
+      - .env
+      - ./rtc/.env
+    environment:
+      USE_HTTPS: ${USE_HTTPS:-false}
+      RTC_PORT_HTTP: ${RTC_PORT_HTTP:-5050}
+      RTC_PORT_HTTPS: ${RTC_PORT_HTTPS:-5051}
+      JWT_SECRET: ${JWT_SECRET}
+      MONGO_URI: ${MONGO_URI}
+      STUN_URLS: ${STUN_URLS:-stun:coturn:3478}
+      TURN_URL: ${TURN_URL:-turn:coturn:3478}
+      TURN_USERNAME: ${TURN_USERNAME:-rtcuser}
+      TURN_CREDENTIAL: ${TURN_CREDENTIAL:-changeme}
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
+      ALLOWED_ORIGINS: >-
+        http://${SERVER_HOST:-localhost}:${WEB_PORT_HTTP:-4000},
+        https://${SERVER_HOST:-localhost}:${WEB_PORT_HTTPS:-4004},
+        http://localhost:3000,https://localhost:3000,
+        http://localhost:4000,https://localhost:4004
+    depends_on:
+      - coturn
+    networks:
+      - app-network
+      - rtc-net
+
+  # ── NGINX proxy for RTC ────────────────────────────────────────────────────
+  nginx-rtc:
+    build:
+      context: ./rtc
+      dockerfile: Dockerfile.nginx
+    container_name: nginx-rtc
+    restart: unless-stopped
+    ports:
+      - "${RTC_PORT_HTTP:-5050}:80"
+      - "${RTC_PORT_HTTPS:-5051}:443"
+    depends_on:
+      - rtc
+    networks:
+      - app-network
+      - rtc-net
+
+  # ── COTURN STUN/TURN ───────────────────────────────────────────────────────
+  coturn:
+    image: coturn/coturn:latest
+    container_name: coturn
+    restart: unless-stopped
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "5349:5349/tcp"
+      - "5349:5349/udp"
+    volumes:
+      - ./rtc/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    networks:
+      - rtc-net
+
+  # ── WEB FRONTEND (React) ───────────────────────────────────────────────────
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_EMAILJS_PUBLIC_KEY: ${REACT_APP_EMAILJS_PUBLIC_KEY}
+    container_name: web-frontend
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT_HTTP:-4000}:80"
+      - "${WEB_PORT_HTTPS:-4004}:443"
+    # URLs injected at RUNTIME by docker-entrypoint.sh.
+    # Set REACT_APP_API_URL and REACT_APP_RTC_URL in .env to match your server.
+    environment:
+      REACT_APP_USE_HTTPS: ${USE_HTTPS:-false}
+      REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:4040/api}
+      REACT_APP_RTC_URL: ${REACT_APP_RTC_URL:-http://localhost:5050}
+    networks:
+      - app-network
+    depends_on:
+      - app
+      - rtc
+
+volumes:
+  mongo_data:
+  app_storage:
+
+networks:
+  app-network:
+    driver: bridge
+  rtc-net:
+    driver: bridge

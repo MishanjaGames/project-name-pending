@@ -256,10 +256,10 @@ export default function AddCourseForm() {
                         className="form-select" name="direction" 
                         value={formData.direction} onChange={handleChange}
                     >
-                        <option value="Programming">Programming</option>
-                        <option value="Game Dev">Game Dev</option>
-                        <option value="Data Science">Data Science</option>
-                        <option value="Design">Design</option>
+                        <option value="Programming">{t('directions.programming')}</option>
+                        <option value="Game Dev">{t('directions.gameDev')}</option>
+                        <option value="Data Science">{t('directions.dataSciense')}</option>
+                        <option value="Design">{t('directions.design')}</option>
                     </select>
                 </div>
 
@@ -270,10 +270,10 @@ export default function AddCourseForm() {
                         className="form-select" name="level" 
                         value={formData.level} onChange={handleChange}
                     >
-                        <option value="Junior">Junior</option>
-                        <option value="Middle">Middle</option>
-                        <option value="Senior">Senior</option>
-                        <option value="Guru">Guru 🚀</option>
+                        <option value="Junior">{t('levels.junior')}</option>
+                        <option value="Middle">{t('levels.middle')}</option>
+                        <option value="Senior">{t('levels.senior')}</option>
+                        <option value="Guru">{t('levels.guru')}</option>
                     </select>
                 </div>
 

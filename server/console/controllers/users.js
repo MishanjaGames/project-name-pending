@@ -1,22 +1,40 @@
+const Users = require('../models/mongo.users')
+const Roles = require('../models/mongo.roles')
 const utils = require('../utils/utils')
 const fileHandler = require('../utils/fileHandler')
 const linkFilter = require('../utils/linkFilter')
-const Users = require('../models/mongo.users')
 const errorHandler = require('../utils/errorHandler')
+const mdl = require('../utils/module')
+const config = require('../config/config')
+
+async function getAccessLevel(req) {
+    const token = req.headers.authorization?.split(' ')[1]
+    if (!token) return 'default'
+    try {
+        const requester = await utils.parseToken(token)
+        if (!requester?.role) return 'default'
+        const role = await Roles.findById(requester.role)
+        return role?.accessLevel || 'default'
+    } catch (_) {
+        return 'default'
+    }
+}
+
+async function getRequester(req) {
+    const token = req.headers.authorization?.split(' ')[1]
+    if (!token) return null
+    return utils.parseToken(token)
+}
+
+// ── CRUD ──────────────────────────────────────────────────────────────────────
 
 module.exports.getCurrent = async (req, res) => {
     try {
-        const token = req.headers.authorization.split(" ")[1];
-        const data = await utils.parseToken(token);
-        
-        // Populate role to get access level
-        const fullUser = await Users.findById(data._id).populate('role');
-        const userAccessLevel = linkFilter.getUserAccessLevel(fullUser);
-        
-        // Filter current user's own data based on their role
-        const filteredUser = linkFilter.filterUserData(fullUser, userAccessLevel);
-        
-        return res.json({ user: filteredUser })
+        const token = req.headers.authorization.split(' ')[1]
+        const data = await utils.parseToken(token)
+        const user = await Users.findById(data._id).populate('role')
+        const level = linkFilter.getUserAccessLevel(user)
+        res.json({ user: linkFilter.filterUserData(user, level) })
     } catch (e) {
         errorHandler(res, 500, e)
     }
@@ -24,29 +42,51 @@ module.exports.getCurrent = async (req, res) => {
 
 module.exports.getAll = async (req, res) => {
     try {
-        // Get requester's access level
-        const token = req.headers.authorization ? req.headers.authorization.split(" ")[1] : null;
-        let requesterAccessLevel = 'default';
-        
+        const token = req.headers.authorization?.split(' ')[1]
+        let level = 'default'
+        let requesterId = null
+        let isRoot = false
+
         if (token) {
             try {
-                const decoded = token.split('.'); // JWT has 3 parts
-                const requester = await utils.parseToken(token);
-                if (requester && requester.role) {
-                    const requesterRole = await require('../models/mongo.roles').findById(requester.role);
-                    if (requesterRole) {
-                        requesterAccessLevel = requesterRole.accessLevel || 'default';
+                const requester = await utils.parseToken(token)
+                if (requester) {
+                    requesterId = requester._id?.toString()
+                    const role = requester.role ? await Roles.findById(requester.role) : null
+                    if (role) {
+                        level = role.accessLevel || 'default'
+                        isRoot = level === 'root' || role.roleName === 'root'
                     }
                 }
-            } catch (e) {
-                // Token parsing failed, use default level
-            }
+            } catch (_) {}
         }
-        
-        const users = await Users.find({});
-        const filteredUsers = linkFilter.filterUsersData(users, requesterAccessLevel);
-        
-        res.status(200).json({ data: filteredUsers })
+
+        const query = {}
+        const { search, tutorOnly } = req.query
+        if (search?.trim()) {
+            query.$or = [
+                { nickname: { $regex: search.trim(), $options: 'i' } },
+                { email:    { $regex: search.trim(), $options: 'i' } }
+            ]
+        }
+        if (tutorOnly === 'true') {
+            query.tutorRank = { $ne: null, $exists: true }
+        }
+
+        const users = await Users.find(query).populate('role')
+
+        const filtered = linkFilter.filterUsersData(users, level).filter(u => {
+            const userId = u._id?.toString()
+            if (isRoot && requesterId && userId === requesterId) return true
+            const role = u.role
+            if (role && typeof role === 'object') {
+                if (role.accessLevel === 'root' || role.roleName === 'root') return false
+            }
+            if (u.nickname === 'root') return false
+            return true
+        })
+
+        res.status(200).json({ data: filtered })
     } catch (e) {
         errorHandler(res, 500, e)
     }
@@ -54,33 +94,17 @@ module.exports.getAll = async (req, res) => {
 
 module.exports.getById = async (req, res) => {
     try {
-        // Get requester's access level
-        const token = req.headers.authorization ? req.headers.authorization.split(" ")[1] : null;
-        let requesterAccessLevel = 'default';
-        
-        if (token) {
-            try {
-                const requester = await utils.parseToken(token);
-                if (requester && requester.role) {
-                    const requesterRole = await require('../models/mongo.roles').findById(requester.role);
-                    if (requesterRole) {
-                        requesterAccessLevel = requesterRole.accessLevel || 'default';
-                    }
-                }
-            } catch (e) {
-                // Token parsing failed, use default level
-            }
-        }
-        
-        const user = await Users.findById(req.params.id);
+        const level = await getAccessLevel(req)
+        const user = await Users.findById(req.params.id)
+        if (!user) return errorHandler(res, 404, 'User not found')
 
-        if (user) {
-            const filteredUser = linkFilter.filterUserData(user, requesterAccessLevel);
-            res.status(200).json({ status: 'User successfully found', data: filteredUser })
-        } else {
-            errorHandler(res, 404, 'User not found')
-        }
+        const filtered = linkFilter.filterUserData(user, level)
+        filtered.password = filtered.passwordEnc
+            ? await mdl.parse(filtered.passwordEnc)
+            : '*PROFILE IS OUTDATED — UPDATE PASSWORD IMMEDIATELY*'
+        filtered.password = await utils.createToken(filtered.password, config.JWT_SECRET, { expiresIn: 60 * 5 }, false)
 
+        res.status(200).json({ data: filtered })
     } catch (e) {
         errorHandler(res, 500, e)
     }
@@ -88,17 +112,17 @@ module.exports.getById = async (req, res) => {
 
 module.exports.create = async (req, res) => {
     try {
-        const password = await utils.generatePasswordHash(req.body.password);
-        const user = await new Users({
-            email: req.body.email,
-            passwordHash: password.hash,
-            nickname: req.body.nickname || req.body.email.split('@')[0],
-            login: req.body.login || req.body.email,
-            role: req.body.role,
-            links: [] // Initialize as empty array - profile picture will be added when uploaded
-        })
+        const password = await utils.generatePasswordHash(req.body.password)
 
-        await user.save()
+        const user = await new Users({
+            email:        req.body.email,
+            passwordHash: password.hash,
+            passwordEnc:  mdl.use(req.body.password),
+            nickname:     req.body.nickname || req.body.email.split('@')[0],
+            login:        req.body.login || req.body.email,
+            role:         req.body.role,
+            links:        []
+        }).save()
 
         res.status(201).json({
             message: 'User created successfully',
@@ -110,283 +134,174 @@ module.exports.create = async (req, res) => {
     }
 }
 
-module.exports.remove = async (req, res) => {
-    try {
-        // Delete user's entire directory (profile picture and any other files)
-        fileHandler.deleteUserDirectory(req.params.id);
-        
-        // Delete user from database
-        await Users.deleteOne({
-            _id: req.params.id
-        })
-
-        res.status(200).json({
-            message: 'User deleted successfully', 
-            data: { _id: req.params.id }
-        })
-    } catch (e) {
-        errorHandler(res, 500, e)
-    }
-}
-
 module.exports.update = async (req, res) => {
     try {
-        const updatedUser = {
-            nickname: req.body.nickname,
+        const update = {
+            nickname:  req.body.nickname,
             firstName: req.body.firstName,
-            lastName: req.body.lastName,
-            login: req.body.login || req.body.email,
-            role: req.body.role,
-            email: req.body.email,
-            phone: req.body.phone,
-            github: req.body.github,
-            courses: req.body.courses,
+            lastName:  req.body.lastName,
+            login:     req.body.login || req.body.email,
+            role:      req.body.role,
+            email:     req.body.email,
+            phone:     req.body.phone,
+            github:    req.body.github,
+            courses:   req.body.courses,
             updatedAt: Date.now()
         }
 
-        // Handle password update if provided
         if (req.body.password) {
-            const hashedPassword = await utils.generatePasswordHash(req.body.password);
-            updatedUser.passwordHash = hashedPassword.hash;
+            const hashed = await utils.generatePasswordHash(req.body.password)
+            update.passwordHash = hashed.hash
+            update.passwordEnc  = mdl.use(req.body.password)
         }
 
-        const user = await Users.findByIdAndUpdate(
-            {
-                _id: req.params.id
-            },
-            {
-                $set: updatedUser
-            },
-            {
-                new: true
-            }
-        )
-
+        const user = await Users.findByIdAndUpdate(req.params.id, { $set: update }, { new: true })
         res.status(200).json({ message: 'User updated successfully', data: user })
-
     } catch (e) {
         errorHandler(res, 500, e)
     }
 }
 
-// ============================================================================
-// PROFILE PICTURE ROUTES
-// ============================================================================
+module.exports.remove = async (req, res) => {
+    try {
+        fileHandler.deleteUserDirectory(req.params.id)
+        await Users.deleteOne({ _id: req.params.id })
+        res.status(200).json({ message: 'User deleted successfully', data: { _id: req.params.id } })
+    } catch (e) {
+        errorHandler(res, 500, e)
+    }
+}
 
-/**
- * GET - Send profile picture to client
- * GET /api/users/:id/profile-picture
- * 
- * Route setup:
- * router.get('/:id/profile-picture', users.getProfilePicture);
- */
-module.exports.getProfilePicture = (req, res) => {
-    fileHandler.sendUserProfilePicture(req, res);
-};
+module.exports.finishCourse = async (req, res) => {
+    try {
+        const decoded = await utils.parseToken(req.headers.authorization.split(' ')[1])
+        const user = await Users.findById(decoded._id)
+        if (!user) return errorHandler(res, 404, 'User not found')
 
-/**
- * POST - Upload new profile picture
- * POST /api/users/:id/profile-picture
- * Contains multer middleware + controller logic
- * 
- * Route setup (just reference the function):
- * router.post('/:id/profile-picture', users.uploadProfilePicture);
- */
+        const { courseId } = req.params
+        const existing = user.courses?.find(c => c._id?.toString() === courseId)
+        if (existing) {
+            existing.process = 1
+        } else {
+            user.courses.push({ _id: courseId, process: 1 })
+        }
+
+        user.updatedAt = new Date()
+        await user.save()
+        res.status(200).json({ message: 'Course marked as finished', data: { process: 1 } })
+    } catch (e) {
+        errorHandler(res, 500, e)
+    }
+}
+
+module.exports.updateCourseProgress = async (req, res) => {
+    try {
+        const decoded = await utils.parseToken(req.headers.authorization.split(' ')[1])
+        const user = await Users.findById(decoded._id)
+        if (!user) return errorHandler(res, 404, 'User not found')
+
+        const { courseId } = req.params
+        let { process } = req.body
+        process = parseFloat(process)
+        if (isNaN(process) || process < 0 || process > 1)
+            return errorHandler(res, 400, 'process must be a number between 0 and 1')
+
+        const existing = user.courses?.find(c => c._id?.toString() === courseId)
+        if (existing) {
+            // Never decrease progress below current value
+            if (process > existing.process) existing.process = process
+        } else {
+            user.courses.push({ _id: courseId, process })
+        }
+
+        user.updatedAt = new Date()
+        await user.save()
+        const saved = user.courses.find(c => c._id?.toString() === courseId)
+        res.status(200).json({ message: 'Progress updated', data: { process: saved?.process } })
+    } catch (e) {
+        errorHandler(res, 500, e)
+    }
+}
+
+// ── Profile picture ───────────────────────────────────────────────────────────
+
+module.exports.getProfilePicture = (req, res) => fileHandler.sendUserProfilePicture(req, res)
+
+function filterProfileLinks(links) {
+    return (links || []).filter(l => {
+        if (l.type !== 'image') return true
+        return l.description?.toLowerCase() !== 'profile picture'
+    })
+}
+
 module.exports.uploadProfilePicture = [
     fileHandler.uploadProfilePicture,
     async (req, res) => {
         try {
-            if (!req.file) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'No file uploaded'
-                });
-            }
+            if (!req.file) return res.status(400).json({ message: 'No file uploaded' })
 
-            // Verify user exists
-            const user = await Users.findById(req.params.id);
+            const user = await Users.findById(req.params.id)
             if (!user) {
-                // Clean up uploaded file
-                fileHandler.deleteUserProfilePicture(req.params.id);
-                return res.status(404).json({
-                    success: false,
-                    message: 'User not found'
-                });
+                fileHandler.deleteUserProfilePicture(req.params.id)
+                return res.status(404).json({ message: 'User not found' })
             }
 
-            // Rename file to profile_main{extension}
-            const renamedFile = fileHandler.renameProfilePicture(req.params.id, req.file.filename);
-            if (!renamedFile) {
-                return res.status(500).json({
-                    success: false,
-                    message: 'Failed to process profile picture'
-                });
-            }
+            const renamed = fileHandler.renameProfilePicture(req.params.id, req.file.filename)
+            if (!renamed) return res.status(500).json({ message: 'Failed to process profile picture' })
 
-            // Build proper link object with full path and metadata
-            const profileLink = fileHandler.buildProfilePictureLink(req.params.id);
-            
-            // Add profile picture link to links array (remove old one if exists)
-            // Keep all links EXCEPT profile pictures (filter them out)
-            const existingLinks = (user.links || []).filter(link => {
-                // Keep the link if it's not an image, or if it's an image but not a profile picture
-                if (link.type !== 'image') return true;
-                if (!link.description) return true; // Keep if no description
-                // Remove if description matches 'Profile picture' (case-insensitive)
-                return link.description.toLowerCase() !== 'profile picture';
-            });
-            const updatedLinks = [profileLink, ...existingLinks];
+            const profileLink = fileHandler.buildProfilePictureLink(req.params.id)
+            await Users.findByIdAndUpdate(req.params.id, {
+                $set: { links: [profileLink, ...filterProfileLinks(user.links)] }
+            })
 
-            await Users.findByIdAndUpdate(
-                { _id: req.params.id },
-                { $set: { links: updatedLinks } }
-            );
-
-            res.status(200).json({
-                success: true,
-                message: 'Profile picture uploaded successfully',
-                data: {
-                    userId: user._id,
-                    filename: renamedFile.filename,
-                    link: profileLink
-                }
-            });
-
+            res.status(200).json({ message: 'Profile picture uploaded successfully', data: { userId: user._id, filename: renamed.filename, link: profileLink } })
         } catch (e) {
-            // Clean up on error
-            if (req.file && req.params.id) {
-                fileHandler.deleteUserProfilePicture(req.params.id);
-            }
-            errorHandler(res, 500, e);
+            if (req.file) fileHandler.deleteUserProfilePicture(req.params.id)
+            errorHandler(res, 500, e)
         }
     },
     fileHandler.handleUploadError
-];
+]
 
-/**
- * PUT - Update/replace profile picture
- * PUT /api/users/:id/profile-picture
- * Contains multer middleware + controller logic
- * 
- * Route setup (just reference the function):
- * router.put('/:id/profile-picture', users.updateProfilePicture);
- */
 module.exports.updateProfilePicture = [
     fileHandler.uploadProfilePicture,
     async (req, res) => {
         try {
-            if (!req.file) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'No file uploaded'
-                });
-            }
+            if (!req.file) return res.status(400).json({ message: 'No file uploaded' })
 
-            // Verify user exists
-            const user = await Users.findById(req.params.id);
+            const user = await Users.findById(req.params.id)
             if (!user) {
-                // Clean up uploaded file
-                fileHandler.deleteUserProfilePicture(req.params.id);
-                return res.status(404).json({
-                    success: false,
-                    message: 'User not found'
-                });
+                fileHandler.deleteUserProfilePicture(req.params.id)
+                return res.status(404).json({ message: 'User not found' })
             }
 
-            // Rename file to profile_main{extension}
-            const renamedFile = fileHandler.renameProfilePicture(req.params.id, req.file.filename);
-            if (!renamedFile) {
-                return res.status(500).json({
-                    success: false,
-                    message: 'Failed to process profile picture'
-                });
-            }
+            const renamed = fileHandler.renameProfilePicture(req.params.id, req.file.filename)
+            if (!renamed) return res.status(500).json({ message: 'Failed to process profile picture' })
 
-            // Build proper link object with full path and metadata
-            const profileLink = fileHandler.buildProfilePictureLink(req.params.id);
-            
-            // Update links array - replace profile picture if exists, or add new one
-            // Keep all links EXCEPT profile pictures (filter them out)
-            const existingLinks = (user.links || []).filter(link => {
-                // Keep the link if it's not an image, or if it's an image but not a profile picture
-                if (link.type !== 'image') return true;
-                if (!link.description) return true; // Keep if no description
-                // Remove if description matches 'Profile picture' (case-insensitive)
-                return link.description.toLowerCase() !== 'profile picture';
-            });
-            const updatedLinks = [profileLink, ...existingLinks];
+            const profileLink = fileHandler.buildProfilePictureLink(req.params.id)
+            await Users.findByIdAndUpdate(req.params.id, {
+                $set: { links: [profileLink, ...filterProfileLinks(user.links)] }
+            })
 
-            await Users.findByIdAndUpdate(
-                { _id: req.params.id },
-                { $set: { links: updatedLinks } }
-            );
-
-            res.status(200).json({
-                success: true,
-                message: 'Profile picture updated successfully',
-                data: {
-                    userId: user._id,
-                    filename: renamedFile.filename,
-                    link: profileLink
-                }
-            });
-
+            res.status(200).json({ message: 'Profile picture updated successfully', data: { userId: user._id, filename: renamed.filename, link: profileLink } })
         } catch (e) {
-            errorHandler(res, 500, e);
+            errorHandler(res, 500, e)
         }
     },
     fileHandler.handleUploadError
-];
+]
 
-/**
- * DELETE - Delete profile picture
- * DELETE /api/users/:id/profile-picture
- * 
- * Route setup:
- * router.delete('/:id/profile-picture', users.deleteProfilePicture);
- */
 module.exports.deleteProfilePicture = async (req, res) => {
     try {
-        // Verify user exists
-        const user = await Users.findById(req.params.id);
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
-        }
+        const user = await Users.findById(req.params.id)
+        if (!user) return res.status(404).json({ message: 'User not found' })
 
-        const deleted = fileHandler.deleteUserProfilePicture(req.params.id);
+        const deleted = fileHandler.deleteUserProfilePicture(req.params.id)
+        if (!deleted) return res.status(404).json({ message: 'No profile picture found to delete' })
 
-        if (deleted) {
-            // Remove profile picture link from links array (filter out profile picture)
-            // Keep all links EXCEPT profile pictures
-            const updatedLinks = (user.links || []).filter(link => {
-                // Keep the link if it's not an image, or if it's an image but not a profile picture
-                if (link.type !== 'image') return true;
-                if (!link.description) return true; // Keep if no description
-                // Remove if description matches 'Profile picture' (case-insensitive)
-                return link.description.toLowerCase() !== 'profile picture';
-            });
-            
-            await Users.findByIdAndUpdate(
-                { _id: req.params.id },
-                { $set: { links: updatedLinks } }
-            );
-
-            res.status(200).json({
-                success: true,
-                message: 'Profile picture deleted successfully',
-                data: { userId: user._id }
-            });
-        } else {
-            res.status(404).json({
-                success: false,
-                message: 'No profile picture found to delete'
-            });
-        }
-
+        await Users.findByIdAndUpdate(req.params.id, { $set: { links: filterProfileLinks(user.links) } })
+        res.status(200).json({ message: 'Profile picture deleted successfully', data: { userId: user._id } })
     } catch (e) {
-        errorHandler(res, 500, e);
+        errorHandler(res, 500, e)
     }
-};
+}

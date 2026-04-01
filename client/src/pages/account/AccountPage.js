@@ -130,7 +130,7 @@ function AccountPage() {
                 {createdCourses.length === 0 ? (
                    <div className="text-center py-4 text-muted border rounded bg-light">
                      <p className="mb-2">{t('accountPage.noCreatedCourses')}</p>
-                     <button className="btn btn-sm btn-success" onClick={() => navigate('/create-course')}>{t('accountPage.createFirstCourse')}</button>
+                     <button className="btn btn-sm btn-success" onClick={() => navigate('/add-course')}>{t('accountPage.createFirstCourse')}</button>
                    </div>
                 ) : (
                   <div className="d-grid gap-3">
@@ -178,7 +178,7 @@ function AccountPage() {
                                   e.stopPropagation(); 
                                   navigate(`/manage/session/${c._id || c.id}`);
                                 }}
-                                title="Manage Session"
+                                title={t('common.manageSession')}
                               >
                                  <i className="bi bi-kanban me-1"></i> {t('accountPage.manage')}
                               </button>

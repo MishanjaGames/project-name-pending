@@ -1,3 +1,4 @@
+import { toHttps } from '../utils/utils';
 /**
  * formConfigs.js
  *
@@ -12,7 +13,7 @@
  *   title:       string   — page / card heading
  *   description: string   — subtitle shown on the public form
  *
- *   apiBase:   string     — base URL, e.g. "http://localhost:4040/api"
+ *   apiBase:   string     — base URL, e.g. (toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api')) + ""
  *   listPath:  string     — client-side route for the admin list
  *   viewPath:  fn(id)     — client-side route for the admin detail view
  *
@@ -85,11 +86,57 @@ const get = (obj, path) => path.split('.').reduce((o, k) => o?.[k], obj);
  * Collecting: name, about, skills with certificates and work examples.
  */
 export const creatorApplicationConfig = {
+    formType:    'tutor',
+    title:       'Tutor Application',
+    description: 'Fill the form to apply for a tutor role. HRs will contact you after review.',
+
+    apiBase:  toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api'),
+    listPath: '/manage/forms',
+    viewPath: (id) => `/manage/forms/detail/${id}`,
+
+    // ── Public form fields ────────────────────────────────────────────────────
+    fields: [
+        { name: 'firstName', label: 'First Name', type: 'text',     required: true,  placeholder: 'John',  col: 6 },
+        { name: 'lastName',  label: 'Last Name',  type: 'text',     required: true,  placeholder: 'Smith', col: 6 },
+        { name: 'email', label: 'Write your Email address', type: 'email',     required: true,  placeholder: 'example@email.com',  col: 12 },
+        { name: 'about',     label: 'Tell us about yourself', type: 'textarea', required: true,
+          rows: 4, placeholder: 'Your background, teaching experience, what you are passionate about…' },
+    ],
+
+    // ── Skills section ────────────────────────────────────────────────────────
+    skills: {
+        label:    'Skills',
+        required: true,
+        minCount: 1,
+        knowledgeTypes:   SHARED_KNOWLEDGE_TYPES,
+        subjectsByType:   SHARED_SUBJECTS_BY_TYPE,
+        knowledgeSources: SHARED_KNOWLEDGE_SOURCES,
+    },
+
+    // ── Agreement checkbox ────────────────────────────────────────────────────
+    agreement: {
+        label:    'I agree to the terms and conditions of the teacher application program',
+        required: true,
+    },
+
+    // ── Admin list display ────────────────────────────────────────────────────
+    getTitle:    (s) => `${s.data?.firstName ?? ''} ${s.data?.lastName ?? ''}`.trim() || '(no name)',
+    getSubtitle: (s) => s.data?.about ? `${s.data.about.substring(0, 70)}${s.data.about.length > 70 ? '…' : ''}` : '',
+    getInitials: (s) => `${s.data?.firstName?.[0] ?? '?'}${s.data?.lastName?.[0] ?? ''}`,
+
+    // ── Admin detail info card ────────────────────────────────────────────────
+    infoCardTitle: 'Applicant Information',
+    infoFields: [
+        { key: 'about', label: 'About' },
+    ],
+};
+
+export const tutorApplicationConfig = {
     formType:    'creator',
     title:       'Creator Application',
-    description: 'Fill the form to apply for a teacher role. An administrator will contact you after review.',
+    description: 'Fill the form to apply for a creator role. HRs will contact you after review.',
 
-    apiBase:  'http://localhost:4040/api',
+    apiBase:  toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api'),
     listPath: '/manage/forms',
     viewPath: (id) => `/manage/forms/detail/${id}`,
 
@@ -137,16 +184,16 @@ export const supportTicketConfig = {
     formType:    'support-ticket',
     title:       'Support Ticket',
     description: 'Report a problem or ask a question.',
-    apiBase:     'http://localhost:4040/api',
+    apiBase:     toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api'),
     listPath:    '/manage/forms/support-ticket',
     viewPath:    (id) => `/manage/forms/support-ticket/${id}`,
     fields: [
-        { name: 'name',        label: 'Your Name',    type: 'text',   required: true, col: 6 },
-        { name: 'email',       label: 'Email',        type: 'email',  required: true, col: 6 },
-        { name: 'subject',     label: 'Subject',      type: 'text',   required: true },
-        { name: 'description', label: 'Description',  type: 'textarea', required: true, rows: 5 },
+        { name: 'name',        label: 'Your Name',    type: 'text',   required: true, placeholder: 'John Smith', col: 6 },
+        { name: 'email',       label: 'Email',        type: 'email',  required: true, placeholder: 'example@email.com', col: 6 },
+        { name: 'subject',     label: 'Subject',      type: 'text',   required: true, placeholder: 'Something doesnt work...'},
+        { name: 'description', label: 'Description (Describe your problem in details as much as you can)',  type: 'textarea', required: true, placeholder: 'This or that doesnt work...', rows: 5 },
         { name: 'severity',    label: 'Severity',     type: 'select', required: true,
-          options: ['low', 'medium', 'high', 'critical'] },
+          options: ['Low', 'Medium', 'High', 'Critical', 'Emergency'] },
     ],
     skills:    null,
     agreement: null,
@@ -168,5 +215,6 @@ export const supportTicketConfig = {
  */
 export const FORM_CONFIGS = {
     [creatorApplicationConfig.formType]: creatorApplicationConfig,
+    [tutorApplicationConfig.formType]: tutorApplicationConfig,
     [supportTicketConfig.formType]: supportTicketConfig,
 };

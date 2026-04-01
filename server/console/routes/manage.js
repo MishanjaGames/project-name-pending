@@ -1,15 +1,13 @@
-const router = require('express').Router()
-const userRouter = require('./users')
-const coursesRouter = require('./courses')
-const roleRouter = require('./roles')
-const filesRouter = require('./manage/files')
-const formsRouter = require('./forms')
+const router   = require('express').Router()
 const passport = require('passport')
 const { validate } = require('../utils/utils')
 
-router.use('/courses', passport.authenticate('jwt', {session: false}), validate('create'), coursesRouter)
-router.use('/users', passport.authenticate('jwt', {session: false}), validate('manage'), userRouter)
-router.use('/roles', passport.authenticate('jwt', {session: false}), validate('manage'), roleRouter)
-router.use('/files', passport.authenticate('jwt', {session: false}), validate('manage'), filesRouter)
-router.use('/forms', passport.authenticate('jwt', {session: false}), validate('quality'), formsRouter)
+const auth = passport.authenticate('jwt', { session: false })
+
+router.use('/courses', auth, validate('create'), require('./courses'))
+router.use('/users',   auth, validate('manage'), require('./users'))
+router.use('/roles',   auth, validate('manage'), require('./roles'))
+router.use('/files',   auth, validate('manage'), require('./manage/files'))
+router.use('/forms',   auth, validate('quality'), require('./forms'))
+
 module.exports = router

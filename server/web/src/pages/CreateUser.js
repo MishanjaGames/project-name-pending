@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Navbar } from "../components/Navbar";
+import AppLayout from '../components/Layout';
+import { UtilityModal } from '../components/UtilityModal';
 
 function CreateUser({ data, onLogout }) {
     const navigate = useNavigate();
@@ -10,10 +11,17 @@ function CreateUser({ data, onLogout }) {
     const [formData, setFormData] = useState({
         nickname: '',
         email: '',
+        tutorRank: null,
         password: '',
         role: ''
     });
     const [errors, setErrors] = useState({});
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', confirmToken: '', tokenLabel: '', onConfirm: null, onDelete: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
+    const showDelete  = (title, message, confirmToken, tokenLabel, onDelete) => setModal({ show: true, type: 'delete', title, message, confirmToken, tokenLabel, onDelete, onCancel: closeModal, deleteLabel: 'Delete' });
 
     // Profile picture state
     const [profilePicture, setProfilePicture] = useState(null);
@@ -25,7 +33,7 @@ function CreateUser({ data, onLogout }) {
         if (token) {
             const fetchRoles = async () => {
                 try {
-                    const response = await fetch('http://localhost:4040/api/manage/roles', {
+                    const response = await fetch(process.env.REACT_APP_API_URL + '/manage/roles', {
                         method: 'GET',
                         headers: {
                             'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
@@ -46,9 +54,9 @@ function CreateUser({ data, onLogout }) {
     }, []);
 
     const generatePassword = () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
         let password = '';
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 16; i++) {
             password += chars.charAt(Math.floor(Math.random() * chars.length));
         }
         return password;
@@ -146,20 +154,21 @@ function CreateUser({ data, onLogout }) {
             };
 
             // Step 1: Create user
-            const response = await fetch('http://localhost:4040/api/manage/users', {
+            const response = await fetch(process.env.REACT_APP_API_URL + '/manage/users', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
                     nickname: formData.nickname,
                     email: formData.email,
                     password: formData.password,
-                    role: formData.role
+                    role: formData.role,
+                    tutorRank: formData.tutorRank || null
                 })
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                alert(`Failed to create user: ${errorData.message || 'Unknown error'}`);
+                showInfo('Error', `Failed to create user: ${errorData.message || 'Unknown error'}`);
                 setSaving(false);
                 return;
             }
@@ -172,7 +181,7 @@ function CreateUser({ data, onLogout }) {
                 const profileFormData = new FormData();
                 profileFormData.append('profilePicture', profilePicture);
 
-                await fetch(`http://localhost:4040/api/manage/users/${userId}/profile-picture`, {
+                await fetch(`${process.env.REACT_APP_API_URL}/manage/users/${userId}/profile-picture`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`
@@ -181,20 +190,18 @@ function CreateUser({ data, onLogout }) {
                 });
             }
 
-            alert('User created successfully!');
+            showInfo('Success', 'User created successfully!');
             navigate('/manage/users');
         } catch (error) {
             console.error('Error creating user:', error);
-            alert('Error creating user. Please try again.');
+            showInfo('Error', 'Error creating user. Please try again.');
         } finally {
             setSaving(false);
         }
     };
 
     const handleCancel = () => {
-        if (window.confirm('Are you sure you want to cancel? All entered data will be lost.')) {
-            navigate('/manage/users');
-        }
+        showConfirm('Cancel', 'Are you sure you want to cancel? All entered data will be lost.', () => navigate('/manage/users'));
     };
 
     const getRoleName = (roleId) => {
@@ -203,10 +210,8 @@ function CreateUser({ data, onLogout }) {
     };
 
     return (
-        <>
-            <Navbar data={data} onLogout={onLogout} />
-
-            <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+    <AppLayout data={data} onLogout={onLogout} title="Create User">
+<div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
                 {/* Page Header */}
                 <div className="row mb-4">
                     <div className="col-12">
@@ -430,6 +435,23 @@ function CreateUser({ data, onLogout }) {
                                         )}
                                     </div>
 
+                                        {/* Tutor Sub-Rank */}
+                                        <div className="col-12 col-md-6">
+                                            <label htmlFor="tutorRank" className="form-label fw-semibold">Tutor Sub-Rank</label>
+                                            <select
+                                                className="form-select"
+                                                id="tutorRank"
+                                                value={formData.tutorRank || ''}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, tutorRank: e.target.value || null }))}
+                                            >
+                                                <option value="">None (not a tutor)</option>
+                                                {['assistant','teacher','lecturer','instructor','tutor','professor'].map(r => (
+                                                    <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                                                ))}
+                                            </select>
+                                            <small className="text-muted">Only applies if user has tutor access level</small>
+                                        </div>
+
                                     {/* Form Actions */}
                                     <div className="d-flex gap-2 justify-content-end pt-3 border-top">
                                         <button
@@ -466,7 +488,37 @@ function CreateUser({ data, onLogout }) {
                     </div>
                 </div>
             </div>
-        </>
+
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
+            <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                confirmToken={modal.confirmToken}
+                tokenLabel={modal.tokenLabel}
+                deleteLabel={modal.deleteLabel || 'Delete'}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onDelete={() => { modal.onDelete?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+        </AppLayout>
     );
 }
 

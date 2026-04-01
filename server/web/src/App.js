@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { toHttps } from './utils/utils';
+import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { extendSession } from "./utils/utils";
 
 import Login from './pages/Login';
 import Main from './pages/Main';
@@ -22,217 +22,191 @@ import EditRole from './pages/EditRole';
 import EditCourse from './pages/EditCourse';
 import CoursePreview from './pages/CoursePreview';
 import ViewCourse from './pages/ViewCourse';
-import CreatorForm from './pages/CreatorForm';
+import ApplicationForm from './pages/ApplicationForm';
 import Forms from './pages/Forms';
+import Keys from './pages/Keys';
+import Promos from './pages/Promos';
+import RedeemKey from './pages/RedeemKey';
 import ViewForm from './pages/ViewForm';
+import Sessions from './pages/Sessions';
+import ManageSession from './pages/ManageSession';
+import StudentDashboard from './pages/StudentDashboard';
+import Grades from './pages/Grades';
+import { VideoConference } from './components/VideoConference';
+import MeetingPage from './pages/MeetingPage';
+import RoomPage from './pages/RoomPage';
+
+const API = toHttps(process.env.REACT_APP_API_URL || 'http://localhost:4040/api');
+
+const DEFAULT_USER = { id:'', nickname:'', email:'', role:'', tutorRank: null, accessLevel: 'default' };
 
 function App() {
   const navigate = useNavigate();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userData, setUserData] = useState({
-    id: '',
-    nickname: '',
-    email: '',
-    role: ''
-  });
+  const [isLoggedIn, setIsLoggedIn]   = useState(false);
+  const [userData,   setUserData]     = useState(DEFAULT_USER);
+  const [meeting,    setMeeting]      = useState(null);
+  const [meetingMode, setMeetingMode] = useState('full');
 
+  // ── Auth bootstrap ────────────────────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem('token');
-
-    if (token) {
-      const fetchUserData = async () => {
-        try {
-          const response = await fetch('http://localhost:4040/api/users/c', {
-            method: 'GET',
-            headers: {
-              'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
-              'Content-Type': 'application/json'
-            }
+    if (!token) return;
+    (async () => {
+      try {
+        const r = await fetch(`${API}/users/c`, {
+          headers: { Authorization: token }
+        });
+        if (r.status === 401) { localStorage.removeItem('token'); return; }
+        if (r.ok) {
+          const { user } = await r.json();
+          setUserData({
+            _id:         user._id,
+            nickname:    user.nickname,
+            email:       user.email,
+            role:        user.role,
+            tutorRank:   user.tutorRank || null,
+            accessLevel: user.role?.accessLevel || 'default',
+            links:       user.links || [],
           });
-
-          if (response.status === 401) {
-            await extendSession(userData)
-          }
-
-          if (response.ok) {
-            const data = await response.json();
-            setUserData({
-              _id: data.user._id,
-              nickname: data.user.nickname,
-              email: data.user.email,
-              role: data.user.role
-            });
-            setIsLoggedIn(true);
-          } else {
-            localStorage.removeItem('token');
-          }
-        } catch (error) {
-          console.error('Error fetching user data:', error);
+          setIsLoggedIn(true);
+        } else {
           localStorage.removeItem('token');
         }
-      };
-
-      fetchUserData();
-    }
+      } catch {
+        localStorage.removeItem('token');
+      }
+    })();
   }, [isLoggedIn]);
 
   const handleLogin = (user) => {
     setUserData({
-      nickname: user.nickname,
-      email: user.email,
-      role: user.role
+      _id:         user._id,
+      nickname:    user.nickname,
+      email:       user.email,
+      role:        user.role,
+      tutorRank:   user.tutorRank || null,
+      accessLevel: user.role?.accessLevel || 'default',
+      links:       user.links || [],
     });
     setIsLoggedIn(true);
     navigate('/');
   };
 
   const handleLogout = () => {
+    setMeeting(null);
     setIsLoggedIn(false);
-    setUserData({
-      nickname: '',
-      email: '',
-      role: ''
-    });
+    setUserData(DEFAULT_USER);
     localStorage.removeItem('token');
     navigate('/login');
   };
 
+  // ── Meeting helpers ───────────────────────────────────────────────────────
+  const startMeeting = useCallback(({ roomId, sessionId }) => {
+    setMeeting({ roomId: roomId || null, sessionId: sessionId || null, nickname: userData.nickname || 'Guest' });
+    setMeetingMode('full');
+  }, [userData]);
+
+  const endMeeting     = useCallback(() => setMeeting(null), []);
+  const minimizeMeeting = useCallback(() => setMeetingMode('mini'), []);
+  const expandMeeting  = useCallback(() => setMeetingMode('full'), []);
+
+  const meetingProps = { startMeeting, endMeeting, activeMeeting: meeting };
+
+  // ── Shorthand auth route ──────────────────────────────────────────────────
+  const R = (Component, extra = {}) =>
+    isLoggedIn ? <Component data={userData} onLogout={handleLogout} {...meetingProps} {...extra} /> : <Login onLogin={handleLogin} />;
+
   return (
-    <div className="App">
+    <>
+      {/* Persistent meeting overlay */}
+      {meeting && meetingMode === 'full' && (
+        <>
+          <VideoConference roomId={meeting.roomId} sessionId={meeting.sessionId}
+            nickname={meeting.nickname} onClose={endMeeting} mini={false} />
+          <button onClick={minimizeMeeting} style={{
+            position:'fixed',top:14,right:100,zIndex:3100,
+            background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.15)',
+            borderRadius:8,color:'#c9cdd4',cursor:'pointer',padding:'5px 10px',fontSize:'.75rem'
+          }}><i className="bi bi-pip" /> Mini</button>
+        </>
+      )}
+      {meeting && meetingMode === 'mini' && (
+        <VideoConference roomId={meeting.roomId} sessionId={meeting.sessionId}
+          nickname={meeting.nickname} onClose={endMeeting} mini onExpand={expandMeeting} />
+      )}
+      {meeting && meetingMode === 'hidden' && (
+        <MeetingDot onExpand={expandMeeting} onEnd={endMeeting} />
+      )}
+
       <Routes>
-        {/* Login Route */}
-        <Route path="/login" element={
-          !isLoggedIn ?
-            <Login onLogin={handleLogin} /> :
-            <Navigate to="/" />
-        } />
+        <Route path="/login" element={isLoggedIn ? <Navigate to="/" /> : <Login onLogin={handleLogin} />} />
+        <Route path="/"      element={R(Main)} />
 
-        <Route path="/" element={
-          isLoggedIn ?
-            <Main data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
+        <Route path="/creator/apply"      element={R(ApplicationForm, { formType: 'creator' })} />
+        <Route path="/tutor/apply"        element={R(ApplicationForm, { formType: 'tutor' })} />
+        <Route path="/support/open-ticket" element={R(ApplicationForm, { formType: 'support-ticket' })} />
+        <Route path="/manage/forms"           element={R(Forms)} />
+        <Route path="/manage/forms/detail/:id" element={R(ViewForm)} />
 
-        {/* Forms */}
-        <Route path="/creator/apply" element={
-          isLoggedIn ?
-            <CreatorForm formType={'creator'} data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/forms/" element={
-          isLoggedIn ?
-            <Forms data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/forms/detail/:id" element={
-          isLoggedIn ?
-            <ViewForm data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
+        <Route path="/manage/courses"        element={R(Courses)} />
+        <Route path="/manage/courses/create" element={R(CreateCourse)} />
+        <Route path="/manage/course/:id"     element={R(EditCourse)} />
+        <Route path="/course/preview/:id"    element={R(CoursePreview)} />
+        <Route path="/course/view/:id"       element={R(ViewCourse)} />
 
-        {/* Courses Routes */}
-        <Route path="/manage/courses" element={
-          isLoggedIn ?
-            <Courses data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/courses/create" element={
-          isLoggedIn ?
-            <CreateCourse data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/course/:id" element={
-          isLoggedIn ?
-            <EditCourse data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/course/preview/:id" element={
-          isLoggedIn ?
-            <CoursePreview data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/course/view/:id" element={
-          isLoggedIn ?
-            <ViewCourse data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        {/* Settings Route */}
-        <Route path="/manage/settings" element={
-          isLoggedIn ?
-            <Settings data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
+        <Route path="/manage/settings" element={R(Settings)} />
 
-        {/* Directions Routes */}
-        <Route path="/manage/directions" element={
-          isLoggedIn ?
-            <Directions data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/directions/create" element={
-          isLoggedIn ?
-            <CreateDirection data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/direction/:id" element={
-          isLoggedIn ?
-            <EditDirection data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
+        <Route path="/manage/directions"        element={R(Directions)} />
+        <Route path="/manage/directions/create" element={R(CreateDirection)} />
+        <Route path="/manage/direction/:id"     element={R(EditDirection)} />
 
-        {/* Levels Routes */}
-        <Route path="/manage/levels" element={
-          isLoggedIn ?
-            <Levels data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/levels/create" element={
-          isLoggedIn ?
-            <CreateLevel data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/level/:id" element={
-          isLoggedIn ?
-            <EditLevel data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
+        <Route path="/manage/levels"        element={R(Levels)} />
+        <Route path="/manage/levels/create" element={R(CreateLevel)} />
+        <Route path="/manage/level/:id"     element={R(EditLevel)} />
 
-        {/* Users Routes */}
-        <Route path="/manage/users" element={
-          isLoggedIn ?
-            <Users data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/users/create" element={
-          isLoggedIn ?
-            <CreateUser data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/user/:id" element={
-          isLoggedIn ?
-            <EditUser data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
+        <Route path="/manage/users"        element={R(Users)} />
+        <Route path="/manage/users/create" element={R(CreateUser)} />
+        <Route path="/manage/user/:id"     element={R(EditUser)} />
 
-        {/* Roles Routes */}
-        <Route path="/manage/roles" element={
-          isLoggedIn ?
-            <Roles data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/roles/create" element={
-          isLoggedIn ?
-            <CreateRole data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
-        <Route path="/manage/role/:id" element={
-          isLoggedIn ?
-            <EditRole data={userData} onLogout={handleLogout} /> :
-            <Navigate to="/login" />
-        } />
+        <Route path="/manage/roles"        element={R(Roles)} />
+        <Route path="/manage/roles/create" element={R(CreateRole)} />
+        <Route path="/manage/role/:id"     element={R(EditRole)} />
 
-        <Route path="*" element={<Navigate to={isLoggedIn ? "/" : "/login"} />} />
+        <Route path="/manage/promos" element={R(Promos)} />
+        <Route path="/manage/keys"   element={R(Keys)} />
+        <Route path="/redeem"        element={R(RedeemKey)} />
+
+        <Route path="/manage/sessions"    element={R(Sessions)} />
+        <Route path="/manage/session/:id" element={R(ManageSession)} />
+
+        <Route path="/my-courses" element={R(StudentDashboard)} />
+        <Route path="/my-grades"  element={R(Grades)} />
+
+        <Route path="/meeting" element={R(MeetingPage)} />
+        <Route path="/room/:roomId" element={R(RoomPage)} />
+
+        <Route path="*" element={<Navigate to={isLoggedIn ? '/' : '/login'} />} />
       </Routes>
+    </>
+  );
+}
+
+function MeetingDot({ onExpand, onEnd }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ position:'fixed',bottom:24,right:24,zIndex:9000,display:'flex',
+        alignItems:'center',gap:8,background:hover?'#1a1d28':'#141519',
+        border:'1.5px solid rgba(116,143,252,.3)',borderRadius:12,
+        padding:hover?'8px 14px':'10px',cursor:'pointer',transition:'all .2s',
+        fontFamily:'system-ui,sans-serif' }}>
+      <div style={{ width:10,height:10,borderRadius:'50%',background:'#69db7c',
+        boxShadow:'0 0 8px #69db7c',flexShrink:0 }} />
+      {hover && <>
+        <span style={{ color:'#c9cdd4',fontSize:'.75rem',fontWeight:500,whiteSpace:'nowrap' }}>In meeting</span>
+        <button onClick={onExpand} style={{ background:'rgba(116,143,252,.15)',border:'1px solid rgba(116,143,252,.3)',borderRadius:6,color:'#748ffc',fontSize:'.7rem',padding:'3px 8px',cursor:'pointer' }}>Open</button>
+        <button onClick={onEnd}    style={{ background:'rgba(224,49,49,.15)',border:'1px solid rgba(224,49,49,.3)',borderRadius:6,color:'#ff6b6b',fontSize:'.7rem',padding:'3px 8px',cursor:'pointer' }}>End</button>
+      </>}
     </div>
   );
 }

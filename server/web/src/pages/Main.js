@@ -1,378 +1,293 @@
-import { Navbar } from "../components/Navbar";
-import { useState, useEffect } from "react";
-import { formatLaunchTime, formatUptime, getTimeAgo, useTimeout } from "../utils/utils";
-import { extendSession } from "../utils/utils";
+import { toHttps } from '../utils/utils';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import AppLayout from '../components/Layout';
+import { formatLaunchTime, formatUptime, getTimeAgo } from '../utils/utils';
 
-function Main({ data, onLogout }) {
-  const [serverStatus, setServerStatus] = useState({
-    status: 'ok',
-    db_status: 'ok',
-    uptime: '45d 12h 30m',
-    launchTime: undefined,
-    cpuUsage: 35,
-    memoryUsage: 62,
-    diskUsage: 48
-  });
+const API = toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api');
 
-  const [adminStats, setAdminStats] = useState({
-    totalUsers: '???',
-    activeUsers: '???',
-    totalCourses: '???',
-    enrollments: '???',
-  });
+function Sparkbar({ value, max, color }) {
+  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
+  return (
+    <div className="stat-bar">
+      <div className="stat-bar-fill" style={{ width: `${pct}%`, background: color }} />
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub, icon, color = 'var(--accent)', sparkValue, sparkMax, onClick }) {
+  return (
+    <div className={`stat-card${onClick ? ' cursor-pointer' : ''}`} onClick={onClick}>
+      <div className="d-flex align-items-start justify-content-between mb-1">
+        <div className="sc-label">{label}</div>
+        <span style={{ fontSize: 20, color, opacity: .8 }}>{icon}</span>
+      </div>
+      <div className="sc-value" style={{ color }}>
+        {value === undefined || value === null ? <span style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>—</span> : value}
+      </div>
+      {sub && <div className="sc-sub">{sub}</div>}
+      {sparkMax !== undefined && <Sparkbar value={sparkValue || 0} max={sparkMax} color={color} />}
+    </div>
+  );
+}
+
+function StatusDot({ ok }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px',
+      borderRadius: 20, fontSize: '.75rem', fontWeight: 700,
+      background: ok ? 'var(--success-bg)' : 'var(--danger-bg)',
+      color: ok ? 'var(--success)' : 'var(--danger)'
+    }}>
+      <span style={{ fontSize: '.5rem' }}>●</span>
+      {ok ? 'Online' : 'Offline'}
+    </span>
+  );
+}
+
+function Main({ data, onLogout, startMeeting, activeMeeting }) {
+  const navigate = useNavigate();
+  const [status, setStatus] = useState({ status: 'ok', db_status: 'ok', uptime: 0, launchTime: null });
+  const [stats,  setStats]  = useState({ userCount: null, courseCount: null, sessionCount: null,
+    activeSessionCount: null, groupCount: null, assignmentCount: null,
+    pendingSubmissionCount: null, upcomingMeetings: [] });
+  const [live, setLive] = useState('connecting');
+  const esRef = useRef(null);
 
   useEffect(() => {
-    updateInfo()
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const url = `${API}/utils/status/stream?token=${encodeURIComponent(token)}`;
+    const es = new EventSource(url);
+    esRef.current = es;
+    es.onopen    = () => setLive('open');
+    es.onerror   = () => { setLive('error'); setStatus(p => ({ ...p, status: 'fixing' })); };
+    es.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        setStatus(p => ({ ...p, ...d }));
+        setStats(p => ({
+          userCount:             d.userCount            ?? p.userCount,
+          courseCount:           d.courseCount          ?? p.courseCount,
+          sessionCount:          d.sessionCount         ?? p.sessionCount,
+          activeSessionCount:    d.activeSessionCount   ?? p.activeSessionCount,
+          groupCount:            d.groupCount           ?? p.groupCount,
+          assignmentCount:       d.assignmentCount      ?? p.assignmentCount,
+          pendingSubmissionCount: d.pendingSubmissionCount ?? p.pendingSubmissionCount,
+          upcomingMeetings:      d.upcomingMeetings     ?? p.upcomingMeetings,
+        }));
+        if (live !== 'open') setLive('open');
+      } catch {}
+    };
+    return () => es.close();
   }, []);
 
-  const { reset } = useTimeout(async () => {
-    await updateInfo()
-    reset()
-  }, 10000)
+  const serverOk = status.status === 'ok';
+  const dbOk     = serverOk && status.db_status === 'connected';
 
-  const updateInfo = async () => {
-    try {
-      const loginData = localStorage.getItem('token')
-      const response = await fetch('http://localhost:4040/api/utils/status', {
-        method: 'GET',
-        headers: {
-          'Authorization': `${loginData.split(' ')[0]} ${loginData.split(' ')[1]}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.status === 401) {
-        extendSession(data)
-      }
-
-      if (response.ok) {
-        const res = await response.json();
-        setServerStatus((p) => {
-          return {
-            ...p,
-            uptime: res.uptime,
-            status: res.status,
-            db_status: res.db_status,
-            launchTime: res.launchTime
-          }
-        });
-        setAdminStats((p) => {
-          return {
-            ...p,
-            totalUsers: res.users.length,
-            totalCourses: res.courses.length,
-            db_status: res.db_status
-          }
-        });
-      }
-    } catch (error) {
-      console.error('SERVER NOT RESPONDING', error);
-      setServerStatus((p) => {
-        return {
-          ...p,
-          status: 'fixing'
-        }
-      });
-    }
-  }
+  const isManage = ['manage','admin','root'].includes(data?.accessLevel);
+  const isTutor  = ['tutor','manage','admin','root'].includes(data?.accessLevel);
 
   return (
-    <>
-      <Navbar data={data} onLogout={onLogout} />
+    <AppLayout
+      data={data} onLogout={onLogout}
+      title="Dashboard"
+      topbarActions={
+        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+          <StatusDot ok={serverOk} />
+          {live === 'open'
+            ? <span className="status-badge active" style={{ fontSize: '.7rem' }}>Live</span>
+            : <span className="status-badge warning" style={{ fontSize: '.7rem' }}>Connecting…</span>
+          }
+        </div>
+      }
+    >
 
-      <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
-        <div className="row mb-4">
-          <div className="col-12">
-            <div className="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-2">
-              <div>
-                <h1 className="h3 h2-md fw-bold text-dark mb-1">Server Admin Dashboard</h1>
-                <p className="text-muted mb-0 small">Server status and system information</p>
-              </div>
-              {/*
-                <div className="d-none d-lg-block">
-                  <div className="badge bg-success p-2 px-3">
-                    <svg width="10" height="10" fill="currentColor" viewBox="0 0 16 16" className="me-2" style={{display: 'inline'}}>
-                      <circle cx="8" cy="8" r="8"/>
-                    </svg>
-                    {serverStatus.status.toUpperCase()}
-                  </div>
+      {/* ── Welcome banner ── */}
+      <div style={{ background: 'var(--accent)', borderRadius: 'var(--radius)', padding: '1.25rem 1.5rem', marginBottom: '1.5rem', color: '#fff' }}>
+        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <h2 style={{ margin: 0, fontWeight: 800, fontSize: '1.2rem' }}>
+              Welcome back, {data?.nickname || 'User'} 👋
+            </h2>
+            <p style={{ margin: '.25rem 0 0', opacity: .82, fontSize: '.88rem' }}>
+              {new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}
+            </p>
+          </div>
+          {isTutor && (
+            <button className="btn btn-light btn-sm fw-semibold" onClick={() => navigate('/manage/sessions')}>
+              <i className="bi bi-people me-1" /> My Sessions
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Stats row — only for manage+ ── */}
+      {isManage && (
+        <>
+          <div className="row g-3 mb-3">
+            <div className="col-6 col-lg-3">
+              <StatCard label="Users" value={stats.userCount} sub="Registered accounts"
+                icon="👤" color="var(--accent)"
+                sparkValue={stats.userCount} sparkMax={Math.max(stats.userCount||0,100)}
+                onClick={() => navigate('/manage/users')} />
+            </div>
+            <div className="col-6 col-lg-3">
+              <StatCard label="Courses" value={stats.courseCount} sub="All types"
+                icon="📚" color="#6610f2"
+                sparkValue={stats.courseCount} sparkMax={Math.max(stats.courseCount||0,50)}
+                onClick={() => navigate('/manage/courses')} />
+            </div>
+            <div className="col-6 col-lg-3">
+              <StatCard label="Sessions" value={stats.sessionCount}
+                sub={`${stats.activeSessionCount ?? '—'} active`}
+                icon="🎓" color="var(--info)"
+                sparkValue={stats.activeSessionCount} sparkMax={Math.max(stats.sessionCount||0,1)}
+                onClick={() => navigate('/manage/sessions')} />
+            </div>
+            <div className="col-6 col-lg-3">
+              <StatCard label="Pending Reviews" value={stats.pendingSubmissionCount}
+                sub="Awaiting grade" icon="⏳"
+                color={stats.pendingSubmissionCount > 0 ? 'var(--danger)' : 'var(--success)'}
+                sparkValue={stats.pendingSubmissionCount} sparkMax={Math.max(stats.pendingSubmissionCount||0,10)} />
+            </div>
+          </div>
+          <div className="row g-3 mb-3">
+            <div className="col-6 col-md-3">
+              <StatCard label="Groups" value={stats.groupCount} sub="Across sessions"
+                icon="👥" color="var(--warning)"
+                sparkValue={stats.groupCount} sparkMax={Math.max(stats.groupCount||0,20)} />
+            </div>
+            <div className="col-6 col-md-3">
+              <StatCard label="Assignments" value={stats.assignmentCount}
+                sub="Defined tasks" icon="📋" color="var(--success)" />
+            </div>
+            <div className="col-6 col-md-3">
+              <StatCard label="Uptime"
+                value={serverOk ? formatUptime(status.uptime) : '—'}
+                sub={status.launchTime ? `Since ${formatLaunchTime(status.launchTime)}` : ''}
+                icon="🕐" color={serverOk ? 'var(--success)' : 'var(--danger)'} />
+            </div>
+            <div className="col-6 col-md-3">
+              <StatCard label="Database" value={dbOk ? 'Connected' : 'Offline'}
+                icon="🗄️" color={dbOk ? 'var(--success)' : 'var(--danger)'} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Upcoming meetings + quick links ── */}
+      <div className="row g-3">
+        {/* Upcoming meetings */}
+        <div className="col-12 col-lg-7">
+          <div className="card h-100">
+            <div className="card-header d-flex align-items-center justify-content-between">
+              <span><i className="bi bi-calendar-event me-2" />Upcoming Meetings</span>
+              <button className="btn btn-sm btn-outline-secondary" onClick={() => navigate('/manage/sessions')}>
+                All Sessions
+              </button>
+            </div>
+            <div className="card-body p-0">
+              {!stats.upcomingMeetings?.length ? (
+                <div className="empty-state">
+                  <div className="empty-state-icon">📭</div>
+                  <div className="empty-state-title">No meetings in the next 7 days</div>
                 </div>
-                */}
+              ) : (
+                <ul className="list-group list-group-flush">
+                  {stats.upcomingMeetings.map((m, i) => {
+                    const d = new Date(m.datetime);
+                    const isToday = d.toDateString() === new Date().toDateString();
+                    return (
+                      <li key={i} className="list-group-item px-3 py-2">
+                        <div className="d-flex align-items-center gap-3">
+                          <div style={{ minWidth: 44, textAlign:'center',
+                            background: isToday ? 'var(--accent)' : 'var(--surface-3)',
+                            color: isToday ? '#fff' : 'var(--text-2)',
+                            borderRadius: 8, padding: '4px 6px', lineHeight: 1.2 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700 }}>
+                              {d.toLocaleDateString('en', { month: 'short' }).toUpperCase()}
+                            </div>
+                            <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1 }}>{d.getDate()}</div>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="fw-semibold truncate" style={{ fontSize: '.9rem' }}>{m.title}</div>
+                            <small className="text-muted-c">{m.courseTitle}</small>
+                          </div>
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div className="fw-semibold small">
+                              {d.toLocaleTimeString('en', { hour:'2-digit', minute:'2-digit' })}
+                            </div>
+                            <small className="text-muted-c">{m.durationMin} min</small>
+                          </div>
+                        </div>
+                        {m.meetingLink && (
+                          <a href={m.meetingLink} target="_blank" rel="noopener noreferrer"
+                            className="btn btn-sm btn-outline-success mt-2 w-100" style={{ fontSize: '.78rem' }}>
+                            <i className="bi bi-camera-video me-1" />Join Meeting
+                          </a>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Server Status Cards */}
-        <div className="row g-3 mb-4">
-          <div className="col-6 col-lg-3">
-            <div className="card border-0 shadow-sm h-100">
-              <div className="card-body p-3">
-                <div className="d-flex align-items-center justify-content-between mb-2">
-                  <h6 className="text-muted mb-0 small text-uppercase">Server Uptime</h6>
-                  <svg width="20" height="20" fill="#0d6efd" viewBox="0 0 16 16">
-                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
-                    <path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.854 1.927a.5.5 0 0 1-.408.934L7.5 9.71V3.5a.5.5 0 0 1 .5-.5z" />
-                  </svg>
-                </div>
-                {
-                  serverStatus.status === 'ok' ?
-                    <>
-                      <h3 className="fw-bold mb-1 h4">{formatUptime(serverStatus.uptime)}</h3>
-                      <small className="text-success">✓ Stable</small></> :
-                    <>
-                      <h3 className="fw-bold mb-1 h4">?????????????</h3>
-                      <small className="text-warning">? Reaching...</small></>
-                }
-
+        {/* Quick links + system info */}
+        <div className="col-12 col-lg-5">
+          <div className="card mb-3">
+            <div className="card-header"><i className="bi bi-grid me-2" />Quick Access</div>
+            <div className="card-body">
+              <div className="d-flex flex-wrap gap-2">
+                {[
+                  { label: 'My Courses',  path: '/my-courses',        icon: 'bi-collection-play', show: true },
+                  { label: 'My Grades',   path: '/my-grades',         icon: 'bi-award', show: true },
+                  { label: 'Redeem Key',  path: '/redeem',            icon: 'bi-key', show: true },
+                  { label: 'Sessions',    path: '/manage/sessions',   icon: 'bi-people', show: isTutor },
+                  { label: 'Users',       path: '/manage/users',      icon: 'bi-people-fill', show: isManage },
+                  { label: 'Courses',     path: '/manage/courses',    icon: 'bi-book', show: isTutor },
+                  { label: 'Keys',        path: '/manage/keys',       icon: 'bi-key-fill', show: isManage },
+                  { label: 'Settings',    path: '/manage/settings',   icon: 'bi-gear', show: isManage },
+                ].filter(l => l.show).map(l => (
+                  <button key={l.path} className="btn btn-sm btn-outline-secondary"
+                    onClick={() => navigate(l.path)}>
+                    <i className={`bi ${l.icon} me-1`} />{l.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
 
-          {/*
-            <div className="col-6 col-lg-3">
-              <div className="card border-0 shadow-sm h-100">
-                <div className="card-body p-3">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <h6 className="text-muted mb-0 small text-uppercase">CPU Usage</h6>
-                    <svg width="20" height="20" fill="#ffc107" viewBox="0 0 16 16">
-                      <path d="M5 0a.5.5 0 0 1 .5.5V2h1V.5a.5.5 0 0 1 1 0V2h1V.5a.5.5 0 0 1 1 0V2h1V.5a.5.5 0 0 1 1 0V2A2.5 2.5 0 0 1 14 4.5h1.5a.5.5 0 0 1 0 1H14v1h1.5a.5.5 0 0 1 0 1H14v1h1.5a.5.5 0 0 1 0 1H14v1h1.5a.5.5 0 0 1 0 1H14a2.5 2.5 0 0 1-2.5 2.5v1.5a.5.5 0 0 1-1 0V14h-1v1.5a.5.5 0 0 1-1 0V14h-1v1.5a.5.5 0 0 1-1 0V14h-1v1.5a.5.5 0 0 1-1 0V14A2.5 2.5 0 0 1 2 11.5H.5a.5.5 0 0 1 0-1H2v-1H.5a.5.5 0 0 1 0-1H2v-1H.5a.5.5 0 0 1 0-1H2v-1H.5a.5.5 0 0 1 0-1H2A2.5 2.5 0 0 1 4.5 2V.5A.5.5 0 0 1 5 0zm-.5 3A1.5 1.5 0 0 0 3 4.5v7A1.5 1.5 0 0 0 4.5 13h7a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 11.5 3h-7zM5 6.5A1.5 1.5 0 0 1 6.5 5h3A1.5 1.5 0 0 1 11 6.5v3A1.5 1.5 0 0 1 9.5 11h-3A1.5 1.5 0 0 1 5 9.5v-3zM6.5 6a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3z"/>
-                    </svg>
-                  </div>
-                  <h3 className="fw-bold mb-1 h4">{serverStatus.cpuUsage}%</h3>
-                  <div className="progress" style={{height: '4px'}}>
-                    <div className="progress-bar bg-warning" style={{width: `${serverStatus.cpuUsage}%`}}></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            */}
-
-          {/*
-            <div className="col-6 col-lg-3">
-              <div className="card border-0 shadow-sm h-100">
-                <div className="card-body p-3">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <h6 className="text-muted mb-0 small text-uppercase">Memory Usage</h6>
-                    <svg width="20" height="20" fill="#17a2b8" viewBox="0 0 16 16">
-                      <path d="M3 0h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V1a1 1 0 0 1 1-1zm0 1v14h10V1H3z"/>
-                      <path d="M5 2h6a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5H5a.5.5 0 0 1-.5-.5v-3a.5.5 0 0 1 .5-.5z"/>
-                    </svg>
-                  </div>
-                  <h3 className="fw-bold mb-1 h4">{serverStatus.memoryUsage}%</h3>
-                  <div className="progress" style={{height: '4px'}}>
-                    <div className="progress-bar bg-info" style={{width: `${serverStatus.memoryUsage}%`}}></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            */}
-
-          {/*
-            <div className="col-6 col-lg-3">
-              <div className="card border-0 shadow-sm h-100">
-                <div className="card-body p-3">
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <h6 className="text-muted mb-0 small text-uppercase">Disk Usage</h6>
-                    <svg width="20" height="20" fill="#6f42c1" viewBox="0 0 16 16">
-                      <path d="M4.5 7a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1zm3 0a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/>
-                      <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H2z"/>
-                    </svg>
-                  </div>
-                  <h3 className="fw-bold mb-1 h4">{serverStatus.diskUsage}%</h3>
-                  <div className="progress" style={{height: '4px'}}>
-                    <div className="progress-bar" style={{width: `${serverStatus.diskUsage}%`, backgroundColor: '#6f42c1'}}></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            */}
-
-          {/* Admin Statistics */}
-          <div className="col-6 col-md-4 col-lg-2">
-            <div className="card border-0 shadow-sm h-100">
-              <div className="card-body p-3">
-                <h6 className="text-muted mb-2 small text-uppercase">Total Users</h6>
-                {
-                  (adminStats.totalUsers > 0 && serverStatus.status === 'ok') ? <h2 className="fw-bold text-primary mb-1 h3">{adminStats.totalUsers}</h2> : <h2 className="fw-bold text-secondary mb-1 h3">???</h2>
-                }
-                {
-                  (adminStats.totalUsers > 0 && serverStatus.status === 'ok') ? <small className="text-muted">{adminStats.activeUsers} in process of learning</small> : <small className="text-warning">??? in process of learning</small>
-                }
-              </div>
-            </div>
-          </div>
-
-          <div className="col-6 col-md-4 col-lg-2">
-            <div className="card border-0 shadow-sm h-100">
-              <div className="card-body p-3">
-                <h6 className="text-muted mb-2 small text-uppercase">Total Courses</h6>
-                {
-                  (adminStats.totalCourses > 0 || serverStatus.status === 'ok') ? <h2 className="fw-bold text-primary mb-1 h3">{adminStats.totalCourses}</h2> : <h2 className="fw-bold text-secondary mb-1 h3">???</h2>
-                }
-                {
-                  (adminStats.totalCourses > 0 || serverStatus.status === 'ok') ? <small className="text-muted">{adminStats.enrollments} being checked</small> : <small className="text-warning">??? being checked</small>
-                }
-              </div>
-            </div>
-          </div>
-
-          {/*
-            <div className="col-6 col-md-4 col-lg-2">
-              <div className="card border-0 shadow-sm h-100">
-                <div className="card-body p-3">
-                  <h6 className="text-muted mb-2 small text-uppercase">Total Roles</h6>
-                  <h2 className="fw-bold text-warning mb-1 h3">{adminStats.totalRoles}</h2>
-                  <small className="text-muted">{adminStats.activeRoles} active</small>
-                </div>
-              </div>
-            </div>
-            */}
-
-          {/*
-            <div className="col-6 col-md-6 col-lg-3">
-              <div className="card border-0 shadow-sm h-100">
-                <div className="card-body p-3">
-                  <h6 className="text-muted mb-2 small text-uppercase">API Status</h6>
-                  <div className="d-flex align-items-center gap-2 mb-1">
-                    <span className="badge bg-success">ONLINE</span>
-                    <small className="text-muted">Responding</small>
-                  </div>
-                </div>
-              </div>
-            </div>
-            */}
-
-          <div className="col-6 col-md-6 col-lg-3">
-            <div className="card border-0 shadow-sm h-100">
-              <div className="card-body p-3">
-                <h6 className="text-muted mb-2 small text-uppercase">Database status</h6>
-                {
-                  serverStatus.db_status === 'connected' && serverStatus.status === 'ok' ?
-                    <>
-                      <div className="d-flex align-items-center gap-2 mb-1">
-                        <span className="badge bg-success">CONNECTED</span>
-                      </div>
-                      <div className="d-flex align-items-center gap-2 mb-1">
-                        <span className="badge bg-success">SYNCED</span>
-                      </div>
-                    </> :
-                    serverStatus.status === 'fixing' || serverStatus.db_status === 'reconnecting' ?
-                      <>
-                        <div className="d-flex align-items-center gap-2 mb-1">
-                          <span className="badge bg-warning">CONNECTING</span>
-                        </div>
-                        <div className="d-flex align-items-center gap-2 mb-1">
-                          <span className="badge bg-warning">SYNCING</span>
-                        </div>
-                      </> :
-                      <>
-                        <div className="d-flex align-items-center gap-2 mb-1">
-                          <span className="badge bg-danger">DISCONNECTED</span>
-                        </div>
-                        <div className="d-flex align-items-center gap-2 mb-1">
-                          <span className="badge bg-danger">NOT SYNCED</span>
-                        </div>
-                      </>
-                }
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* System Info and Server Health */}
-        <div className="row g-1 mb-4">
-          <div className="col-12 col-lg-8">
-            <div className="card border-0 shadow-sm">
-              <div className="card-header bg-white border-bottom d-flex align-items-center justify-content-between py-3">
-                <h5 className="mb-0">System Information</h5>
-              </div>
-              <div className="card-body">
+          {isManage && (
+            <div className="card">
+              <div className="card-header"><i className="bi bi-server me-2" />System</div>
+              <div className="card-body p-0">
                 <table className="table table-sm table-borderless mb-0">
                   <tbody>
-                    <tr>
-                      <td className="text-muted" width="40%"><strong>Server Status:</strong></td>
-                      <td>
-                        {
-                          serverStatus.status === 'ok' ?
-                            <span className="badge bg-success">Connected</span>
-                            :
-                            <span className="badge bg-warning">Reconnecting</span>
-                        }
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="text-muted"><strong>MongoDB Status:</strong></td>
-                      <td>
-                        {
-                          serverStatus.status === 'ok' && serverStatus.db_status === 'connected' ?
-                            <span className="badge bg-success">Connected</span>
-                            :
-                            serverStatus.status === 'fixing' || serverStatus.db_status === 'reconnecting' ?
-                              <span className="badge bg-warning">Reconnecting</span>
-                              :
-                              <span className="badge bg-danger">Disconnected</span>
-                        }
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="text-muted"><strong>Last Restart:</strong></td>
-                      <td>
-                        <div>
-                          {formatLaunchTime(serverStatus.launchTime)}
-                          <small className="text-muted"> ({getTimeAgo(serverStatus.launchTime)})</small>
-                        </div>
-                      </td>
-                    </tr>
+                    {[
+                      ['API Server',  <StatusDot ok={serverOk} />],
+                      ['Database',    <StatusDot ok={dbOk} />],
+                      ['Uptime',      serverOk ? formatUptime(status.uptime) : '—'],
+                      ['Restarted',   status.launchTime ? getTimeAgo(status.launchTime) : '—'],
+                      ['Live feed',   live === 'open' ? <span className="status-badge active">Live</span> : <span className="status-badge warning">Reconnecting</span>],
+                    ].map(([k, v]) => (
+                      <tr key={k}>
+                        <td style={{ color: 'var(--text-muted)', width: '45%', paddingLeft: '1rem' }}><strong>{k}</strong></td>
+                        <td>{v}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             </div>
-          </div>
+          )}
         </div>
-
-        {/*
-          <div className="row g-3">
-            <div className="col-12 col-lg-4">
-              <div className="card border-0 shadow-sm">
-                <div className="card-header bg-white border-bottom py-3">
-                  <h5 className="mb-0">Server Health</h5>
-                </div>
-                <div className="card-body">
-                  <div className="mb-4">
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                      <span className="small text-muted">Overall Health</span>
-                      <span className="fw-bold text-success">98%</span>
-                    </div>
-                    <div className="progress" style={{ height: '8px' }}>
-                      <div className="progress-bar bg-success" style={{ width: '98%' }}></div>
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                      <span className="small text-muted">Response Time</span>
-                      <span className="fw-bold">45ms</span>
-                    </div>
-                    <div className="progress" style={{ height: '8px' }}>
-                      <div className="progress-bar bg-info" style={{ width: '85%' }}></div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                      <span className="small text-muted">Error Rate</span>
-                      <span className="fw-bold text-success">0.2%</span>
-                    </div>
-                    <div className="progress" style={{ height: '8px' }}>
-                      <div className="progress-bar bg-success" style={{ width: '99%' }}></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          */}
       </div>
-    </>
-  )
+    </AppLayout>
+  );
 }
 
 export default Main;

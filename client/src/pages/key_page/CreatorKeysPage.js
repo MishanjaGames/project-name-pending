@@ -6,7 +6,7 @@ import { getUser } from '../../utils/auth';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4040/api';
 
 function CreatorKeysPage() {
-  const { theme } = useContext(SettingsContext);
+  const { theme, t } = useContext(SettingsContext);
   const [user] = useState(() => { try { return getUser(); } catch(e) { return null; } });
   
   const [keysData, setKeysData] = useState([]);
@@ -35,7 +35,7 @@ function CreatorKeysPage() {
       if (response.ok) {
         setKeysData(result.data || []);
       } else {
-        console.error('Ошибка загрузки ключей:', result.message);
+        console.error(t('common.keysLoadError'), result.message);
       }
     } catch (error) {
       console.error('Ошибка сервера:', error);
@@ -110,11 +110,11 @@ function CreatorKeysPage() {
         fetchKeys(); // Обновляем таблицу
       } else {
         const errorData = await response.json();
-        alert(`Ошибка генерации: ${errorData.message}`);
+        alert(`${t('common.generationError')}: ${errorData.message}`);
       }
     } catch (error) {
       console.error('Ошибка сервера:', error);
-      alert('Ошибка соединения с сервером');
+      alert(t('common.connectionError'));
     }
   };
 
@@ -131,7 +131,7 @@ function CreatorKeysPage() {
         setKeysData(keysData.filter(k => k._id !== id));
       } else {
         const err = await response.json();
-        alert(`Cannot delete: ${err.message}`);
+        alert(`${t('common.deleteError')}: ${err.message}`);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -152,7 +152,7 @@ function CreatorKeysPage() {
             className="btn btn-primary fw-bold d-flex align-items-center gap-2 shadow-sm"
             onClick={() => setShowModal(true)}
           >
-            <i className="bi bi-plus-lg"></i> Generate Keys
+            <i className="bi bi-plus-lg"></i> {t('common.generateKeys')}
           </button>
         </div>
 
@@ -162,20 +162,20 @@ function CreatorKeysPage() {
             <table className={`table table-hover mb-0 align-middle ${theme === 'dark' ? 'table-dark' : ''}`}>
               <thead className={`${theme === 'dark' ? 'table-dark' : 'table-light'} text-muted small text-uppercase`}>
                 <tr>
-                  <th className="py-3 px-4 fw-semibold">Code</th>
-                  <th className="py-3 fw-semibold">Courses</th>
-                  <th className="py-3 fw-semibold">Note</th>
-                  <th className="py-3 fw-semibold text-center">Status</th>
-                  <th className="py-3 fw-semibold">Redeemed By</th>
-                  <th className="py-3 fw-semibold">Expires</th>
-                  <th className="py-3 px-4 fw-semibold text-end">Actions</th>
+                  <th className="py-3 px-4 fw-semibold">{t('common.code')}</th>
+                  <th className="py-3 fw-semibold">{t('common.coursesColumn')}</th>
+                  <th className="py-3 fw-semibold">{t('common.noteColumn')}</th>
+                  <th className="py-3 fw-semibold text-center">{t('common.status')}</th>
+                  <th className="py-3 fw-semibold">{t('common.redeemedBy')}</th>
+                  <th className="py-3 fw-semibold">{t('common.expires')}</th>
+                  <th className="py-3 px-4 fw-semibold text-end">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="border-top-0">
                 {loading ? (
                   <tr><td colSpan="7" className="text-center py-5"><div className="spinner-border text-primary"></div></td></tr>
                 ) : keysData.length === 0 ? (
-                  <tr><td colSpan="7" className="text-center py-5 text-muted">No keys generated yet.</td></tr>
+                  <tr><td colSpan="7" className="text-center py-5 text-muted">{t('common.noKeysGenerated')}</td></tr>
                 ) : (
                   keysData.map((item) => (
                     <tr key={item._id}>
@@ -188,7 +188,7 @@ function CreatorKeysPage() {
                       <td className="py-3 text-muted">{item.note || '—'}</td>
                       <td className="py-3 text-center">
                         <span className={`badge ${item.isRedeemed ? 'bg-success' : 'bg-primary'}`}>
-                          {item.isRedeemed ? 'Redeemed' : 'Available'}
+                          {item.isRedeemed ? t('common.redeemed') : t('common.available')}
                         </span>
                       </td>
                       <td className="py-3 small text-muted">
@@ -207,7 +207,7 @@ function CreatorKeysPage() {
                           <button 
                             className="btn btn-sm btn-outline-danger rounded-circle"
                             onClick={() => handleDeleteKey(item._id)}
-                            title="Delete Key"
+                            title={t('common.deleteKey')}
                           >
                             <i className="bi bi-trash"></i>
                           </button>

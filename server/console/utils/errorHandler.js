@@ -1,6 +1,5 @@
-module.exports = (res, codeStatus, error) => {
-    res.status(codeStatus).json({
-        success: false,
-        message: error.message ? error.message : error
+module.exports = (res, statusCode, error) => {
+    res.status(statusCode).json({
+        message: error instanceof Error ? error.message : error
     })
 }

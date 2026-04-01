@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Navbar } from '../components/Navbar';
+import AppLayout from '../components/Layout';
+import { UtilityModal } from '../components/UtilityModal';
 
 function CreateLevel({ data, onLogout }) {
   const navigate = useNavigate();
   const [levelName, setLevelName] = useState('');
   const [directionName, setDirectionName] = useState('');
+  const [minTutorRank, setMinTutorRank] = useState('assistant');
   const [directions, setDirections] = useState([]);
   const [loading, setLoading] = useState(true);
+    // ── Modal state ──────────────────────────────────────────────────────────
+    const [modal, setModal] = useState({ show: false, type: 'info', title: '', message: '', onConfirm: null, onCancel: null, onClose: null, danger: false });
+    const closeModal  = () => setModal(p => ({ ...p, show: false }));
+    const showInfo    = (title, message) => setModal({ show: true, type: 'info', title, message, onClose: closeModal });
+    const showConfirm = (title, message, onConfirm, danger = false) => setModal({ show: true, type: 'confirm', danger, title, message, onConfirm, onCancel: closeModal });
   const [saving, setSaving] = useState(false);
 
   const token = localStorage.getItem('token');
@@ -19,7 +26,7 @@ function CreateLevel({ data, onLogout }) {
   const fetchDirections = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:4040/api/directions');
+      const response = await fetch(process.env.REACT_APP_API_URL + '/directions');
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -37,7 +44,7 @@ function CreateLevel({ data, onLogout }) {
     } catch (err) {
       console.error('Error fetching directions:', err);
       setDirections([]);
-      alert('Failed to load directions. Please check your connection.');
+      showInfo('Error', 'Failed to load directions. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -47,19 +54,19 @@ function CreateLevel({ data, onLogout }) {
     e.preventDefault();
 
     if (!levelName.trim()) {
-      alert('Please enter a level name');
+      showInfo('Validation', 'Please enter a level name');
       return;
     }
 
     if (!directionName) {
-      alert('Please select a direction');
+      showInfo('Validation', 'Please select a direction');
       return;
     }
 
     setSaving(true);
 
     try {
-      const response = await fetch('http://localhost:4040/api/levels', {
+      const response = await fetch(process.env.REACT_APP_API_URL + '/levels', {
         method: 'POST',
         headers: {
           'Authorization': `${token.split(' ')[0]} ${token.split(' ')[1]}`,
@@ -67,20 +74,21 @@ function CreateLevel({ data, onLogout }) {
         },
         body: JSON.stringify({
           levelName: levelName.trim(),
-          directionName: directionName
+          directionName: directionName,
+          minTutorRank: minTutorRank
         })
       });
 
       if (response.ok) {
-        alert('Level created successfully');
+        showInfo('Success', 'Level created successfully');
         navigate('/manage/levels');
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to create level');
+        showInfo('Error', error.message || 'Failed to create level');
       }
     } catch (err) {
       console.error('Error creating level:', err);
-      alert('Failed to create level');
+      showInfo('Error', 'Failed to create level');
     } finally {
       setSaving(false);
     }
@@ -88,21 +96,19 @@ function CreateLevel({ data, onLogout }) {
 
   if (loading) {
     return (
-      <>
-        <Navbar data={data} onLogout={onLogout} />
-        <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
+    <AppLayout data={data} onLogout={onLogout} title="Create Level">
+<div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
           <div className="text-center py-5">
             <div className="spinner-border text-primary"></div>
           </div>
         </div>
-      </>
+      </AppLayout>
     );
   }
 
   return (
-    <>
-      <Navbar data={data} onLogout={onLogout} />
-      <div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
+    <AppLayout data={data} onLogout={onLogout} title="Create Level">
+<div className="p-3 p-md-4 bg-light" style={{ minHeight: 'calc(100vh - 56px)' }}>
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 className="mb-0">Create Level</h2>
           <button
@@ -216,7 +222,19 @@ function CreateLevel({ data, onLogout }) {
           </div>
         </div>
       </div>
-    </>
+        <UtilityModal
+                show={modal.show}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                danger={modal.danger}
+                onConfirm={() => { modal.onConfirm?.(); closeModal(); }}
+                onCancel={modal.onCancel || closeModal}
+                onClose={modal.onClose || closeModal}
+            />
+
+    </AppLayout>
+
   );
 }
 
