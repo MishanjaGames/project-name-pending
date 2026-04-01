@@ -3,7 +3,7 @@ require('dotenv').config();
 // ═══════════════════════════════════════════════════════════════════════════
 // PROTOCOL SELECTION: Automatically select ports and URLs based on USE_HTTPS
 // ═══════════════════════════════════════════════════════════════════════════
-const useHttps = false;
+const useHttps = process.env.USE_HTTPS === true;
 
 // Select port based on protocol
 const rtcPort = useHttps
@@ -35,7 +35,7 @@ module.exports = {
     // ─────────────────────────────────────────────────────────────────────
     // JWT & Authentication
     // ─────────────────────────────────────────────────────────────────────
-    JWT_SECRET:             'Z3H@u8E#375Q[hKxAprDFGmERb05' || process.env.JWT_SECRET,
+    JWT_SECRET:             process.env.JWT_SECRET || 'Z3H@u8E#375Q[hKxAprDFGmERb05',
 
     // ─────────────────────────────────────────────────────────────────────
     // CORS Configuration

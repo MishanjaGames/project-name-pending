@@ -9,7 +9,8 @@ async function verifyToken(token) {
     if (!token) return null
     try {
         // Strip "Bearer " prefix if present
-        const raw = token.startsWith('Bearer ') ? token : `Bearer ${token}`
+        const raw = token.startsWith('Bearer ') ? token : 'Bearer '+ token;
+        console.log(token)
         return jwt.verify(raw, config.JWT_SECRET)
     } catch {
         return null
@@ -20,7 +21,7 @@ async function verifyToken(token) {
  * Socket.IO middleware — attaches user payload to socket.data.user
  * or disconnects with UNAUTHORIZED if token is invalid.
  */
-function socketAuth(socket, next) {
+async function socketAuth(socket, next) {
     // Accept token from multiple places socket.io clients might send it
     const raw =
         socket.handshake.auth?.token ||
@@ -36,7 +37,7 @@ function socketAuth(socket, next) {
         return next(new Error('UNAUTHORIZED'))
     }
 
-    const user = verifyToken(token)
+    const user = await verifyToken(token)
     if (!user) {
         console.warn('[auth] invalid token, ip:', socket.handshake.address, 'token prefix:', token.slice(0, 20))
         return next(new Error('UNAUTHORIZED'))

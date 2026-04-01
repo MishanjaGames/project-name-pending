@@ -366,3 +366,39 @@ module.exports.getExpandedSchedule = async (req, res) => {
         res.status(200).json({ data: expanded })
     } catch (e) { errorHandler(res, 500, e) }
 }
+module.exports.prune = async (req, res) => {
+    try {
+        const requester = await getRequester(req)
+        if (!requester) return errorHandler(res, 401, 'Authentication required')
+
+        const level = await getAccessLevel(requester)
+        if (!MANAGE_LEVELS.includes(level))
+            return errorHandler(res, 403, 'Only manage+ can prune sessions')
+
+        const { olderThanDays = 90, statuses = ['archived', 'completed'] } = req.body
+        if (!Array.isArray(statuses) || statuses.some(s => !['archived', 'completed'].includes(s)))
+            return errorHandler(res, 400, 'statuses must be array of archived/completed')
+
+        const cutoff = new Date()
+        cutoff.setDate(cutoff.getDate() - parseInt(olderThanDays, 10))
+
+        const Groups = require('../models/mongo.groups')
+        const Assignments = require('../models/mongo.assignments')
+
+        const toDelete = await Sessions.find({
+            status: { $in: statuses },
+            updatedAt: { $lt: cutoff }
+        }).select('_id')
+
+        const ids = toDelete.map(s => s._id)
+        if (ids.length === 0) return res.status(200).json({ message: 'No sessions matched', deleted: 0 })
+
+        const groups = await Groups.find({ sessionId: { $in: ids } })
+        const groupIds = groups.map(g => g._id)
+        if (groupIds.length > 0) await Assignments.deleteMany({ groupId: { $in: groupIds } })
+        await Groups.deleteMany({ sessionId: { $in: ids } })
+        await Sessions.deleteMany({ _id: { $in: ids } })
+
+        res.status(200).json({ message: `Pruned ${ids.length} session(s)`, deleted: ids.length, groupsDeleted: groups.length })
+    } catch (e) { errorHandler(res, 500, e) }
+}

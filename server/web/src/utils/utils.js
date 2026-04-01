@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef } from 'react';
  */
 export const toHttps = (url) => {
   if (!url) return url;
-  const useHttps = false;
+  const useHttps = process.env.USE_HTTPS === true;
   if (!useHttps) return url; // Use URL as-is (HTTP)
   return url.replace(/^http:\/\//i, 'https://');
 };

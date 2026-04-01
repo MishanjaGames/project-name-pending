@@ -3,7 +3,7 @@ require('dotenv').config();
 // ═══════════════════════════════════════════════════════════════════════════
 // PROTOCOL SELECTION: Automatically select ports and URLs based on USE_HTTPS
 // ═══════════════════════════════════════════════════════════════════════════
-const useHttps = process.env.USE_HTTPS || false;
+const useHttps = process.env.USE_HTTPS === true;
 
 // Select port based on protocol
 const apiPort = useHttps
