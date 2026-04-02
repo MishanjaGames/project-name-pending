@@ -3,3 +3,4 @@ build
 .git
 .vscode
 .idea
+/webrtc-test/backend/node_modules

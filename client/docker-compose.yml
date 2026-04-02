@@ -13,6 +13,15 @@ services:
     networks:
       - app-network
   
+  webrtc:
+    build:
+      context: ./webrtc-test/backend 
+    container_name: webrtc-server
+    ports:
+      - "5001:5001"
+    networks:
+      - app-network
+
   # server:
   #   build: ./server
   #   container_name: node_server
