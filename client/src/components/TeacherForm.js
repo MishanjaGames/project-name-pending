@@ -1,12 +1,11 @@
 import React, { useState, useContext, useRef } from 'react';
 import './TeacherForm.css';
-import { submitTeacherApplication } from '../utils/teacher'; // Оставляем твой импорт
+import { submitTeacherApplication } from '../utils/teacher';
 import { SettingsContext } from '../contexts/SettingsContext';
 
 export default function TeacherForm({ initialEmail = '' }) {
   const { t } = useContext(SettingsContext);
 
-  // Основной стейт формы
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -14,10 +13,7 @@ export default function TeacherForm({ initialEmail = '' }) {
     agreement: false
   });
 
-  // Массив навыков (каждый навык содержит свои данные и файлы)
   const [skills, setSkills] = useState([]);
-
-  // Состояния для модального окна добавления/редактирования навыка
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSkillIndex, setEditingSkillIndex] = useState(null);
   const [currentSkill, setCurrentSkill] = useState({
@@ -25,11 +21,10 @@ export default function TeacherForm({ initialEmail = '' }) {
     subject: '',
     experience: '',
     source: '',
-    certs: [], // Массив файлов
-    examples: [], // Массив объектов { type: 'file'|'link', data: File|String }
+    certs: [],
+    examples: [],
   });
 
-  // Вспомогательные состояния
   const [tempLink, setTempLink] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -38,13 +33,11 @@ export default function TeacherForm({ initialEmail = '' }) {
   const certInputRef = useRef(null);
   const exampleInputRef = useRef(null);
 
-  // --- ОБРАБОТЧИКИ ОСНОВНОЙ ФОРМЫ ---
   const onChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  // --- ОБРАБОТЧИКИ МОДАЛЬНОГО ОКНА ---
   const openSkillModal = (index = null) => {
     if (index !== null) {
       setEditingSkillIndex(index);
@@ -66,19 +59,17 @@ export default function TeacherForm({ initialEmail = '' }) {
     setCurrentSkill({ ...currentSkill, [e.target.name]: e.target.value });
   };
 
-  // Файлы сертификатов
   const handleCertUpload = (e) => {
     if (e.target.files && e.target.files.length > 0) {
       setCurrentSkill(prev => ({ ...prev, certs: [...prev.certs, ...Array.from(e.target.files)] }));
     }
-    e.target.value = null; // Сброс input
+    e.target.value = null; 
   };
 
   const removeCert = (idx) => {
     setCurrentSkill(prev => ({ ...prev, certs: prev.certs.filter((_, i) => i !== idx) }));
   };
 
-  // Примеры работ (Файлы и Ссылки)
   const handleExampleUpload = (e) => {
     if (e.target.files && e.target.files.length > 0) {
       const newExamples = Array.from(e.target.files).map(f => ({ type: 'file', data: f }));
@@ -100,7 +91,7 @@ export default function TeacherForm({ initialEmail = '' }) {
 
   const saveSkill = () => {
     if (!currentSkill.type || !currentSkill.subject || !currentSkill.experience) {
-      alert('Please fill Type, Subject and Experience');
+      alert(t('teacher.alertFillRequired'));
       return;
     }
 
@@ -118,11 +109,10 @@ export default function TeacherForm({ initialEmail = '' }) {
     setSkills(skills.filter((_, i) => i !== idx));
   };
 
-  // --- ОТПРАВКА НА БЭКЕНД ---
   const validate = () => {
-    if (!form.firstName || !form.lastName || !form.bio) return 'Please fill all required personal fields.';
-    if (skills.length === 0) return 'Please add at least one skill.';
-    if (!form.agreement) return 'You must agree to the terms.';
+    if (!form.firstName || !form.lastName || !form.bio) return t('teacher.alertFillPersonal');
+    if (skills.length === 0) return t('teacher.alertAddSkill');
+    if (!form.agreement) return t('teacher.alertAgree');
     return null;
   };
 
@@ -139,18 +129,15 @@ export default function TeacherForm({ initialEmail = '' }) {
       const fd = new FormData();
       fd.append('firstName', form.firstName);
       fd.append('lastName', form.lastName);
-      fd.append('email', initialEmail); // Email берем из пропсов аккаунта
+      fd.append('email', initialEmail); 
       fd.append('bio', form.bio);
 
-      // Важно для БЭКЕНДА: Упаковываем сложную структуру навыков.
-      // Текстовые данные навыков шлем как JSON строку
       const skillsMetadata = skills.map(s => ({
         type: s.type, subject: s.subject, experience: s.experience, source: s.source,
         links: s.examples.filter(ex => ex.type === 'link').map(ex => ex.data)
       }));
       fd.append('skillsData', JSON.stringify(skillsMetadata));
 
-      // Файлы прикрепляем с уникальными ключами (чтобы бэкенд понял, какому навыку они принадлежат)
       skills.forEach((skill, skillIdx) => {
         skill.certs.forEach((cert, certIdx) => {
           fd.append(`cert_skill_${skillIdx}_${certIdx}`, cert);
@@ -162,13 +149,12 @@ export default function TeacherForm({ initialEmail = '' }) {
       });
 
       const res = await submitTeacherApplication(fd);
-      setSuccess(res.message || 'Application submitted successfully!');
+      setSuccess(res.message || t('teacher.alertSuccess'));
       
-      // Очистка формы
       setForm({ firstName: '', lastName: '', bio: '', agreement: false });
       setSkills([]);
     } catch (err) {
-      setError(err.message || 'Error sending application.');
+      setError(err.message || t('teacher.alertError'));
     } finally {
       setSending(false);
     }
@@ -176,11 +162,6 @@ export default function TeacherForm({ initialEmail = '' }) {
 
   return (
     <div className="teacher-form-container">
-      {/* <div className="mb-4">
-        <h3 className="fw-bold mb-1">Teacher application</h3>
-        <p className="text-muted small">Fill the form to apply for a teacher role. An administrator will contact you after review.</p>
-      </div> */}
-
       <form onSubmit={handleSubmit} className="card p-4 border-0 shadow-sm bg-transparent">
         {error && <div className="alert alert-danger">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
@@ -215,10 +196,10 @@ export default function TeacherForm({ initialEmail = '' }) {
                   <div className="skill-pill-data">
                     <span className="fw-bold text-truncate" style={{maxWidth: '100px'}}>{s.type}</span>
                     <span className="text-muted text-truncate" style={{maxWidth: '100px'}}>{s.subject}</span>
-                    <span className="badge bg-secondary">{s.experience} yrs</span>
+                    <span className="badge bg-secondary">{s.experience} {t('teacher.yrs')}</span>
                     <span className="text-muted">{s.source}</span>
-                    <span className="text-primary small">[{s.certs.length} certs]</span>
-                    <span className="text-info small">[{s.examples.length} examples]</span>
+                    <span className="text-primary small">[{s.certs.length} {t('teacher.certsCount')}]</span>
+                    <span className="text-info small">[{s.examples.length} {t('teacher.examplesCount')}]</span>
                   </div>
                   <div className="skill-pill-actions">
                     <button type="button" onClick={() => openSkillModal(idx)}><i className="bi bi-pencil"></i></button>
@@ -246,52 +227,52 @@ export default function TeacherForm({ initialEmail = '' }) {
         <div className="skill-modal-overlay" onClick={closeSkillModal}>
           <div className="skill-modal-content" onClick={e => e.stopPropagation()}>
             <div className="skill-modal-header">
-              <h5>{editingSkillIndex !== null ? 'Edit Skill' : 'Add Skill'}</h5>
+              <h5>{editingSkillIndex !== null ? t('teacher.editSkill') : t('teacher.addSkillModal')}</h5>
               <button type="button" className="btn-close btn-close-white" onClick={closeSkillModal}></button>
             </div>
             
             <div className="skill-modal-body">
               <div className="mb-3">
-                <label className="form-label small text-muted text-uppercase fw-bold">Type of knowledge <span className="req-star">*</span></label>
+                <label className="form-label small text-muted text-uppercase fw-bold">{t('teacher.typeOfKnowledge')} <span className="req-star">*</span></label>
                 <select name="type" value={currentSkill.type} onChange={onSkillChange} className="form-select rounded-pill">
-                  <option value="">Select type...</option>
-                  <option value="Specified">Specified</option>
-                  <option value="General">General</option>
-                  <option value="Language">Language</option>
+                  <option value="">{t('teacher.selectType')}</option>
+                  <option value="Specified">{t('teacher.typeSpecified')}</option>
+                  <option value="General">{t('teacher.typeGeneral')}</option>
+                  <option value="Language">{t('teacher.typeLanguage')}</option>
                 </select>
               </div>
 
               <div className="mb-3">
-                <label className="form-label small text-muted text-uppercase fw-bold">Subject <span className="req-star">*</span></label>
+                <label className="form-label small text-muted text-uppercase fw-bold">{t('teacher.subject')} <span className="req-star">*</span></label>
                 <select name="subject" value={currentSkill.subject} onChange={onSkillChange} className="form-select rounded-pill">
-                  <option value="">Select subject...</option>
-                  <option value="Design">Design</option>
-                  <option value="Coding">Coding</option>
-                  <option value="Marketing">Marketing</option>
+                  <option value="">{t('teacher.selectSubject')}</option>
+                  <option value="Design">{t('teacher.subjectDesign')}</option>
+                  <option value="Coding">{t('teacher.subjectCoding')}</option>
+                  <option value="Marketing">{t('teacher.subjectMarketing')}</option>
                 </select>
               </div>
 
               <div className="mb-3">
-                <label className="form-label small text-muted text-uppercase fw-bold">Experience (in full years) <span className="req-star">*</span></label>
+                <label className="form-label small text-muted text-uppercase fw-bold">{t('teacher.experience')} <span className="req-star">*</span></label>
                 <input type="number" name="experience" value={currentSkill.experience} onChange={onSkillChange} className="form-control rounded-pill" min="0" placeholder="0" />
               </div>
 
               <div className="mb-4">
-                <label className="form-label small text-muted text-uppercase fw-bold">Source of knowledge <span className="req-star">*</span></label>
+                <label className="form-label small text-muted text-uppercase fw-bold">{t('teacher.source')} <span className="req-star">*</span></label>
                 <select name="source" value={currentSkill.source} onChange={onSkillChange} className="form-select rounded-pill">
-                  <option value="">Select source...</option>
-                  <option value="Self-taught">Self-taught</option>
-                  <option value="University">University</option>
-                  <option value="Courses">Courses</option>
+                  <option value="">{t('teacher.selectSource')}</option>
+                  <option value="Self-taught">{t('teacher.sourceSelf')}</option>
+                  <option value="University">{t('teacher.sourceUni')}</option>
+                  <option value="Courses">{t('teacher.sourceCourses')}</option>
                 </select>
               </div>
 
               {/* Сертификаты */}
               <div className="mb-4">
-                <label className="form-label small text-muted text-uppercase fw-bold">Certificate / Diploma (with grades) <span className="req-star">*</span></label>
+                <label className="form-label small text-muted text-uppercase fw-bold">{t('teacher.certs')} <span className="req-star">*</span></label>
                 
                 <div className="file-upload-zone" onClick={() => certInputRef.current?.click()}>
-                   Add files (PDF or Image)
+                   {t('teacher.addFiles')}
                 </div>
                 <input type="file" multiple accept=".pdf,image/*" ref={certInputRef} onChange={handleCertUpload} className="d-none" />
                 
@@ -310,16 +291,16 @@ export default function TeacherForm({ initialEmail = '' }) {
 
               {/* Примеры работ */}
               <div className="mb-2">
-                <label className="form-label small text-muted text-uppercase fw-bold">Examples of work <span className="req-star">*</span></label>
+                <label className="form-label small text-muted text-uppercase fw-bold">{t('teacher.examples')} <span className="req-star">*</span></label>
                 
                 <div className="file-upload-zone" onClick={() => exampleInputRef.current?.click()}>
-                   Add archive or paste link to cloud storage
+                   {t('teacher.addArchive')}
                 </div>
                 <input type="file" multiple accept=".zip,.rar,image/*,video/*" ref={exampleInputRef} onChange={handleExampleUpload} className="d-none" />
                 
                 <div className="link-input-group">
                   <input type="url" value={tempLink} onChange={(e) => setTempLink(e.target.value)} className="form-control rounded-pill" placeholder="https://..." />
-                  <button type="button" className="btn btn-outline-primary rounded-pill" onClick={addExampleLink}>Add</button>
+                  <button type="button" className="btn btn-outline-primary rounded-pill" onClick={addExampleLink}>{t('teacher.addLink')}</button>
                 </div>
 
                 {currentSkill.examples.map((ex, idx) => (
@@ -338,7 +319,7 @@ export default function TeacherForm({ initialEmail = '' }) {
 
             <div className="p-3 border-top" style={{ borderColor: 'var(--input-border)' }}>
                <button className="btn btn-primary w-100 rounded-pill" onClick={saveSkill}>
-                 {editingSkillIndex !== null ? 'UPDATE' : 'ADD'}
+                 {editingSkillIndex !== null ? t('teacher.updateBtn') : t('teacher.addBtnModal')}
                </button>
             </div>
           </div>

@@ -1,6 +1,8 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Slider from 'rc-slider';
+
+const BASE_URL = (process.env.REACT_APP_API_URL || '${BASE_URL}/api').replace('/api', '');
 import 'rc-slider/assets/index.css';
 import { getUser, setUser as setUserStorage } from '../../utils/auth'; 
 import { SettingsContext } from '../../contexts/SettingsContext';
@@ -42,7 +44,7 @@ function SearchPage() {
             if (imageLink && imageLink.url) {
               let cleanUrl = imageLink.url.replace(/\\/g, '/');
               cleanUrl = cleanUrl.replace('/api/manage/courses', '/api/courses');
-              imgSrc = cleanUrl.startsWith('http') ? cleanUrl : `http://localhost:4040${cleanUrl}`;
+              imgSrc = cleanUrl.startsWith('http') ? cleanUrl : `${BASE_URL}${cleanUrl}`;
             }
           } else if (c.img) {
             imgSrc = c.img;
@@ -264,7 +266,7 @@ function SearchPage() {
                   type="button" 
                   className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-outline-primary bg-white text-primary'}`} 
                   onClick={() => setViewMode('grid')}
-                  title="Grid view"
+                  title={t('common.gridView')}
                 >
                   <i className="bi bi-grid-fill"></i>
                 </button>
@@ -272,7 +274,7 @@ function SearchPage() {
                   type="button" 
                   className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline-primary bg-white text-primary'}`} 
                   onClick={() => setViewMode('list')}
-                  title="List view"
+                  title={t('common.listView')}
                 >
                   <i className="bi bi-list-ul"></i>
                 </button>

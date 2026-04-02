@@ -3,17 +3,16 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import AuthImage from '../../components/AuthImage';
 import { getUser } from '../../utils/auth';
+
+const API_URL = process.env.REACT_APP_API_URL || '${API_URL}';
+const BASE_URL = API_URL.replace('/api', '');
 import './CoursePage.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://localhost:4040/api';
-
 function CoursePage() {
-
   const { t } = useContext(SettingsContext);
-
   const { id } = useParams();
   const navigate = useNavigate();
-  const currentUser = getUser(); // Берем текущего юзера
+  const currentUser = getUser();
   const token = localStorage.getItem('token');
   const authHeader = token ? `Bearer ${token}` : '';
 
@@ -29,12 +28,10 @@ function CoursePage() {
   const [directions, setDirections] = useState([]);
   const [levels, setLevels] = useState([]);
 
-  // Drag & Drop states
   const [draggedVolume, setDraggedVolume] = useState(null);
   const [draggedChapter, setDraggedChapter] = useState(null);
   const [draggedItem, setDraggedItem] = useState(null);
 
-  // Modal & Edit states
   const [editableCourse, setEditableCourse] = useState(null);
   const [showAddItemModal, setShowAddItemModal] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -45,7 +42,6 @@ function CoursePage() {
   const [textRefreshKey, setTextRefreshKey] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Админ ли текущий пользователь?
   const isAdmin = currentUser && ['admin', 'root', 'manager', 'create', 'teacher'].includes(currentUser.role);
 
   useEffect(() => {
@@ -57,18 +53,15 @@ function CoursePage() {
     if (course) fetchUserData();
   }, [course?.userId]);
 
-  // Проверка: куплен ли курс (или админ ли мы)
   const checkCCourse = async () => {
     if (!currentUser) {
       setLocked(true);
       return;
     }
-    // Админам и создателям доступ открыт всегда!
     if (isAdmin) {
       setLocked(false);
       return;
     }
-
     try {
       const response = await fetch(`${API_URL}/users/${currentUser.id || currentUser._id}`, {
         method: 'GET',
@@ -85,7 +78,6 @@ function CoursePage() {
         }
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
       setLocked(true);
     }
   };
@@ -93,13 +85,12 @@ function CoursePage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // УМНАЯ ССЫЛКА: Админы стучатся в manage, обычные юзеры - в публичный API
       const courseEndpoint = isAdmin ? `/api/manage/courses/${id}` : `/api/courses/${id}`;
 
       const [courseRes, directionsRes, levelsRes, filesRes] = await Promise.all([
-        fetch(`https://localhost:4040${courseEndpoint}`, { headers: { 'Authorization': authHeader } }).catch(() => null),
-        fetch(`${API_URL}/directions`).catch(() => null),
-        fetch(`${API_URL}/levels`).catch(() => null),
+        fetch(`${BASE_URL}${courseEndpoint}`, { headers: { 'Authorization': authHeader } }).catch(() => null),
+        fetch('${API_URL}/directions').catch(() => null),
+        fetch('${API_URL}/levels').catch(() => null),
         fetch(`${API_URL}/manage/courses/${id}/files`, {
           headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' }
         }).catch(() => null),
@@ -145,7 +136,6 @@ function CoursePage() {
   };
 
   const fetchUserData = async () => {
-    // Если бэкенд уже прислал объект юзера - используем его
     if (course?.userId?.nickname) {
       setAuthor({
         nickname: course.userId.nickname,
@@ -155,7 +145,6 @@ function CoursePage() {
       });
       return;
     }
-    // Иначе пытаемся подтянуть (работает для админов)
     if (!isAdmin) return;
     try {
       const uId = course.userId?._id || course.userId;
@@ -228,7 +217,6 @@ function CoursePage() {
     }
   };
 
-  // Volume & Chapter Logic
   const addVolume = () => {
     const newVolume = { vid: `vol-${Date.now()}`, title: t('coursePage.addVolume'), chapters: [] };
     setVolumes([...volumes, newVolume]);
@@ -237,7 +225,7 @@ function CoursePage() {
 
   const deleteVolume = (volumeIndex) => {
     const volume = volumes[volumeIndex];
-    const userInput = prompt(`To delete this volume, please type its title:\n"${volume.title}"`);
+    const userInput = prompt(`${t('coursePage.deleteVolumePrompt')}:\n"${volume.title}"`);
     if (userInput === volume.title) {
       setVolumes(volumes.filter((_, i) => i !== volumeIndex));
       setHasChanges(true);
@@ -252,7 +240,7 @@ function CoursePage() {
   };
 
   const addChapter = (volumeIndex) => {
-    const newChapter = { cid: `ch-${Date.now()}`, title: 'New Chapter', items: [] };
+    const newChapter = { cid: `ch-${Date.now()}`, title: t('coursePage.newChapter'), items: [] };
     const newVolumes = [...volumes];
     newVolumes[volumeIndex].chapters.push(newChapter);
     setVolumes(newVolumes);
@@ -261,7 +249,7 @@ function CoursePage() {
 
   const deleteChapter = (volumeIndex, chapterIndex) => {
     const chapter = volumes[volumeIndex].chapters[chapterIndex];
-    const userInput = prompt(`To delete this chapter, please type its title:\n"${chapter.title}"`);
+    const userInput = prompt(`${t('coursePage.deleteChapterPrompt')}:\n"${chapter.title}"`);
     if (userInput === chapter.title) {
       const newVolumes = [...volumes];
       newVolumes[volumeIndex].chapters = newVolumes[volumeIndex].chapters.filter((_, i) => i !== chapterIndex);
@@ -277,7 +265,6 @@ function CoursePage() {
     setHasChanges(true);
   };
 
-  // Content Items Logic
   const addContentItem = (volumeIndex, chapterIndex, type) => setShowAddItemModal({ volumeIndex, chapterIndex, type });
 
   const saveContentItem = (volumeIndex, chapterIndex, itemData) => {
@@ -325,7 +312,7 @@ function CoursePage() {
   };
 
   const deleteContentItem = (volumeIndex, chapterIndex, itemIndex) => {
-    if (!window.confirm('Delete this item?')) return;
+    if (!window.confirm(t('coursePage.deleteItemConfirm'))) return;
     const newVolumes = [...volumes];
     newVolumes[volumeIndex].chapters[chapterIndex].items.splice(itemIndex, 1);
     setVolumes(newVolumes);
@@ -339,7 +326,6 @@ function CoursePage() {
     setHasChanges(true);
   };
 
-  // Drag and Drop (kept identical)
   const handleVolumeDragStart = (e, index) => { if (!editMode) return; setDraggedVolume(index); e.dataTransfer.effectAllowed = 'move'; };
   const handleVolumeDrop = (e, targetIndex) => {
     if (!editMode || draggedVolume === null) return;
@@ -364,7 +350,6 @@ function CoursePage() {
   };
   const handleDragOver = (e) => { if (!editMode) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
 
-  // Syntax Parser (Identical)
   const parseTextSyntax = (text) => {
     if (!text) return '';
     const codeBlocks = [];
@@ -490,7 +475,7 @@ function CoursePage() {
           })
         );
         if (uploadResults.some(ok => !ok)) {
-          alert('Some files failed to upload. Discarding unsaved changes.');
+          alert(t('coursePage.alertUploadFailed'));
           resetUnsavedState(); await fetchData(); return;
         }
       }
@@ -519,19 +504,19 @@ function CoursePage() {
         resetUnsavedState();
         setEditMode(false);
         await fetchData();
-        alert('Changes saved successfully!');
+        alert(t('coursePage.alertSaveSuccess'));
       } else {
-        alert('Failed to save. Discarding changes.');
+        alert(t('coursePage.alertSaveFailed'));
         resetUnsavedState(); await fetchData();
       }
     } catch (err) {
-      alert(`Error: ${err.message}.`);
+      alert(`${t('coursePage.alertError')} ${err.message}.`);
       resetUnsavedState(); await fetchData();
     } finally { setIsSaving(false); }
   };
 
-  const handleAddToCart = () => alert(`Added "${course.title}" to cart!`);
-  const handleEnroll = () => alert(`Enrolled in "${course.title}"!`);
+  const handleAddToCart = () => alert(`${t('coursePage.addedToCart')} "${course.title}"!`);
+  const handleEnroll = () => alert(`${t('coursePage.enrolledIn')} "${course.title}"!`);
 
   const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -546,28 +531,24 @@ function CoursePage() {
 
   if (loading) {
     return (
-      <>
-        <div className="course-preview-loading">
-          <div className="spinner-border text-primary"></div>
-        </div>
-      </>
+      <div className="course-preview-loading">
+        <div className="spinner-border text-primary"></div>
+      </div>
     );
   }
 
   if (!course) {
     return (
-      <>
-        <div className="course-preview-page">
-          <div className="row mb-1">
-            <div className="col-12">
-              <button className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 mb-2" onClick={() => navigate('/account')}>
-                <i className="bi bi-arrow-left"></i> {t('coursePage.back')}
-              </button>
-            </div>
+      <div className="course-preview-page">
+        <div className="row mb-1">
+          <div className="col-12">
+            <button className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 mb-2" onClick={() => navigate('/account')}>
+              <i className="bi bi-arrow-left"></i> {t('coursePage.back')}
+            </button>
           </div>
-          <div className="course-preview-error"><h3>{t('coursePage.notFound')}</h3></div>
         </div>
-      </>
+        <div className="course-preview-error"><h3>{t('coursePage.notFound')}</h3></div>
+      </div>
     );
   }
 
@@ -678,9 +659,9 @@ function CoursePage() {
               </div>
 
               <div className="mobile-buttons">
-                <button className="btn btn-primary btn-lg w-100 mb-2 disabled" onClick={handleAddToCart}>Add to Cart</button>
-                <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>Enroll Now</button>
-                <p className="guarantee-text">30-Day Money-Back Guarantee</p>
+                <button className="btn btn-primary btn-lg w-100 mb-2 disabled" onClick={handleAddToCart}>{t('coursePage.addToCart')}</button>
+                <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>{t('coursePage.enrollNow')}</button>
+                <p className="guarantee-text">{t('coursePage.guaranteeText')}</p>
               </div>
 
               <div className="desktop-skills section-card">
@@ -775,7 +756,7 @@ function CoursePage() {
                         {editMode && editingTitle?.type === 'volume' && editingTitle?.volumeIndex === volumeIndex ? (
                           <input type="text" className="form-control title-edit-input" value={volume.title} onChange={(e) => updateVolumeTitle(volumeIndex, e.target.value)} onBlur={() => setEditingTitle(null)} onKeyDown={(e) => { if (e.key === 'Enter') setEditingTitle(null); }} autoFocus onClick={(e) => e.stopPropagation()} />
                         ) : <span className="volume-title-text">{volume.title}</span>}
-                        <span className="volume-count">{volume.chapters.length} {volume.chapters.length === 1 ? 'chapter' : 'chapters'}</span>
+                        <span className="volume-count">{volume.chapters.length} {volume.chapters.length === 1 ? t('coursePage.chapter_one') : t('coursePage.chapter_other')}</span>
                         {editMode && (
                           <div className="header-actions" onClick={(e) => e.stopPropagation()}>
                             <button className="btn btn-sm btn-outline-primary" onClick={() => setEditingTitle({ type: 'volume', volumeIndex })}><i className="bi bi-pencil"></i></button>
@@ -787,7 +768,7 @@ function CoursePage() {
                       {(expandedVolumes[volume.vid] || editMode) && (
                         <div className="volume-content">
                           {volume.chapters.length === 0 ? (
-                            <div className="no-content-small"><p>No chapters</p>{editMode && <button className="btn btn-sm btn-primary" onClick={() => addChapter(volumeIndex)}><i className="bi bi-plus"></i> {t('coursePage.addChapter')}</button>}</div>
+                            <div className="no-content-small"><p>{t('coursePage.noChapters')}</p>{editMode && <button className="btn btn-sm btn-primary" onClick={() => addChapter(volumeIndex)}><i className="bi bi-plus"></i> {t('coursePage.addChapter')}</button>}</div>
                           ) : (
                             <div className={`chapters-list ${locked ? 'muted blocked' : ''}`}>
                               {volume.chapters.map((chapter, chapterIndex) => (
@@ -797,7 +778,7 @@ function CoursePage() {
                                     {editMode && editingTitle?.type === 'chapter' && editingTitle?.volumeIndex === volumeIndex && editingTitle?.chapterIndex === chapterIndex ? (
                                       <input type="text" className="form-control title-edit-input" value={chapter.title} onChange={(e) => updateChapterTitle(volumeIndex, chapterIndex, e.target.value)} onBlur={() => setEditingTitle(null)} onKeyDown={(e) => { if (e.key === 'Enter') setEditingTitle(null); }} autoFocus onClick={(e) => e.stopPropagation()} />
                                     ) : <span className="chapter-title-text">{chapter.title}</span>}
-                                    <span className="chapter-count">{chapter.items.length} {chapter.items.length === 1 ? 'item' : 'items'}</span>
+                                    <span className="chapter-count">{chapter.items.length} {chapter.items.length === 1 ? t('coursePage.item_one') : t('coursePage.item_other')}</span>
                                     {editMode && (
                                       <div className="header-actions" onClick={(e) => e.stopPropagation()}>
                                         <button className="btn btn-sm btn-outline-primary" onClick={() => setEditingTitle({ type: 'chapter', volumeIndex, chapterIndex })}><i className="bi bi-pencil"></i></button>
@@ -829,8 +810,8 @@ function CoursePage() {
                                             {item.type === 'video' ? <div className="video-item"><video src={item.url} controls className="video-player" /></div> :
                                              item.type === 'image' ? <div className="image-item"><img src={item.url} alt={item.title} className="content-image" /></div> :
                                              item.type === 'audio' ? <div className="audio-item"><audio src={item.url} controls className="audio-player" /></div> :
-                                             item.type === 'document' ? <div className="document-item"><a href={item.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-info"><i className="bi bi-file-pdf me-1"></i> Open Document</a></div> :
-                                             item.type === 'archive' ? <div className="archive-item"><a href={item.url} download className="btn btn-sm btn-outline-info"><i className="bi bi-file-zip me-1"></i> Download Archive</a></div> :
+                                             item.type === 'document' ? <div className="document-item"><a href={item.url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-info"><i className="bi bi-file-pdf me-1"></i> {t('coursePage.openDocument')}</a></div> :
+                                             item.type === 'archive' ? <div className="archive-item"><a href={item.url} download className="btn btn-sm btn-outline-info"><i className="bi bi-file-zip me-1"></i> {t('coursePage.downloadArchive')}</a></div> :
                                              item.type === 'text' ? <TextItemDisplay key={`${item.iid}-${textRefreshKey}`} url={item.url} parseTextSyntax={parseTextSyntax} refreshKey={textRefreshKey} localContent={localTextContent[item.iid]} /> : null}
                                           </div>
                                         ))
@@ -870,7 +851,6 @@ function CoursePage() {
   );
 }
 
-// ─── Text Item Display ────────────────────────────────────────────────────────
 function TextItemDisplay({ url, parseTextSyntax, refreshKey, localContent }) {
   const { t } = useContext(SettingsContext);
   const [content, setContent] = useState('');
@@ -882,8 +862,7 @@ function TextItemDisplay({ url, parseTextSyntax, refreshKey, localContent }) {
     if (!url) { setLoading(false); return; }
     const fetchContent = async () => {
       try {
-        const API_BASE = (API_URL).replace('/api', '');
-        const response = await fetch(`${API_BASE}${url}?_=${refreshKey || Date.now()}`, {
+        const response = await fetch(`${BASE_URL}${url}?_=${refreshKey || Date.now()}`, {
           headers: { 'Authorization': token ? `Bearer ${token}` : '' }
         });
         if (response.ok) setContent(await response.text());
@@ -895,12 +874,6 @@ function TextItemDisplay({ url, parseTextSyntax, refreshKey, localContent }) {
   if (loading) return <div className="text-item"><p><em>{t('coursePage.loadingContent')}</em></p></div>;
   return <div className="text-item"><div dangerouslySetInnerHTML={{ __html: parseTextSyntax(content) }} /></div>;
 }
-
-const SYNTAX_GROUPS = [
-  { label: 'Text & Structure', icon: 'bi-text-left', rows: [ { format: 'Heading 1', syntax: '# Text' }, { format: 'Code Snippet', syntax: '~(language)[code]~' } ] },
-  { label: 'Media', icon: 'bi-play-circle', rows: [ { format: 'Video', syntax: '{https://video-url.mp4}' }, { format: 'YouTube', syntax: '(https://youtube.com/watch?v=ID)' } ] },
-  { label: 'Links', icon: 'bi-link-45deg', rows: [ { format: 'Link', syntax: '@https://url@' } ] },
-];
 
 function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseTextSyntax, uploadedFiles = [] }) {
   const { t } = useContext(SettingsContext);
@@ -926,15 +899,14 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
     if (fileId) {
       const selectedFile = uploadedFiles.find(f => f.path === fileId || f.url === fileId);
       if (selectedFile) {
-        const API_BASE = (API_URL).replace('/api', '');
-        const fileUrl = (selectedFile.url || selectedFile.path).startsWith('http') ? selectedFile.url : `${API_BASE}${selectedFile.url || selectedFile.path}`;
+        const fileUrl = (selectedFile.url || selectedFile.path).startsWith('http') ? selectedFile.url : `${BASE_URL}${selectedFile.url || selectedFile.path}`;
         setUrl(fileUrl); setPreview(fileUrl); setFile(null);
       }
     } else { setUrl(''); setPreview(''); }
   };
 
   const handleSave = () => {
-    if (!title.trim()) { alert('Please enter a title'); return; }
+    if (!title.trim()) { alert(t('coursePage.alertNoTitle')); return; }
     if (type === 'text') { onSave({ type, title, content }); return; }
     onSave({ type, title, url: url || preview || '', content: undefined });
   };
@@ -943,7 +915,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h5>{isEditing ? 'Edit' : 'Add'} {type.toUpperCase()}</h5>
+          <h5>{isEditing ? t('coursePage.modalEdit') : t('coursePage.modalAdd')} {type.toUpperCase()}</h5>
           <button className="btn-close" onClick={onClose}></button>
         </div>
         <div className="modal-body">

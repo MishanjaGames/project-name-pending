@@ -4,7 +4,7 @@ import { getUser, setUser as setUserStorage } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
 
 export default function SettingsPage() {
-  const { t } = useContext(SettingsContext);
+  const { t, theme } = useContext(SettingsContext);
   const navigate = useNavigate();
   const user = getUser();
 
@@ -28,13 +28,14 @@ export default function SettingsPage() {
     // Обновляем данные в localStorage
     const updatedUser = { ...user, ...formData, name: formData.nickname };
     setUserStorage(updatedUser);
-    alert('Profile updated successfully!');
+    alert(t('common.profileUpdated'));
     navigate('/account');
   };
 
   return (
-    <div className="container py-5" style={{ maxWidth: '600px' }}>
-      <div className="card border-0 shadow-sm p-4">
+    <div className={`min-vh-100 py-5 ${theme === 'dark' ? 'bg-dark' : 'bg-light'}`}>
+      <div className="container" style={{ maxWidth: '600px' }}>
+        <div className={`card border-0 shadow-sm p-4 ${theme === 'dark' ? 'bg-dark text-light' : ''}`}>
         <h3 className="fw-bold mb-4">{t('settings')}</h3>
         <form onSubmit={handleSave}>
           <div className="row g-3">
@@ -68,6 +69,7 @@ export default function SettingsPage() {
             <button type="submit" className="btn btn-primary px-4">{t('settingsPage.save')}</button>
           </div>
         </form>
+      </div>
       </div>
     </div>
   );

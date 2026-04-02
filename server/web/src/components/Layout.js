@@ -17,6 +17,15 @@ const lvl = (a) => ACCESS[a] ?? 0;
 
 const NAV = [
     {
+        section: 'Learning',
+        minLvl: 0,
+        items: [
+        { to: '/my-courses',  icon: 'bi-collection-play',   label: 'My Courses' },
+        { to: '/my-grades',   icon: 'bi-award',              label: 'My Grades' },
+        { to: '/redeem',      icon: 'bi-key',                label: 'Redeem Key' },
+        ],
+    },
+    {
         section: 'Management', minLvl: 3,
         items: [
             { to: '/',                  icon: 'bi-speedometer2',    label: 'Dashboard' },

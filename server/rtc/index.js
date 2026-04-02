@@ -25,7 +25,7 @@ if (config.MONGO_URI) {
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
 const io = new Server(server, {
     cors: {
-        origin:      config.ALLOWED_ORIGINS,
+        origin:      '*',
         methods:     ['GET', 'POST'],
         credentials: true
     },
@@ -56,7 +56,21 @@ console.error = (...a) => { pushLog('error', ...a); origErr(...a)  }
 registerHandlers(io)
 
 // ── REST ──────────────────────────────────────────────────────────────────────
-app.use(cors({ origin: config.ALLOWED_ORIGINS, credentials: true }))
+// app.use(cors({
+//     //origin: config.ALLOWED_ORIGINS,
+//     origin: true,
+//     credentials: true,
+//     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+//     allowedHeaders: ['Content-Type', 'Authorization'],
+//     maxAge: 86400
+// }))
+// app.options(true, cors({
+//     //origin: config.ALLOWED_ORIGINS,
+//     origin: true,
+//     credentials: true,
+//     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+//     allowedHeaders: ['Content-Type', 'Authorization'],
+// }))
 app.use(express.json())
 
 // Health check
@@ -93,7 +107,11 @@ server.listen(config.PORT, () => {
     console.log(`Protocol: ${protocol} | Port: ${config.PORT}`);
     console.log(`API URL: ${config.SERVICE_URLS.API}`);
     console.log(`RTC URL: ${config.SERVICE_URLS.RTC}`);
-    console.log(`Allowed origins: ${config.ALLOWED_ORIGINS.join(', ')}`);
+    console.log(`\n[CORS] Configured for these origins:`);
+    // config.ALLOWED_ORIGINS.forEach(origin => {
+    //     console.log(`       ✓ ${origin}`);
+    // });
+    console.log(`       ✓ *`);
     console.log(`Mongo: ${config.MONGO_URI ? 'enabled' : 'disabled (in-memory only)'}`);
     console.log(`${'═'.repeat(70)}\n`);
 })

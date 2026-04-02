@@ -2,7 +2,7 @@ import { toHttps } from '../utils/utils';
 import { useState } from 'react';
 import { useTheme } from '../components/Layout';
 
-const API = toHttps(process.env.REACT_APP_API_URL || 'https://localhost:4040/api');
+const API = toHttps(process.env.REACT_APP_API_URL);
 
 export default function Login({ onLogin }) {
   const { theme, toggle } = useTheme();
@@ -34,7 +34,13 @@ export default function Login({ onLogin }) {
       }
       const { token, tokenType } = await r1.json();
       const fullToken = `${tokenType} ${token}`;
-      if (form.memo) localStorage.setItem('token', fullToken);
+
+      // Always store the token — localStorage if "remember me", sessionStorage otherwise
+      if (form.memo) {
+        localStorage.setItem('token', fullToken);
+      } else {
+        sessionStorage.setItem('token', fullToken);
+      }
 
       const r2 = await fetch(`${API}/users/c`, {
         headers: { Authorization: fullToken }
@@ -51,7 +57,6 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="login-page">
-      {/* Theme toggle top-right */}
       <button
         className="theme-toggle"
         onClick={toggle}
@@ -62,7 +67,6 @@ export default function Login({ onLogin }) {
       </button>
 
       <div className="login-card">
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{ width: 52, height: 52, borderRadius: 12, background: 'var(--accent)',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+const BASE_URL = (process.env.REACT_APP_API_URL || '${BASE_URL}/api').replace('/api', '');
+
 function AuthImage({ src, alt, className, style, fallback }) {
     const [imageSrc, setImageSrc] = useState(null);
     const [error, setError] = useState(false);
@@ -24,14 +26,13 @@ function AuthImage({ src, alt, className, style, fallback }) {
                     'Authorization': `Bearer ${token}`
                 };
 
-                const API_BASE = process.env.REACT_APP_API_URL?.replace('/api', '') || 'https://localhost:4040';
                 let imageUrl;
                 if (src.startsWith('http://') || src.startsWith('https://')) {
                     imageUrl = src;
                 } else if (src.startsWith('/')) {
-                    imageUrl = `${API_BASE}${src}`;
+                    imageUrl = `${BASE_URL}${src}`;
                 } else {
-                    imageUrl = `${API_BASE}/${src}`;
+                    imageUrl = `${BASE_URL}/${src}`;
                 }
 
                 const response = await fetch(imageUrl, { headers });

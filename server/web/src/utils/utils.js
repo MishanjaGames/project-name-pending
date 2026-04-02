@@ -10,14 +10,18 @@ import { useCallback, useEffect, useRef } from 'react';
  */
 export const toHttps = (url) => {
   if (!url) return url;
-  const useHttps = process.env.USE_HTTPS === true;
-  if (!useHttps) return url; // Use URL as-is (HTTP)
-  return url.replace(/^http:\/\//i, 'https://');
+  const useHttps = process.env.REACT_APP_USE_HTTPS === 'true';
+  if (!useHttps) return url;
+  // Swap protocol and HTTP port → HTTPS port
+  return url
+    .replace(/^http:\/\//i, 'https://')
+    .replace(/:4040(\/|$)/, ':4043$1')
+    .replace(/:5050(\/|$)/, ':5051$1')
+    .replace(/:4000(\/|$)/, ':4004$1');
 };
 
 // REACT_APP_API_URL is already the correct http/https URL — baked at build time
-export const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4040/api';
-
+export const API_URL = process.env.REACT_APP_API_URL;
 // Hook: runs callback after `delay` ms, with reset/clear controls
 export function useTimeout(callback, delay) {
   const callbackRef = useRef(callback);

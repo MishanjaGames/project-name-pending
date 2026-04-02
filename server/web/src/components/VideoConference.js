@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const RTC_URL = process.env.REACT_APP_RTC_URL || 'http://localhost:5050';
+import { toHttps } from '../utils/utils';
+
+const _RTC_BASE = process.env.REACT_APP_USE_HTTPS === 'true'
+  ? (process.env.REACT_APP_RTC_URL_S || 'https://localhost:5051')
+  : (process.env.REACT_APP_RTC_URL   || 'http://localhost:5050');
+const RTC_URL = toHttps(_RTC_BASE);
 
 let _io = null;
 async function getIO() {

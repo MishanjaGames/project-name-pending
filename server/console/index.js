@@ -20,7 +20,22 @@ global.appState = {
 
 const app = express()
 
-app.use(cors({ origin: true, credentials: true }))
+// // ── CORS Configuration ───────────────────────────────────────────────────────
+// // Uses dynamic ALLOWED_ORIGINS from config (set from SERVER_HOST + localhost fallbacks)
+// app.use(cors({
+//     origin: config.ALLOWED_ORIGINS,
+//     credentials: true,
+//     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+//     allowedHeaders: ['Content-Type', 'Authorization'],
+//     maxAge: 86400
+// }))
+// // Handle preflight for all routes explicitly
+// app.options(true, cors({
+//     origin: config.ALLOWED_ORIGINS,
+//     credentials: true,
+//     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+//     allowedHeaders: ['Content-Type', 'Authorization'],
+// }))
 app.use(passport.initialize())
 require('./middleware/passport')(passport)
 app.use(morgan('dev'))
@@ -36,8 +51,8 @@ app.use('/api', restRouter)
 
 const protocol = config.USE_HTTPS ? 'HTTPS' : 'HTTP';
 const url = config.USE_HTTPS 
-    ? `https://localhost:${config.PORT}`
-    : `http://localhost:${config.PORT}`;
+    ? `https://${process.env.SERVER_HOST}:${config.PORT}`
+    : `http://${process.env.SERVER_HOST}:${config.PORT}`;
 
 app.listen(config.PORT, () => {
     console.log(`\n${'═'.repeat(70)}`);
@@ -46,5 +61,10 @@ app.listen(config.PORT, () => {
     console.log(`API URL: ${config.SERVICE_URLS.API}`);
     console.log(`RTC URL: ${config.SERVICE_URLS.RTC}`);
     console.log(`WEB URL: ${config.SERVICE_URLS.WEB}`);
+    console.log(`\n[CORS] Configured for these origins:`);
+    // config.ALLOWED_ORIGINS.forEach(origin => {
+    //     console.log(`       ✓ ${origin}`);
+    // });
+    console.log(`       ✓ *`);
     console.log(`${'═'.repeat(70)}\n`);
 })

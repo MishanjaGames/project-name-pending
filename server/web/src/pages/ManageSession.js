@@ -13,7 +13,7 @@ const MARK_SCALES = ['5','12','100','custom'];
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-function ScheduleCalendar({ schedule = [], onRemove, canEdit, onEventClick }) {
+function ScheduleCalendar({ schedule = [], onRemove, canEdit, onEventClick, onCopyLink }) {
     const [calYear, setCalYear]   = useState(() => new Date().getFullYear());
     const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
     const [view, setView]         = useState('month'); // 'month' | 'list'
@@ -184,9 +184,14 @@ function ScheduleCalendar({ schedule = [], onRemove, canEdit, onEventClick }) {
                                             </div>
                                             <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
                                                 {s.meetingLink && (
-                                                    <a href={s.meetingLink} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-success" style={{fontSize:'.75rem'}}>
-                                                        <i className="bi bi-camera-video me-1" />Join
-                                                    </a>
+                                                    <>
+                                                        <button className="btn btn-sm btn-outline-success" style={{fontSize:'.75rem'}} onClick={() => onEventClick?.(s)}>
+                                                            <i className="bi bi-camera-video me-1" />Join
+                                                        </button>
+                                                        <button className="btn btn-sm btn-outline-secondary" style={{fontSize:'.75rem'}} onClick={() => onCopyLink?.(s)} title="Copy invite link">
+                                                            <i className="bi bi-link-45deg" />
+                                                        </button>
+                                                    </>
                                                 )}
                                                 {canEdit && (
                                                     <button className="btn btn-sm btn-outline-danger" onClick={() => onRemove(i)} title="Remove">
@@ -850,10 +855,16 @@ function ManageSession({ data, onLogout, startMeeting }) {
                                                             {diffDays <= 1 && <span className="badge bg-danger" style={{fontSize:'.65rem'}}>Today</span>}
                                                             {diffDays > 1 && diffDays <= 3 && <span className="badge bg-warning text-dark" style={{fontSize:'.65rem'}}>Soon</span>}
                                                             {s.meetingLink && (
-                                                                <a href={s.meetingLink} target="_blank" rel="noopener noreferrer"
-                                                                    className="btn btn-sm btn-outline-primary" style={{padding:'2px 8px', fontSize:'.75rem'}}>
-                                                                    <i className="bi bi-camera-video me-1"></i>Join
-                                                                </a>
+                                                                <>
+                                                                    <button className="btn btn-sm btn-outline-primary" style={{padding:'2px 8px', fontSize:'.75rem'}}
+                                                                        onClick={() => startMeeting({ sessionId: id })}>
+                                                                        <i className="bi bi-camera-video me-1"></i>Join
+                                                                    </button>
+                                                                    <button className="btn btn-sm btn-outline-secondary" style={{padding:'2px 8px', fontSize:'.75rem'}}
+                                                                        onClick={copyInviteLink} title="Copy invite link">
+                                                                        <i className="bi bi-link-45deg"></i>
+                                                                    </button>
+                                                                </>
                                                             )}
                                                         </div>
                                                     </div>
@@ -974,7 +985,8 @@ function ManageSession({ data, onLogout, startMeeting }) {
                             schedule={session.schedule || []}
                             onRemove={removeScheduleEntry}
                             canEdit={canEditSession}
-                            onEventClick={(ev) => ev.meetingLink && window.open(ev.meetingLink, '_blank')}
+                            onEventClick={(ev) => ev.meetingLink && startMeeting({ sessionId: id })}
+                            onCopyLink={() => copyInviteLink()}
                         />
                     </div>
                 )}

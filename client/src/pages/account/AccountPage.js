@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { getUser, clearUser } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://localhost:4040/api';
-
+const API_URL = process.env.REACT_APP_API_URL || '${API_URL}';
+const BASE_URL = API_URL.replace('/api', '');
 function AccountPage() {
   const navigate = useNavigate();
   const { t } = useContext(SettingsContext);
@@ -18,7 +18,7 @@ function AccountPage() {
   useEffect(() => {
     if (user && ['teacher', 'admin', 'manage', 'create', 'root'].includes(user.role)) {
       const token = localStorage.getItem('token');
-      fetch(`${API_URL}/manage/courses`, {
+      fetch('${API_URL}/manage/courses', {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       })
@@ -132,7 +132,7 @@ function AccountPage() {
                 {createdCourses.length === 0 ? (
                    <div className="text-center py-4 text-muted border rounded bg-light">
                      <p className="mb-2">{t('accountPage.noCreatedCourses')}</p>
-                     <button className="btn btn-sm btn-success" onClick={() => navigate('/create-course')}>{t('accountPage.createFirstCourse')}</button>
+                     <button className="btn btn-sm btn-success" onClick={() => navigate('/add-course')}>{t('accountPage.createFirstCourse')}</button>
                    </div>
                 ) : (
                   <div className="d-grid gap-3">
@@ -141,7 +141,7 @@ function AccountPage() {
                       if (c.links && c.links.length > 0 && c.links[0].url) {
                         let cleanUrl = c.links[0].url.replace(/\\/g, '/');
                         cleanUrl = cleanUrl.replace('/api/manage/courses', '/api/courses');
-                        imgSrc = cleanUrl.startsWith('http') ? cleanUrl : `http://localhost:4040${cleanUrl}`;
+                        imgSrc = cleanUrl.startsWith('http') ? cleanUrl : `${BASE_URL}${cleanUrl}`;
                       } else if (c.img) {
                         imgSrc = c.img;
                       } else if (c._tempImage) {
@@ -173,6 +173,18 @@ function AccountPage() {
                               </div>
                             </div>
                             <div className="d-flex gap-2">
+                              {/* КНОПКА MANAGE */}
+                              <button 
+                                className="btn btn-sm btn-primary shadow-sm fw-bold" 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  navigate(`/manage/session/${c._id || c.id}`);
+                                }}
+                                title={t('common.manageSession')}
+                              >
+                                 <i className="bi bi-kanban me-1"></i> {t('accountPage.manage')}
+                              </button>
+
                               <button 
                                 className="btn btn-sm btn-outline-secondary" 
                                 onClick={(e) => { 
@@ -186,10 +198,10 @@ function AccountPage() {
                                 className="btn btn-sm btn-outline-danger" 
                                 onClick={async (e) => { 
                                   e.stopPropagation();
-                                  if(window.confirm('Are you sure you want to PERMANENTLY delete this course?')) {
+                                  if(window.confirm(t('accountPage.deleteConfirm'))) {
                                     try {
                                       const token = localStorage.getItem('token');
-                                      const response = await fetch(`http://localhost:4040/api/manage/courses/${c._id || c.id}`, {
+                                      const response = await fetch(`${API_URL}/manage/courses/${c._id || c.id}`, {
                                         method: 'DELETE',
                                         headers: { 'Authorization': `Bearer ${token}` }
                                       });
@@ -198,15 +210,15 @@ function AccountPage() {
                                         setCreatedCourses(prev => prev.filter(item => (item._id || item.id) !== (c._id || c.id)));
                                       } else {
                                         const errorData = await response.json();
-                                        alert(`Failed to delete: ${errorData.message || 'Access denied'}`);
+                                        alert(`${t('accountPage.deleteFailed')} ${errorData.message || t('accountPage.accessDenied')}`);
                                       }
                                     } catch (error) {
                                       console.error('Delete error:', error);
-                                      alert('Server error while deleting course');
+                                      alert(t('accountPage.serverErrorDelete'));
                                     }
                                   }
                                 }}
-                                title="Delete Course"
+                                title={t('accountPage.deleteCourse')}
                               >
                                 <i className="bi bi-trash"></i>
                               </button> 
@@ -223,7 +235,16 @@ function AccountPage() {
 
           <div className="card border-0 shadow-sm">
              <div className="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
-                <h5 className="fw-bold mb-0">{t('accountPage.myLearning')}</h5>
+                <div className="d-flex align-items-center gap-3">
+                   <h5 className="fw-bold mb-0">{t('accountPage.myLearning')}</h5>
+                   {/* КНОПКА REDEEM */}
+                   <button 
+                     className="btn btn-sm btn-outline-primary fw-bold px-3 rounded-pill" 
+                     onClick={() => navigate('/redeem')}
+                   >
+                     <i className="bi bi-key-fill me-1"></i> {t('accountPage.redeem')}
+                   </button>
+                </div>
                 <button className="btn btn-link text-decoration-none small" onClick={() => navigate('/search')}>{t('accountPage.browseMore')}</button>
              </div>
              <div className="card-body p-4">
