@@ -208,7 +208,7 @@ function ScheduleCalendar({ schedule = [], onRemove, canEdit, onEventClick }) {
 
 
 
-function ManageSession({ data, onLogout }) {
+function ManageSession({ data, onLogout, startMeeting }) {
     const { id } = useParams();
     const navigate = useNavigate();
     const token = localStorage.getItem("token");
@@ -674,7 +674,7 @@ function ManageSession({ data, onLogout }) {
                     {isHost && (
                         <div className="d-flex gap-2 flex-wrap">
                             <button className="btn btn-success btn-sm d-flex align-items-center gap-1"
-                                onClick={() => window.open(`/meeting?session=${id}`, '_self')}>
+                                onClick={() => startMeeting({ sessionId: id })}>
                                 <i className="bi bi-camera-video-fill"></i> Start Video
                             </button>
                             <button className="btn btn-outline-info btn-sm d-flex align-items-center gap-1"

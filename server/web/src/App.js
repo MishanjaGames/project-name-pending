@@ -38,18 +38,22 @@ const API = toHttps(process.env.REACT_APP_API_URL || 'http://localhost:4040/api'
 const DEFAULT_USER = { id:'', nickname:'', email:'', role:'', tutorRank: null, accessLevel: 'default' };
 
 // ── /meeting?session=ID page ──────────────────────────────────────────────────
-function MeetingRoute({ userData }) {
+// Delegates to App-level pip so mini↔full never remounts VideoConference.
+function MeetingRoute({ userData, startMeeting }) {
     const [params] = useSearchParams();
+    const navigate  = useNavigate();
     const sessionId = params.get('session');
-    if (!sessionId) return <Navigate to="/" />;
-    return (
-        <VideoConference
-            sessionId={sessionId}
-            nickname={userData.nickname || 'Guest'}
-            // onClose not needed — handleLeave in VC already calls navigate('/')
-        />
-    );
+
+    useEffect(() => {
+        if (!sessionId) { navigate('/'); return; }
+        startMeeting({ sessionId, roomId: null });
+        navigate('/', { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessionId]);
+
+    return null;
 }
+
 
 function App() {
     const navigate = useNavigate();
@@ -103,21 +107,24 @@ function App() {
         <>
             <style>{`
                 @keyframes vcFadeIn  { from{opacity:0;transform:scale(.97)} to{opacity:1;transform:none} }
-                @keyframes vcMiniIn  { from{opacity:0;transform:scale(.8)} to{opacity:1;transform:none} }
+                @keyframes vcMiniIn  { from{opacity:0;transform:scale(.8) translateY(12px)} to{opacity:1;transform:none} }
                 .vc-full-wrap { position:fixed;inset:0;z-index:3000;animation:vcFadeIn .2s ease }
-                .vc-minimize-btn { position:fixed;top:14px;right:100px;z-index:3100;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#c9cdd4;cursor:pointer;padding:5px 10px;font-size:.75rem;transition:background .15s }
-                .vc-minimize-btn:hover { background:rgba(255,255,255,.18) }
             `}</style>
 
-            {/* Floating pip — only for meetings started from within app UI (not /meeting route) */}
-            {meeting && meetingMode === 'full' && (
-                <div className="vc-full-wrap">
-                    <VideoConference roomId={meeting.roomId} sessionId={meeting.sessionId} nickname={meeting.nickname} onClose={endMeeting} mini={false} />
-                    <button className="vc-minimize-btn" onClick={minimizeMeeting}><i className="bi bi-pip" /> Mini</button>
+            {/* Single persistent instance — mini prop changes in-place, no remount */}
+            {meeting && (
+                <div className={meetingMode === 'full' ? 'vc-full-wrap' : ''}>
+                    <VideoConference
+                        key={meeting.roomId || meeting.sessionId}
+                        roomId={meeting.roomId}
+                        sessionId={meeting.sessionId}
+                        nickname={meeting.nickname}
+                        onClose={endMeeting}
+                        mini={meetingMode === 'mini'}
+                        onExpand={expandMeeting}
+                        onMinimize={minimizeMeeting}
+                    />
                 </div>
-            )}
-            {meeting && meetingMode === 'mini' && (
-                <VideoConference roomId={meeting.roomId} sessionId={meeting.sessionId} nickname={meeting.nickname} onClose={endMeeting} mini onExpand={expandMeeting} />
             )}
 
             <Routes>
@@ -167,7 +174,7 @@ function App() {
                 {/* ── Sole meeting entry point ── */}
                 <Route path="/meeting" element={
                     isLoggedIn
-                        ? <MeetingRoute userData={userData} />
+                        ? <MeetingRoute userData={userData} startMeeting={startMeeting} />
                         : <Login onLogin={handleLogin} />
                 } />
 

@@ -8,9 +8,7 @@ const config = require('./config')
 async function verifyToken(token) {
     if (!token) return null
     try {
-        // Strip "Bearer " prefix if present
-        const raw = token.startsWith('Bearer ') ? token : 'Bearer '+ token;
-        console.log(token)
+        const raw = token.startsWith('Bearer ') ? token.slice(7) : token
         return jwt.verify(raw, config.JWT_SECRET)
     } catch {
         return null

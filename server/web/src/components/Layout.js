@@ -20,28 +20,29 @@ const NAV = [
         section: 'Management', minLvl: 3,
         items: [
             { to: '/',                  icon: 'bi-speedometer2',    label: 'Dashboard' },
-            { to: '/manage/users',      icon: 'bi-people-fill',     label: 'Users' },
-            { to: '/manage/roles',      icon: 'bi-shield-lock',     label: 'Roles' },
-            { to: '/manage/promos',     icon: 'bi-tag',             label: 'Promo Codes' },
-            { to: '/manage/keys',       icon: 'bi-key-fill',        label: 'Product Keys' },
+            { to: '/manage/courses',  icon: 'bi-book',       label: 'Courses' },
             { to: '/manage/directions', icon: 'bi-compass',         label: 'Directions' },
             { to: '/manage/levels',     icon: 'bi-bar-chart-steps', label: 'Levels' },
+            { to: '/manage/users',      icon: 'bi-people-fill',     label: 'Users' },
+            { to: '/manage/roles',      icon: 'bi-shield-lock',     label: 'Roles' },
+            { to: '/manage/forms',        icon: 'bi-ui-checks',   label: 'Review Forms'},
+            { to: '/manage/promos',     icon: 'bi-tag',             label: 'Promo Codes' },
+            { to: '/manage/keys',       icon: 'bi-key-fill',        label: 'Product Keys' },
+            
         ],
     },
     {
         section: 'Tutor', minLvl: 1.5,
         items: [
             { to: '/manage/sessions', icon: 'bi-people',     label: 'Sessions' },
-            { to: '/manage/courses',  icon: 'bi-book',       label: 'Courses' },
         ],
     },
     {
         section: 'Support', minLvl: 0,
         items: [
-            { to: '/creator/apply',       icon: 'bi-pen',         label: 'Apply as Creator',  maxLvl: 2 },
-            { to: '/tutor/apply',         icon: 'bi-mortarboard', label: 'Apply as Tutor',    maxLvl: 2 },
+            { to: '/creator/apply',       icon: 'bi-pen',         label: 'Apply as Creator'},
+            { to: '/tutor/apply',         icon: 'bi-mortarboard', label: 'Apply as Tutor'},
             { to: '/support/open-ticket', icon: 'bi-headset',     label: 'Support Ticket' },
-            { to: '/manage/forms',        icon: 'bi-ui-checks',   label: 'Review Forms',      minLvl: 2 },
         ],
     },
     {
@@ -60,7 +61,7 @@ function UserAvatar({ user, size = 32 }) {
     return <div className="sidebar-avatar" style={{ width:size, height:size, background:`hsl(${hue},50%,40%)`, fontSize:size*.34 }}>{initials}</div>;
 }
 
-function Sidebar({ data, onLogout, mobileOpen, onClose, collapsed }) {
+function Sidebar({ data, onLogout, mobileOpen, onClose, collapsed, onCollapseClick }) {
     const location = useLocation();
     const navigate  = useNavigate();
     const { theme, toggle } = useTheme();
@@ -71,9 +72,13 @@ function Sidebar({ data, onLogout, mobileOpen, onClose, collapsed }) {
 
     return (
         <aside className={`app-sidebar${mobileOpen?' mobile-open':''}${collapsed?' sidebar-collapsed':''}`}>
-            <Link to="/" className="sidebar-logo" onClick={onClose}>
-                <div className="sidebar-logo-mark">EP</div>
-                {!collapsed && <span className="sidebar-logo-text">Edu<span>Panel</span></span>}
+            {/* <button className="sidebar-logo" onClick={onCollapseClick} title={collapsed?'Expand':'Collapse'} >
+                <div className="sidebar-logo-mark">📟</div>
+                {!collapsed && <span className="sidebar-logo-text">Admin Panel</span>}
+            </button> */}
+            <Link to="#" className="sidebar-logo" onClick={onCollapseClick}>
+                <div className="sidebar-logo-mark">📟</div>
+                {!collapsed && <Link className="sidebar-logo-text" onClick={onClose}>Admin Panel</Link>}
             </Link>
 
             <nav className="nav-sections">
@@ -101,7 +106,7 @@ function Sidebar({ data, onLogout, mobileOpen, onClose, collapsed }) {
             </nav>
 
             <div className="sidebar-footer">
-                <div onClick={()=>{ navigate('/manage/settings'); onClose?.(); }} style={{ display:'flex', alignItems:'center', gap:'.65rem', flex:1, minWidth:0, cursor:'pointer' }}>
+                <div onClick={()=>{ navigate(`/manage/user/${data._id}`); onClose?.(); }} style={{ display:'flex', alignItems:'center', gap:'.65rem', flex:1, minWidth:0, cursor:'pointer' }}>
                     <UserAvatar user={data} size={32} />
                     {!collapsed && (
                         <div className="sidebar-user-info">
@@ -110,7 +115,7 @@ function Sidebar({ data, onLogout, mobileOpen, onClose, collapsed }) {
                         </div>
                     )}
                 </div>
-                <button className="sidebar-logout" onClick={toggle} title={theme==='dark'?'Light mode':'Dark mode'}><i className={`bi ${theme==='dark'?'bi-sun':'bi-moon'}`} /></button>
+                {!collapsed && <button className="sidebar-logout" onClick={toggle} title={theme==='dark'?'Light mode':'Dark mode'}><i className={`bi ${theme==='dark'?'bi-sun':'bi-moon'}`} /></button>}
                 {!collapsed && <button className="sidebar-logout" onClick={onLogout} title="Log out"><i className="bi bi-box-arrow-right" /></button>}
             </div>
         </aside>
@@ -120,8 +125,8 @@ function Sidebar({ data, onLogout, mobileOpen, onClose, collapsed }) {
 function Topbar({ title, onMenuClick, onCollapseClick, collapsed }) {
     return (
         <div className="app-topbar">
-            <button onClick={onMenuClick} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', fontSize:'1.1rem', display:'flex', padding:4 }}><i className="bi bi-list" /></button>
-            <button onClick={onCollapseClick} title={collapsed?'Expand':'Collapse'} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', fontSize:'.9rem', display:'flex', padding:4, marginRight:4 }}><i className={`bi ${collapsed?'bi-layout-sidebar':'bi-layout-sidebar-reverse'}`} /></button>
+            {/* <button onClick={onMenuClick} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', fontSize:'1.1rem', display:'flex', padding:4 }}><i className="bi bi-list" /></button> */}
+            <button onClick={onCollapseClick} title={collapsed?'Expand':'Collapse'} style={{ background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', fontSize:'.9rem', display:'flex', padding:4, marginRight:4 }} hidden><i className={`bi ${collapsed?'bi-layout-sidebar':'bi-layout-sidebar-reverse'}`} /></button>
             {title && <span className="topbar-title">{title}</span>}
         </div>
     );
@@ -137,8 +142,8 @@ export function AppLayout({ data, onLogout, title = '', children }) {
 
     return (
         <div className={`app-shell${collapsed?' sidebar-collapsed':''}`}>
-            {mobileOpen && <div onClick={()=>setMobileOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.5)', zIndex:299, backdropFilter:'blur(2px)' }} />}
-            <Sidebar data={data} onLogout={onLogout} mobileOpen={mobileOpen} collapsed={collapsed} onClose={()=>setMobileOpen(false)} />
+            <div className={`sidebar-backdrop${mobileOpen?' visible':''}`} onClick={()=>setMobileOpen(false)} />
+            <Sidebar data={data} onLogout={onLogout} mobileOpen={mobileOpen} collapsed={collapsed} onCollapseClick={toggleCollapsed} onClose={()=>setMobileOpen(false)} />
             <div className="app-main">
                 <Topbar title={title} onMenuClick={()=>setMobileOpen(p=>!p)} onCollapseClick={toggleCollapsed} collapsed={collapsed} />
                 {children}

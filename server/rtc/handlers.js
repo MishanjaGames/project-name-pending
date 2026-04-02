@@ -27,9 +27,9 @@ module.exports = function registerHandlers(io) {
     io.on('connection', (socket) => {
         const { userId, email } = socket.data.user
 
-        socket.on('join', ({ roomId, nickname }) => {
+        socket.on('join', ({ roomId, nickname, video = false, audio = false }) => {
             if (!roomId) { socket.emit('error', { message: 'roomId is required' }); return }
-            const peerInfo = { userId, nickname: nickname || email, socketId: socket.id, video: true, audio: true, screen: false, handRaised: false }
+            const peerInfo = { userId, nickname: nickname || email, socketId: socket.id, video, audio, screen: false, handRaised: false }
             const existingPeers = rooms.getPeers(roomId)
             const chatHistory   = rooms.getChatHistory(roomId)
             rooms.addPeer(roomId, socket.id, peerInfo)

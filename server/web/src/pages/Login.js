@@ -67,8 +67,8 @@ export default function Login({ onLogin }) {
           <div style={{ width: 52, height: 52, borderRadius: 12, background: 'var(--accent)',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '1.5rem', marginBottom: '.75rem' }}>🎓</div>
-          <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text)', margin: 0 }}>EduPanel</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '.875rem', margin: '.25rem 0 0' }}>Sign in to your account</p>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text)', margin: 0 }}>Admin Panel</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '.875rem', margin: '.25rem 0 0' }}>Sign in to your account to continue</p>
         </div>
 
         {error && (

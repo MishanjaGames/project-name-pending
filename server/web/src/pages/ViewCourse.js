@@ -187,7 +187,7 @@ function executeJsAction(action, params) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-function ViewCourse({ data, onLogout }) {
+function ViewCourse({ data, onLogout, startMeeting }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
@@ -904,7 +904,7 @@ function ViewCourse({ data, onLogout }) {
                       <button
                         className="btn btn-sm btn-success d-inline-flex align-items-center gap-1"
                         style={{ fontSize: '.75rem', padding: '3px 10px', borderRadius: 999 }}
-                        onClick={() => window.location.href = `/meeting?session=${sessionId}`}
+                        onClick={() => startMeeting({ sessionId })}
                         title="Join video conference for this session">
                         <i className="bi bi-camera-video-fill"></i> Join Video
                       </button>

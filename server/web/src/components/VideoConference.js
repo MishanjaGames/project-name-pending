@@ -112,73 +112,206 @@ function ParticipantsPanel({ peers, mySocketId, myNickname, onDM }) {
     );
 }
 
-// ── Single joining screen (device preview + join button in one step) ───────────
-function JoiningScreen({ nickname, onReady }) {
-    const [camOn, setCamOn]   = useState(true);
-    const [micOn, setMicOn]   = useState(true);
-    const [camId, setCamId]   = useState('');
-    const [micId, setMicId]   = useState('');
-    const [devices, setDevices] = useState({ cams: [], mics: [] });
-    const [preview, setPreview] = useState(null);
-    const [joining, setJoining] = useState(false);
-    const previewRef = useRef();
+// ── Mic activity meter ────────────────────────────────────────────────────────
+function MicMeter({ stream, size = 20 }) {
+    const [level, setLevel] = useState(0);
+    useEffect(() => {
+        if (!stream) { setLevel(0); return; }
+        let ctx;
+        try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
+        const src = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        src.connect(analyser);
+        const buf = new Uint8Array(analyser.frequencyBinCount);
+        let raf;
+        const tick = () => {
+            analyser.getByteFrequencyData(buf);
+            const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
+            setLevel(Math.min(1, avg / 60));
+            raf = requestAnimationFrame(tick);
+        };
+        tick();
+        return () => { cancelAnimationFrame(raf); ctx.close(); };
+    }, [stream]);
+
+    const bars = 5;
+    return (
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: size }}>
+            {Array.from({ length: bars }, (_, i) => {
+                const active = level >= (i + 1) / bars;
+                return <div key={i} style={{ width: 3, height: `${35 + i * 15}%`, borderRadius: 2, background: active ? (i < 3 ? '#63d68a' : i < 4 ? '#ffc94a' : '#ff6b6b') : 'rgba(255,255,255,.15)', transition: 'background .08s' }} />;
+            })}
+        </div>
+    );
+}
+
+// ── Single joining screen ──────────────────────────────────────────────────────
+function JoiningScreen({ nickname, roomId, onReady, onCancel }) {
+    const [camOn, setCamOn]         = useState(false);
+    const [micOn, setMicOn]         = useState(false);
+    const [camId, setCamId]         = useState('');
+    const [micId, setMicId]         = useState('');
+    const [speakerId, setSpeakerId] = useState('');
+    const [devices, setDevices]     = useState({ cams: [], mics: [], speakers: [] });
+    const [preview, setPreview]     = useState(null);
+    const [joining, setJoining]     = useState(false);
+    const previewRef  = useRef();
+    const stopPreview = useRef(null);
 
     useEffect(() => {
         (async () => {
             try {
                 await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 const devs = await navigator.mediaDevices.enumerateDevices();
-                const cams = devs.filter(d => d.kind === 'videoinput');
-                const mics = devs.filter(d => d.kind === 'audioinput');
-                setDevices({ cams, mics });
-                if (cams[0]) setCamId(cams[0].deviceId);
-                if (mics[0]) setMicId(mics[0].deviceId);
+                const cams     = devs.filter(d => d.kind === 'videoinput');
+                const mics     = devs.filter(d => d.kind === 'audioinput');
+                const speakers = devs.filter(d => d.kind === 'audiooutput');
+                setDevices({ cams, mics, speakers });
+                if (cams[0])     setCamId(cams[0].deviceId);
+                if (mics[0])     setMicId(mics[0].deviceId);
+                if (speakers[0]) setSpeakerId(speakers[0].deviceId);
             } catch {}
         })();
-        return () => preview?.getTracks().forEach(t => t.stop());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        return () => stopPreview.current?.();
     }, []);
 
     useEffect(() => {
+        // Stop previous stream immediately — no delay
+        stopPreview.current?.();
+        stopPreview.current = null;
+        setPreview(null);
+        if (!camOn && !micOn) return;
         let cancelled = false;
         (async () => {
             try {
-                const s = await navigator.mediaDevices.getUserMedia({ video: camOn && camId ? { deviceId: { ideal: camId } } : camOn, audio: micOn && micId ? { deviceId: { ideal: micId } } : micOn });
+                const s = await navigator.mediaDevices.getUserMedia({
+                    video: camOn ? (camId ? { deviceId: { exact: camId } } : true) : false,
+                    audio: micOn ? (micId ? { deviceId: { exact: micId } } : true) : false,
+                });
                 if (cancelled) { s.getTracks().forEach(t => t.stop()); return; }
+                stopPreview.current = () => s.getTracks().forEach(t => t.stop());
                 setPreview(s);
                 if (previewRef.current) previewRef.current.srcObject = s;
             } catch { setPreview(null); }
         })();
-        return () => { cancelled = true; preview?.getTracks().forEach(t => t.stop()); };
+        return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [camOn, micOn, camId, micId]);
+    // Also add speakers to device list
+    const speakers = devices.speakers;
+
+    const S = { // shared select style
+        width: '100%', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)',
+        borderRadius: 8, padding: '7px 10px', color: '#c9cdd4', fontSize: '0.8rem',
+        fontFamily: 'var(--vc-font)', outline: 'none', cursor: 'pointer', appearance: 'auto',
+    };
+    const labelStyle = { fontSize: '0.66rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#748ffc', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 24, padding: 24, fontFamily: 'var(--vc-font)' }}>
-            <div style={{ color: '#e0e0e0', fontSize: '1.15rem', fontWeight: 700 }}>Ready to join?</div>
-            <div style={{ position: 'relative', width: '100%', maxWidth: 360, aspectRatio: '16/9', background: '#0d0f12', borderRadius: 12, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,.08)' }}>
-                {camOn && preview ? <video ref={previewRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Avatar name={nickname} size={64} /></div>}
-                <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 10 }}>
-                    {[{ on: micOn, setOn: setMicOn, on_ic: 'bi-mic-fill', off_ic: 'bi-mic-mute-fill' }, { on: camOn, setOn: setCamOn, on_ic: 'bi-camera-video-fill', off_ic: 'bi-camera-video-off-fill' }].map(({ on, setOn, on_ic, off_ic }, i) => (
-                        <button key={i} onClick={() => setOn(v => !v)} style={{ width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer', background: on ? 'rgba(255,255,255,.18)' : '#e03131', color: '#fff', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}><i className={`bi ${on ? on_ic : off_ic}`} /></button>
-                    ))}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: 24, fontFamily: 'var(--vc-font)', background: '#0f1117' }}>
+            <div style={{ display: 'flex', gap: 40, width: '100%', maxWidth: 860, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+
+                {/* LEFT — video preview */}
+                <div style={{ flex: '1 1 360px', maxWidth: 420 }}>
+                    <div style={{ position: 'relative', aspectRatio: '16/9', background: '#0a0c12', borderRadius: 14, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,.08)', boxShadow: '0 8px 32px rgba(0,0,0,.5)' }}>
+                        {camOn && preview
+                            ? <video ref={previewRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Avatar name={nickname} size={72} /></div>
+                        }
+                        {/* Name tag */}
+                        <div style={{ position: 'absolute', bottom: 10, left: 12, color: '#e0e0e0', fontSize: '0.82rem', fontWeight: 600, textShadow: '0 1px 4px rgba(0,0,0,.8)' }}>{nickname}</div>
+                        {/* Mic/Cam toggle */}
+                        <div style={{ position: 'absolute', bottom: 8, right: 10, display: 'flex', gap: 6 }}>
+                            {[
+                                { on: micOn, setOn: setMicOn, onIc: 'bi-mic-fill', offIc: 'bi-mic-mute-fill' },
+                                { on: camOn, setOn: setCamOn, onIc: 'bi-camera-video-fill', offIc: 'bi-camera-video-off-fill' },
+                            ].map(({ on, setOn, onIc, offIc }, i) => (
+                                <button key={i} onClick={() => setOn(v => !v)} style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', cursor: 'pointer', background: on ? 'rgba(255,255,255,.18)' : '#e03131', color: '#fff', fontSize: '.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+                                    <i className={`bi ${on ? onIc : offIc}`} />
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    {/* Status pills + mic meter */}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
+                        {[{ on: camOn, offLabel: 'Camera off', ic: 'bi-camera-video-off-fill' }, { on: micOn, offLabel: 'Mic off', ic: 'bi-mic-mute-fill' }].map(({ on, offLabel, ic }, i) => !on && (
+                            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(224,49,49,.18)', border: '1px solid rgba(224,49,49,.3)', borderRadius: 20, padding: '2px 10px', fontSize: '.72rem', color: '#ff6b6b', fontWeight: 600 }}>
+                                <i className={`bi ${ic}`} />{offLabel}
+                            </span>
+                        ))}
+                        {micOn && preview && <MicMeter stream={preview} size={18} />}
+                    </div>
+                </div>
+
+                {/* RIGHT — settings panel */}
+                <div style={{ flex: '1 1 280px', maxWidth: 360 }}>
+                    {/* Header */}
+                    <div style={{ marginBottom: 20 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                            <i className="bi bi-camera-video-fill" style={{ color: '#748ffc', fontSize: '.72rem' }} />
+                            <span style={{ color: '#748ffc', fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em' }}>Video Conference</span>
+                        </div>
+                        <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#e6e8f5', lineHeight: 1.2, letterSpacing: '-.02em' }}>Ready to join?</div>
+                        {roomId && (
+                            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: '.78rem', color: '#5c6484' }}>Room:</span>
+                                <code style={{ fontSize: '.74rem', background: 'rgba(115,142,248,.12)', color: '#738ef8', padding: '2px 8px', borderRadius: 6, border: '1px solid rgba(115,142,248,.2)' }}>{roomId}</code>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Device settings card */}
+                    <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: '16px 18px', marginBottom: 16 }}>
+                        <div style={{ fontSize: '.75rem', fontWeight: 700, color: '#9aa3c0', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <i className="bi bi-sliders" /> Device settings
+                        </div>
+                        {/* Camera */}
+                        <div style={{ marginBottom: 12 }}>
+                            <div style={labelStyle}><i className="bi bi-camera-video-fill" style={{ fontSize: '.7rem' }} /> Camera</div>
+                            <select value={camId} onChange={e => setCamId(e.target.value)} style={S}>
+                                {devices.cams.length === 0 && <option value="">No camera found</option>}
+                                {devices.cams.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || 'Camera'}</option>)}
+                            </select>
+                        </div>
+                        {/* Microphone */}
+                        <div style={{ marginBottom: 12 }}>
+                            <div style={labelStyle}><i className="bi bi-mic-fill" style={{ fontSize: '.7rem' }} /> Microphone</div>
+                            <select value={micId} onChange={e => setMicId(e.target.value)} style={S}>
+                                {devices.mics.length === 0 && <option value="">No microphone found</option>}
+                                {devices.mics.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || 'Microphone'}</option>)}
+                            </select>
+                        </div>
+                        {/* Speaker */}
+                        {speakers.length > 0 && (
+                            <div>
+                                <div style={labelStyle}><i className="bi bi-volume-up-fill" style={{ fontSize: '.7rem' }} /> Speaker</div>
+                                <select value={speakerId} onChange={e => setSpeakerId(e.target.value)} style={S}>
+                                    {speakers.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || 'Speaker'}</option>)}
+                                </select>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Join button */}
+                    <button
+                        onClick={() => { setJoining(true); onReady({ camOn, micOn, camId, micId, stream: preview }); }}
+                        disabled={joining}
+                        style={{ width: '100%', background: joining ? '#3a3f55' : 'linear-gradient(135deg,#5c7cff,#4263eb)', border: 'none', borderRadius: 10, color: '#fff', fontFamily: 'var(--vc-font)', fontWeight: 700, fontSize: '0.95rem', padding: '13px', cursor: joining ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'opacity .15s', marginBottom: 10, boxShadow: joining ? 'none' : '0 4px 16px rgba(66,99,235,.4)' }}
+                    >
+                        {joining
+                            ? <><div className="spinner-border spinner-border-sm" style={{ width: 14, height: 14, borderWidth: 2 }} /> Joining…</>
+                            : <><i className="bi bi-camera-video-fill" /> Join now</>
+                        }
+                    </button>
+                    {/* Cancel */}
+                    {onCancel && (
+                        <button onClick={onCancel} style={{ width: '100%', background: 'transparent', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, color: '#9aa3c0', fontFamily: 'var(--vc-font)', fontWeight: 500, fontSize: '0.875rem', padding: '11px', cursor: 'pointer' }}>
+                            Cancel
+                        </button>
+                    )}
                 </div>
             </div>
-            <div style={{ width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[{ label: 'Camera', list: devices.cams, val: camId, set: setCamId, icon: 'bi-camera-video' }, { label: 'Mic', list: devices.mics, val: micId, set: setMicId, icon: 'bi-mic' }].map(({ label, list, val, set, icon }) => (
-                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <i className={`bi ${icon}`} style={{ color: '#748ffc', width: 16, fontSize: '0.85rem' }} />
-                        <select value={val} onChange={e => set(e.target.value)} style={{ flex: 1, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '6px 10px', color: '#c9cdd4', fontSize: '0.78rem', fontFamily: 'var(--vc-font)', outline: 'none', cursor: 'pointer' }}>
-                            {list.length === 0 && <option value="">No {label.toLowerCase()} found</option>}
-                            {list.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || label}</option>)}
-                        </select>
-                    </div>
-                ))}
-            </div>
-            <button onClick={() => { setJoining(true); onReady({ camOn, micOn, camId, micId, stream: preview }); }} disabled={joining} style={{ background: joining ? '#3a3f55' : '#748ffc', border: 'none', borderRadius: 10, color: '#fff', fontFamily: 'var(--vc-font)', fontWeight: 600, fontSize: '0.9rem', padding: '11px 40px', cursor: joining ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'background .15s' }}>
-                {joining && <div className="spinner-border spinner-border-sm" style={{ width: 14, height: 14, borderWidth: 2 }} />}
-                {joining ? 'Joining…' : 'Join now'}
-            </button>
         </div>
     );
 }
@@ -191,7 +324,7 @@ function MiniVideo({ stream, muted }) {
     return <video ref={ref} autoPlay playsInline muted={muted} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />;
 }
 
-export function VideoConference({ sessionId, roomId: roomIdProp, nickname, onClose, mini = false, onExpand }) {
+export function VideoConference({ sessionId, roomId: roomIdProp, nickname, onClose, mini = false, onExpand, onMinimize }) {
     const navigate = useNavigate();
     const roomId = roomIdProp || `session:${sessionId}`;
 
@@ -210,6 +343,12 @@ export function VideoConference({ sessionId, roomId: roomIdProp, nickname, onClo
     const [handRaised, setHandRaised] = useState(false);
     const [permBanner, setPermBanner] = useState(null);
     const [copied, setCopied]       = useState(false);
+
+    // ── Drag state for mini pip (must be unconditional — hooks rules) ─────────
+    const miniPosRef  = useRef({ x: window.innerWidth - 264, y: window.innerHeight - 180 });
+    const [miniPos, setMiniPos] = useReducer((_, p) => p, miniPosRef.current);
+    const miniDragging = useRef(false);
+    const miniOrigin   = useRef({ mx: 0, my: 0, ex: 0, ey: 0 });
 
     const socketRef   = useRef(null);
     const pcRefs      = useRef({});
@@ -239,14 +378,29 @@ export function VideoConference({ sessionId, roomId: roomIdProp, nickname, onClo
 
     const addLocalTracks = useCallback((pc) => {
         if (!localRef.current) return;
-        localRef.current.getTracks().forEach(track => { if (!pc.getSenders().find(s => s.track === track)) pc.addTrack(track, localRef.current); });
+        localRef.current.getTracks().forEach(track => {
+            const existingSender = pc.getSenders().find(s => s.track?.kind === track.kind);
+            if (existingSender) { existingSender.replaceTrack(track); }
+            else { pc.addTrack(track, localRef.current); }
+        });
     }, []);
 
     const renegotiateAll = useCallback(async () => {
         const socket = socketRef.current;
-        if (!socket || !localRef.current) return;
+        if (!socket) return;
         for (const [peerId, pc] of Object.entries(pcRefs.current)) {
-            localRef.current.getTracks().forEach(track => { if (!pc.getSenders().find(s => s.track === track)) pc.addTrack(track, localRef.current); });
+            // Sync all current local tracks to each peer connection
+            (localRef.current?.getTracks() || []).forEach(track => {
+                const sender = pc.getSenders().find(s => s.track?.kind === track.kind);
+                if (sender) { sender.replaceTrack(track); }
+                else if (localRef.current) { pc.addTrack(track, localRef.current); }
+            });
+            // Null-out senders whose track kind is no longer in localRef (e.g. cam stopped)
+            pc.getSenders().forEach(sender => {
+                if (!sender.track) return;
+                const stillActive = localRef.current?.getTracks().some(t => t.kind === sender.track.kind && t.readyState === 'live');
+                if (!stillActive) { sender.replaceTrack(null); }
+            });
             try { const offer = await pc.createOffer(); await pc.setLocalDescription(offer); socket.emit('offer', { to: peerId, sdp: offer }); } catch {}
         }
     }, []);
@@ -283,7 +437,7 @@ export function VideoConference({ sessionId, roomId: roomIdProp, nickname, onClo
             socket.on('chat-message',  (msg) => { setMessages(prev => [...prev, msg]); setUnread(prev => panel === 'chat' ? 0 : prev + 1); });
             socket.on('hand-raised',   ({ socketId, raised }) => setPeers(prev => prev.map(p => p.socketId === socketId ? { ...p, handRaised: raised } : p)));
 
-            socket.emit('join', { roomId, nickname, sessionId });
+            socket.emit('join', { roomId, nickname, sessionId, video: camOn, audio: micOn });
             setVideo(camOn); setAudio(micOn);
         } catch (e) { setPhase('error'); setErrorMsg(e.message || 'Connection failed'); }
     }, [roomId, nickname, sessionId, getPC, addLocalTracks, panel]);
@@ -296,24 +450,48 @@ export function VideoConference({ sessionId, roomId: roomIdProp, nickname, onClo
     const toggleVideo = useCallback(async () => {
         const newVal = !video;
         if (newVal) {
-            const existing = localRef.current?.getVideoTracks() || [];
-            if (existing.length === 0) {
-                setPermBanner('prompted');
-                try { const s = await navigator.mediaDevices.getUserMedia({ video: true }); setPermBanner(null); if (!localRef.current) { localRef.current = s; setLocalStream(s); } else { s.getTracks().forEach(t => localRef.current.addTrack(t)); setLocalStream(new MediaStream(localRef.current.getTracks())); } await renegotiateAll(); } catch { setPermBanner('denied'); setTimeout(() => setPermBanner(null), 4000); return; }
-            } else { existing.forEach(t => { t.enabled = true; }); setLocalStream(new MediaStream(localRef.current.getTracks())); }
-        } else { localRef.current?.getVideoTracks().forEach(t => { t.enabled = false; }); setLocalStream(localRef.current ? new MediaStream(localRef.current.getTracks()) : null); }
+            // Re-acquire camera
+            setPermBanner('prompted');
+            try {
+                const s = await navigator.mediaDevices.getUserMedia({ video: true });
+                setPermBanner(null);
+                if (!localRef.current) {
+                    localRef.current = s; setLocalStream(s);
+                } else {
+                    s.getVideoTracks().forEach(t => localRef.current.addTrack(t));
+                    setLocalStream(new MediaStream(localRef.current.getTracks()));
+                }
+                await renegotiateAll();
+            } catch { setPermBanner('denied'); setTimeout(() => setPermBanner(null), 4000); return; }
+        } else {
+            // Stop video tracks completely — turns off camera light
+            localRef.current?.getVideoTracks().forEach(t => { t.stop(); localRef.current.removeTrack(t); });
+            setLocalStream(localRef.current ? new MediaStream(localRef.current.getTracks()) : null);
+        }
         setVideo(newVal); socketRef.current?.emit('toggle-media', { roomId, video: newVal, audio });
     }, [video, audio, roomId, renegotiateAll]);
 
     const toggleAudio = useCallback(async () => {
         const newVal = !audio;
         if (newVal) {
-            const existing = localRef.current?.getAudioTracks() || [];
-            if (existing.length === 0) {
-                setPermBanner('prompted');
-                try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); setPermBanner(null); if (!localRef.current) { localRef.current = s; setLocalStream(s); } else { s.getTracks().forEach(t => localRef.current.addTrack(t)); setLocalStream(new MediaStream(localRef.current.getTracks())); } await renegotiateAll(); } catch { setPermBanner('denied'); setTimeout(() => setPermBanner(null), 4000); return; }
-            } else { existing.forEach(t => { t.enabled = true; }); setLocalStream(new MediaStream(localRef.current.getTracks())); }
-        } else { localRef.current?.getAudioTracks().forEach(t => { t.enabled = false; }); setLocalStream(localRef.current ? new MediaStream(localRef.current.getTracks()) : null); }
+            // Re-acquire mic
+            setPermBanner('prompted');
+            try {
+                const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+                setPermBanner(null);
+                if (!localRef.current) {
+                    localRef.current = s; setLocalStream(s);
+                } else {
+                    s.getAudioTracks().forEach(t => localRef.current.addTrack(t));
+                    setLocalStream(new MediaStream(localRef.current.getTracks()));
+                }
+                await renegotiateAll();
+            } catch { setPermBanner('denied'); setTimeout(() => setPermBanner(null), 4000); return; }
+        } else {
+            // Stop audio tracks completely — turns off mic indicator
+            localRef.current?.getAudioTracks().forEach(t => { t.stop(); localRef.current.removeTrack(t); });
+            setLocalStream(localRef.current ? new MediaStream(localRef.current.getTracks()) : null);
+        }
         setAudio(newVal); socketRef.current?.emit('toggle-media', { roomId, video, audio: newVal });
     }, [audio, video, roomId, renegotiateAll]);
 
@@ -337,8 +515,11 @@ export function VideoConference({ sessionId, roomId: roomIdProp, nickname, onClo
     const handleLeave = useCallback(() => {
         socketRef.current?.emit('leave', { roomId });
         cleanup();
-        onClose?.();
-        navigate('/');
+        if (onClose) {
+            onClose();          // pip: just unmounts overlay, user stays on current page
+        } else {
+            navigate('/');      // standalone /meeting route: go home
+        }
     }, [cleanup, onClose, navigate, roomId]);
 
     const copyInvite = () => { navigator.clipboard.writeText(`${window.location.origin}/meeting?session=${sessionId || roomId}`).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); };
@@ -352,19 +533,22 @@ export function VideoConference({ sessionId, roomId: roomIdProp, nickname, onClo
 
     if (mini) {
         const firstPeer = peers[0];
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        const posRef = useRef({ x: window.innerWidth - 264, y: window.innerHeight - 180 });
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        const [pos, setPos] = useReducer((_, p) => p, posRef.current);
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        const dragging = useRef(false);
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        const origin = useRef({ mx: 0, my: 0, ex: 0, ey: 0 });
-        const onPointerDown = (e) => { if (e.target.closest('button')) return; dragging.current = true; origin.current = { mx: e.clientX, my: e.clientY, ex: posRef.current.x, ey: posRef.current.y }; e.currentTarget.setPointerCapture(e.pointerId); };
-        const onPointerMove = (e) => { if (!dragging.current) return; const nx = origin.current.ex + (e.clientX - origin.current.mx); const ny = origin.current.ey + (e.clientY - origin.current.my); posRef.current = { x: Math.max(0, Math.min(window.innerWidth - 240, nx)), y: Math.max(56, Math.min(window.innerHeight - 160, ny)) }; setPos({ ...posRef.current }); };
-        const onPointerUp = () => { dragging.current = false; };
+        const onPointerDown = (e) => {
+            if (e.target.closest('button')) return;
+            miniDragging.current = true;
+            miniOrigin.current = { mx: e.clientX, my: e.clientY, ex: miniPosRef.current.x, ey: miniPosRef.current.y };
+            e.currentTarget.setPointerCapture(e.pointerId);
+        };
+        const onPointerMove = (e) => {
+            if (!miniDragging.current) return;
+            const nx = miniOrigin.current.ex + (e.clientX - miniOrigin.current.mx);
+            const ny = miniOrigin.current.ey + (e.clientY - miniOrigin.current.my);
+            miniPosRef.current = { x: Math.max(0, Math.min(window.innerWidth - 240, nx)), y: Math.max(56, Math.min(window.innerHeight - 160, ny)) };
+            setMiniPos({ ...miniPosRef.current });
+        };
+        const onPointerUp = () => { miniDragging.current = false; };
         return (
-            <div onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9000, width: 240, background: '#141519', borderRadius: 14, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,.7)', border: '1.5px solid rgba(255,255,255,.1)', fontFamily: 'var(--vc-font)', cursor: 'grab', userSelect: 'none', animation: 'vcMiniIn .22s cubic-bezier(.34,1.56,.64,1)' }}>
+            <div onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} style={{ position: 'fixed', left: miniPos.x, top: miniPos.y, zIndex: 9000, width: 240, background: '#141519', borderRadius: 14, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,.7)', border: '1.5px solid rgba(255,255,255,.1)', fontFamily: 'var(--vc-font)', cursor: 'grab', userSelect: 'none', animation: 'vcMiniIn .22s cubic-bezier(.34,1.56,.64,1)' }}>
                 <div style={{ position: 'relative', aspectRatio: '16/9', background: '#0d0f12' }}>
                     {firstPeer?.stream ? <MiniVideo stream={firstPeer.stream} /> : localStream ? <MiniVideo stream={localStream} muted /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Avatar name={nickname} size={36} /></div>}
                     <div style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,.5)', borderRadius: 6, padding: '2px 6px', color: '#aaa', fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: 4 }}><i className="bi bi-people-fill" />{peers.length + 1}</div>
@@ -416,7 +600,7 @@ export function VideoConference({ sessionId, roomId: roomIdProp, nickname, onClo
                         {phase === 'pre' && (
                             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <div style={{ width: '100%', maxWidth: 460, background: 'rgba(255,255,255,.03)', borderRadius: 16, border: '1px solid rgba(255,255,255,.07)', overflow: 'hidden' }}>
-                                    <JoiningScreen nickname={nickname} onReady={handleReady} />
+                                    <JoiningScreen nickname={nickname} roomId={roomId} onReady={handleReady} onCancel={onClose} />
                                 </div>
                             </div>
                         )}
@@ -472,7 +656,10 @@ export function VideoConference({ sessionId, roomId: roomIdProp, nickname, onClo
 
                 {phase === 'joined' && (
                     <div style={{ height: 72, flexShrink: 0, borderTop: '1px solid rgba(255,255,255,.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0 20px' }}>
-                        <ToolBtn icon={audio ? 'bi-mic-fill' : 'bi-mic-mute-fill'} label={audio ? 'Mute' : 'Unmute'} active={audio} onClick={toggleAudio} danger={!audio} />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                            <ToolBtn icon={audio ? 'bi-mic-fill' : 'bi-mic-mute-fill'} label={audio ? 'Mute' : 'Unmute'} active={audio} onClick={toggleAudio} danger={!audio} />
+                            {audio && localStream && <MicMeter stream={localStream} size={12} />}
+                        </div>
                         <ToolBtn icon={video ? 'bi-camera-video-fill' : 'bi-camera-video-off-fill'} label={video ? 'Cam off' : 'Cam on'} active={video} onClick={toggleVideo} danger={!video} />
                         <ToolBtn icon="bi-display" label="Share" active={!!screenStream} onClick={toggleScreen} />
                         <ToolBtn icon={handRaised ? 'bi-hand-index-thumb-fill' : 'bi-hand-index-thumb'} label="Hand" active={handRaised} onClick={toggleHand} />
@@ -481,6 +668,9 @@ export function VideoConference({ sessionId, roomId: roomIdProp, nickname, onClo
                         <ToolBtn icon="bi-chat-text-fill" label="Chat" active={panel === 'chat'} onClick={() => togglePanel('chat')} badge={panel !== 'chat' ? unread : 0} />
                         <div style={{ width: 1, height: 32, background: 'rgba(255,255,255,.08)', margin: '0 4px', flexShrink: 0 }} />
                         <ToolBtn icon="bi-telephone-x-fill" label="Leave" danger onClick={handleLeave} />
+                        {onMinimize && (
+                            <ToolBtn icon="bi-pip" label="Mini" onClick={onMinimize} />
+                        )}
                     </div>
                 )}
             </div>
