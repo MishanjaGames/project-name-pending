@@ -1,9 +1,10 @@
 import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { setUser } from '../../utils/auth';
-
-const API_URL = process.env.REACT_APP_API_URL || '${API_URL}';
 import { SettingsContext } from '../../contexts/SettingsContext';
+import config from '../../config/config';
+
+const API_URL = config.API_URL;
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -24,7 +25,7 @@ function LoginPage() {
         ? { email: loginId, password: password } 
         : { username: loginId, password: password };
 
-      const response = await fetch('${API_URL}/auth/login', {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody) 

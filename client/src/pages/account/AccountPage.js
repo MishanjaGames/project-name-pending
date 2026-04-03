@@ -2,8 +2,9 @@ import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, clearUser } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
+import config from '../../config/config';
 
-const API_URL = process.env.REACT_APP_API_URL || '${API_URL}';
+const API_URL = config.API_URL;
 const BASE_URL = API_URL.replace('/api', '');
 function AccountPage() {
   const navigate = useNavigate();

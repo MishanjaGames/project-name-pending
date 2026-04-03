@@ -1,10 +1,12 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SettingsContext } from '../../contexts/SettingsContext';
-
-const BASE_URL = (process.env.REACT_APP_API_URL || '${BASE_URL}/api').replace('/api', '');
 import { useCart } from '../../contexts/CartContext';
 import { courseService } from '../../api/courseService';
+import config from '../../config/config';
+
+const API_URL = config.API_URL;
+const BASE_URL = (process.env.REACT_APP_API_URL || '${BASE_URL}/api').replace('/api', '');
 
 function HomePage() {
   const navigate = useNavigate();

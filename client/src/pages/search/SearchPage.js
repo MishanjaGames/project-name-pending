@@ -1,14 +1,16 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Slider from 'rc-slider';
-
-const BASE_URL = (process.env.REACT_APP_API_URL || '${BASE_URL}/api').replace('/api', '');
 import 'rc-slider/assets/index.css';
 import { getUser, setUser as setUserStorage } from '../../utils/auth'; 
 import { SettingsContext } from '../../contexts/SettingsContext';
 import { useCart } from '../../contexts/CartContext';
 import { courseService } from '../../api/courseService'; 
 import CourseCard from '../../components/CourseCard'; // ИМПОРТИРУЕМ НАШУ КАРТОЧКУ
+import config from '../../config/config';
+
+const API_URL = config.API_URL;
+const BASE_URL = (process.env.REACT_APP_API_URL || '${BASE_URL}/api').replace('/api', '');
 
 function SearchPage() {
   const navigate = useNavigate();

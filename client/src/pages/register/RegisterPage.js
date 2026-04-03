@@ -1,9 +1,10 @@
 import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { setUser } from '../../utils/auth';
-
-const API_URL = process.env.REACT_APP_API_URL || '${API_URL}';
 import { SettingsContext } from '../../contexts/SettingsContext';
+import config from '../../config/config';
+
+const API_URL = config.API_URL;
 
 function SignUpPage() {
   const navigate = useNavigate();

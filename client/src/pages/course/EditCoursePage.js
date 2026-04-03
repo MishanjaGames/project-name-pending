@@ -3,8 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import NavBar from "../../components/NavBar"; 
 import AuthImage from "../../components/AuthImage";
 import { SettingsContext } from '../../contexts/SettingsContext';
+import config from '../../config/config';
 
-const API_URL = process.env.REACT_APP_API_URL || '${API_URL}';
+const API_URL = config.API_URL;
 const BASE_URL = API_URL.replace('/api', '');
 
 function EditCoursePage() {

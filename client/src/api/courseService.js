@@ -1,4 +1,5 @@
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4040/api';
+import config from '../config/config';
+const API_URL = config.API_URL;
 
 // Умная функция для заголовков с токеном
 function getAuthHeaders() {

@@ -3,10 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import AuthImage from '../../components/AuthImage';
 import { getUser } from '../../utils/auth';
-
-const API_URL = process.env.REACT_APP_API_URL || '${API_URL}';
-const BASE_URL = API_URL.replace('/api', '');
 import './CoursePage.css';
+import config from '../../config/config';
+
+const API_URL = config.API_URL;
+const BASE_URL = API_URL.replace('/api', '');
 
 function CoursePage() {
   const { t } = useContext(SettingsContext);

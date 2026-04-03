@@ -1,0 +1,52 @@
+version: '3.8'
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CLIENT LOCAL DOCKER COMPOSE — Student app standalone deployment
+#
+# Usage:
+#   SERVER_HOST=26.64.216.17 docker-compose -f docker-compose.local.yml up -d --build
+#
+# Or put SERVER_HOST in .env.local at this folder level and just run:
+#   docker-compose -f docker-compose.local.yml up -d --build
+#
+# Ports exposed:
+#   http://<SERVER_HOST>:3000  — Student client app
+#   http://<SERVER_HOST>:5001  — WebRTC test backend
+# ═══════════════════════════════════════════════════════════════════════════════
+
+services:
+
+  client:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: http://${SERVER_HOST:-localhost}:4040/api
+        REACT_APP_RTC_URL: http://${SERVER_HOST:-localhost}:5050
+        REACT_APP_WEBRTC_URL: http://${SERVER_HOST:-localhost}:5001
+    container_name: react_client
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  webrtc:
+    build:
+      context: ./webrtc-test/backend
+    container_name: webrtc-server
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
