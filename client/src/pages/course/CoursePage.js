@@ -1,7 +1,10 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { SettingsContext } from '../../contexts/SettingsContext';
+import { useCart } from '../../contexts/CartContext';
 import AuthImage from '../../components/AuthImage';
+import PaymentModal from '../../components/PaymentModal';
+import { UtilityModal } from '../../components/UtilityModal';
 import { getUser } from '../../utils/auth';
 import './CoursePage.css';
 import config from '../../config/config';
@@ -11,6 +14,7 @@ const BASE_URL = API_URL.replace('/api', '');
 
 function CoursePage() {
   const { t } = useContext(SettingsContext);
+  const { addItem } = useCart();
   const { id } = useParams();
   const navigate = useNavigate();
   const currentUser = getUser();
@@ -42,6 +46,9 @@ function CoursePage() {
   const [localTextContent, setLocalTextContent] = useState({});
   const [textRefreshKey, setTextRefreshKey] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [utilModal, setUtilModal] = useState(null); // { type, title, message, onConfirm?, onSubmit?, confirmToken? }
+  const [infoModal, setInfoModal] = useState({ show: false, title: '', message: '' });
 
   const isAdmin = currentUser && ['admin', 'root', 'manager', 'create', 'teacher'].includes(currentUser.role);
 
@@ -226,11 +233,18 @@ function CoursePage() {
 
   const deleteVolume = (volumeIndex) => {
     const volume = volumes[volumeIndex];
-    const userInput = prompt(`${t('coursePage.deleteVolumePrompt')}:\n"${volume.title}"`);
-    if (userInput === volume.title) {
-      setVolumes(volumes.filter((_, i) => i !== volumeIndex));
-      setHasChanges(true);
-    }
+    setUtilModal({
+      type: 'delete',
+      title: t('coursePage.deleteVolumePrompt') || 'Delete volume',
+      message: `This will permanently remove the volume and all its chapters.`,
+      confirmToken: volume.title,
+      tokenLabel: 'Type the volume name to confirm',
+      onDelete: () => {
+        setVolumes(volumes.filter((_, i) => i !== volumeIndex));
+        setHasChanges(true);
+        setUtilModal(null);
+      },
+    });
   };
 
   const updateVolumeTitle = (volumeIndex, newTitle) => {
@@ -250,13 +264,20 @@ function CoursePage() {
 
   const deleteChapter = (volumeIndex, chapterIndex) => {
     const chapter = volumes[volumeIndex].chapters[chapterIndex];
-    const userInput = prompt(`${t('coursePage.deleteChapterPrompt')}:\n"${chapter.title}"`);
-    if (userInput === chapter.title) {
-      const newVolumes = [...volumes];
-      newVolumes[volumeIndex].chapters = newVolumes[volumeIndex].chapters.filter((_, i) => i !== chapterIndex);
-      setVolumes(newVolumes);
-      setHasChanges(true);
-    }
+    setUtilModal({
+      type: 'delete',
+      title: t('coursePage.deleteChapterPrompt') || 'Delete chapter',
+      message: 'This will permanently remove the chapter and all its content.',
+      confirmToken: chapter.title,
+      tokenLabel: 'Type the chapter name to confirm',
+      onDelete: () => {
+        const newVolumes = [...volumes];
+        newVolumes[volumeIndex].chapters = newVolumes[volumeIndex].chapters.filter((_, i) => i !== chapterIndex);
+        setVolumes(newVolumes);
+        setHasChanges(true);
+        setUtilModal(null);
+      },
+    });
   };
 
   const updateChapterTitle = (volumeIndex, chapterIndex, newTitle) => {
@@ -313,11 +334,19 @@ function CoursePage() {
   };
 
   const deleteContentItem = (volumeIndex, chapterIndex, itemIndex) => {
-    if (!window.confirm(t('coursePage.deleteItemConfirm'))) return;
-    const newVolumes = [...volumes];
-    newVolumes[volumeIndex].chapters[chapterIndex].items.splice(itemIndex, 1);
-    setVolumes(newVolumes);
-    setHasChanges(true);
+    setUtilModal({
+      type: 'confirm',
+      danger: true,
+      title: t('coursePage.deleteItemConfirm') || 'Delete item?',
+      message: 'This content item will be permanently removed.',
+      onConfirm: () => {
+        const newVolumes = [...volumes];
+        newVolumes[volumeIndex].chapters[chapterIndex].items.splice(itemIndex, 1);
+        setVolumes(newVolumes);
+        setHasChanges(true);
+        setUtilModal(null);
+      },
+    });
   };
 
   const updateItemTitle = (volumeIndex, chapterIndex, itemIndex, newTitle) => {
@@ -476,7 +505,7 @@ function CoursePage() {
           })
         );
         if (uploadResults.some(ok => !ok)) {
-          alert(t('coursePage.alertUploadFailed'));
+          setInfoModal({ show: true, title: 'Upload failed', message: t('coursePage.alertUploadFailed') || 'Some files failed to upload. Changes were not saved.' });
           resetUnsavedState(); await fetchData(); return;
         }
       }
@@ -505,19 +534,26 @@ function CoursePage() {
         resetUnsavedState();
         setEditMode(false);
         await fetchData();
-        alert(t('coursePage.alertSaveSuccess'));
+        setInfoModal({ show: true, title: '✓ Saved', message: t('coursePage.alertSaveSuccess') || 'Changes saved successfully.' });
       } else {
-        alert(t('coursePage.alertSaveFailed'));
+        setInfoModal({ show: true, title: 'Save failed', message: t('coursePage.alertSaveFailed') || 'Could not save changes.' });
         resetUnsavedState(); await fetchData();
       }
     } catch (err) {
-      alert(`${t('coursePage.alertError')} ${err.message}.`);
+      setInfoModal({ show: true, title: 'Error', message: `${t('coursePage.alertError') || 'Error:'} ${err.message}.` });
       resetUnsavedState(); await fetchData();
     } finally { setIsSaving(false); }
   };
 
-  const handleAddToCart = () => alert(`${t('coursePage.addedToCart')} "${course.title}"!`);
-  const handleEnroll = () => alert(`${t('coursePage.enrolledIn')} "${course.title}"!`);
+  const handleAddToCart = () => {
+    if (!currentUser) { navigate('/login'); return; }
+    addItem({ id: course._id, title: course.title, price: course.price || 0, img: courseImage, description: course.title }, 1);
+    setInfoModal({ show: true, title: t('coursePage.addedToCart') || 'Added to cart', message: `"${course.title}" has been added to your cart.` });
+  };
+  const handleEnroll = () => {
+    if (!currentUser) { navigate('/login'); return; }
+    setShowPaymentModal(true);
+  };
 
   const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -660,8 +696,8 @@ function CoursePage() {
               </div>
 
               <div className="mobile-buttons">
-                <button className="btn btn-primary btn-lg w-100 mb-2 disabled" onClick={handleAddToCart}>{t('coursePage.addToCart')}</button>
-                <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>{t('coursePage.enrollNow')}</button>
+                {!locked && <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>{t('coursePage.addToCart')}</button>}
+                {locked && <button className="btn btn-outline-secondary btn-lg w-100" onClick={handleEnroll}>{t('coursePage.enrollNow')}</button>}
                 <p className="guarantee-text">{t('coursePage.guaranteeText')}</p>
               </div>
 
@@ -711,8 +747,8 @@ function CoursePage() {
                     </h2>
                   </div>
                   <div className="purchase-buttons">
-                    <button className="btn btn-primary btn-lg w-100 mb-2 disabled" onClick={handleAddToCart}>{t('coursePage.addToCart')}</button>
-                    <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>{t('coursePage.enrollNow')}</button>
+                    {!locked && <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>{t('coursePage.addToCart')}</button>}
+                    {locked && <button className="btn btn-outline-secondary btn-lg w-100" onClick={handleEnroll}>{t('coursePage.enrollNow')}</button>}
                   </div>
                   <p className="guarantee-text">{t('coursePage.guaranteeText')}</p>
                 </div>
@@ -848,6 +884,33 @@ function CoursePage() {
       {editingItem && (
         <AddItemModal type={editingItem.item.type} isEditing={true} initialData={editingItem.item} onSave={(itemData) => updateContentItem(editingItem.volumeIndex, editingItem.chapterIndex, editingItem.itemIndex, itemData)} onClose={() => setEditingItem(null)} parseTextSyntax={parseTextSyntax} uploadedFiles={uploadedFiles} />
       )}
+      {showPaymentModal && course && (
+        <PaymentModal
+          course={course}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={() => { setShowPaymentModal(false); setLocked(false); checkCCourse(); }}
+        />
+      )}
+      <UtilityModal
+        show={!!utilModal}
+        type={utilModal?.type || 'confirm'}
+        danger={utilModal?.danger}
+        title={utilModal?.title || ''}
+        message={utilModal?.message || ''}
+        confirmToken={utilModal?.confirmToken}
+        tokenLabel={utilModal?.tokenLabel}
+        onConfirm={utilModal?.onConfirm}
+        onDelete={utilModal?.onDelete}
+        onCancel={() => setUtilModal(null)}
+        onClose={() => setUtilModal(null)}
+      />
+      <UtilityModal
+        show={infoModal.show}
+        type="info"
+        title={infoModal.title}
+        message={infoModal.message}
+        onClose={() => setInfoModal({ show: false, title: '', message: '' })}
+      />
     </>
   );
 }
@@ -884,6 +947,7 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(initialData?.url || initialData?.content || '');
   const [selectedFileId, setSelectedFileId] = useState('');
+  const [titleError, setTitleError] = useState(false);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -907,7 +971,8 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
   };
 
   const handleSave = () => {
-    if (!title.trim()) { alert(t('coursePage.alertNoTitle')); return; }
+    if (!title.trim()) { setTitleError(true); return; }
+    setTitleError(false);
     if (type === 'text') { onSave({ type, title, content }); return; }
     onSave({ type, title, url: url || preview || '', content: undefined });
   };
@@ -922,7 +987,8 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
         <div className="modal-body">
           <div className="mb-3">
             <label className="form-label">{t('coursePage.title')}</label>
-            <input type="text" className="form-control" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <input type="text" className={`form-control ${titleError ? 'is-invalid' : ''}`} value={title} onChange={(e) => { setTitle(e.target.value); setTitleError(false); }} />
+            {titleError && <div className="invalid-feedback">{t('coursePage.alertNoTitle') || 'Title is required.'}</div>}
           </div>
           {type === 'text' ? (
             <div className="mb-3">

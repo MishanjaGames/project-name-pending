@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import config from '../../config/config';
 
+const API_URL = config.API_URL;
 function RedeemPage() {
   const { t } = useTranslation();
   const [key, setKey] = useState('');
@@ -18,7 +20,7 @@ function RedeemPage() {
 
     try {
       // ВНИМАНИЕ: Убедись, что путь к API правильный (спроси у Миши полный роут)
-      const response = await fetch('http://localhost:5000/api/keys/redeem', {
+      const response = await fetch(`${API_URL}/keys/redeem`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

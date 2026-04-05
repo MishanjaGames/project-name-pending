@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, clearUser } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
+import { UtilityModal } from '../../components/UtilityModal';
 import config from '../../config/config';
 
 const API_URL = config.API_URL;
@@ -13,43 +14,66 @@ function AccountPage() {
   const [user] = (function(){ try { return [getUser()]; } catch (e) { return [null]; } })();
   const [createdCourses, setCreatedCourses] = useState([]);
   const [stats, setStats] = useState({ courseCount: 0, linkCount: 0 });
-
+  const [enrollments, setEnrollments] = useState([]);
+  const [deleteTarget, setDeleteTarget] = useState(null); // course to delete
+  const [infoModal, setInfoModal] = useState({ show: false, title: '', message: '' });
   const hasTeacherRights = user && ['create', 'manage', 'admin', 'root'].includes(user.role);
 
   useEffect(() => {
-    if (user && ['teacher', 'admin', 'manage', 'create', 'root'].includes(user.role)) {
-      const token = localStorage.getItem('token');
-      fetch('${API_URL}/manage/courses', {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-      })
-      .then(res => res.json())
-      .then(res => {
-        const allCourses = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
-        const myCourses = allCourses.filter(c => {
-          const courseOwnerId = String(c.userId?._id || c.userId || '');
-          const currentUserId = String(user.id || user._id || user.email || '');
-          const sameById = courseOwnerId && courseOwnerId === currentUserId;
-          const courseOwnerNick = String(c.userId?.nickname || '').toLowerCase();
-          const userName = String(user.name || '').toLowerCase();
-          const sameByNick = courseOwnerNick && courseOwnerNick === userName;
-          return sameById || sameByNick;
-        });
-        
-        setCreatedCourses(myCourses);
-        const totalLinks = myCourses.reduce((sum, course) => sum + (course.links?.length || 0), 0);
-        setStats({ courseCount: myCourses.length, linkCount: totalLinks });
-      })
-      .catch(err => console.error("Error fetching manage courses:", err));
+    if (!user) return;
+    const token = localStorage.getItem('token');
+    const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+    if (['teacher', 'admin', 'manage', 'create', 'root'].includes(user.role)) {
+      fetch(`${API_URL}/courses`, { headers })
+        .then(res => res.json())
+        .then(res => {
+          const allCourses = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
+          const myCourses = allCourses.filter(c => {
+            const courseOwnerId = String(c.userId?._id || c.userId || '');
+            const currentUserId = String(user.id || user._id || user.email || '');
+            const courseOwnerNick = String(c.userId?.nickname || '').toLowerCase();
+            const userName = String(user.name || '').toLowerCase();
+            return (courseOwnerId && courseOwnerId === currentUserId) || (courseOwnerNick && courseOwnerNick === userName);
+          });
+          setCreatedCourses(myCourses);
+          setStats({ courseCount: myCourses.length, linkCount: myCourses.reduce((sum, c) => sum + (c.links?.length || 0), 0) });
+        })
+        .catch(err => console.error("Error fetching courses:", err));
     }
-  }, [user]);
+
+    if (user.enrolled?.length > 0) {
+      Promise.all(
+        user.enrolled.map(el =>
+          fetch(`${API_URL}/courses/${el._id}`, { headers }).then(res => res.json()).then(res => res.data)
+        )
+      ).then(courses => setEnrollments(courses.filter(Boolean)));
+    }
+  }, []); // empty deps — runs once on mount
+
+  const handleDeleteCourse = async (c) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/manage/courses/${c._id || c.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        setCreatedCourses(prev => prev.filter(item => (item._id || item.id) !== (c._id || c.id)));
+      } else {
+        const errorData = await response.json();
+        setInfoModal({ show: true, title: t('accountPage.deleteFailed') || 'Delete failed', message: errorData.message || t('accountPage.accessDenied') || 'Access denied.' });
+      }
+    } catch {
+      setInfoModal({ show: true, title: 'Error', message: t('accountPage.serverErrorDelete') || 'Server error while deleting.' });
+    }
+    setDeleteTarget(null);
+  };
 
   if (!user) {
     setTimeout(() => navigate('/login'), 0);
     return null;
   }
-
-  const enrollments = user.enrolled || [];
 
   const handleLogout = () => {
     clearUser();
@@ -138,7 +162,7 @@ function AccountPage() {
                 ) : (
                   <div className="d-grid gap-3">
                     {createdCourses.map(c => {
-                      let imgSrc = 'https://via.placeholder.com/60x45?text=No+Img';
+                      let imgSrc = 'https://placehold.co/60x45?text=No+Img';
                       if (c.links && c.links.length > 0 && c.links[0].url) {
                         let cleanUrl = c.links[0].url.replace(/\\/g, '/');
                         cleanUrl = cleanUrl.replace('/api/manage/courses', '/api/courses');
@@ -164,10 +188,10 @@ function AccountPage() {
                               alt={c.title} 
                               className="rounded-3 shadow-sm me-3"
                               style={{ width: '60px', height: '45px', objectFit: 'cover' }} 
-                              onError={(e) => { e.target.src = 'https://via.placeholder.com/60x45?text=No+Img'; }}
+                              onError={(e) => { e.target.src = 'https://placehold.co/60x45?text=No+Img'; }}
                             />
                             <div className="flex-grow-1">
-                              <h6 className="fw-bold mb-0 text-truncate">{c.title}</h6>
+                              <h6 className="fw-bold mb-0 text-truncate">{c.trans[0].title}</h6>
                               <div className="small text-muted">
                                  <span className="badge bg-secondary me-2">{c.status === 'editing' ? t('accountPage.draft') : c.status}</span>
                                  <span>${c.price}</span>
@@ -197,27 +221,9 @@ function AccountPage() {
                               </button>
                               <button 
                                 className="btn btn-sm btn-outline-danger" 
-                                onClick={async (e) => { 
+                                onClick={(e) => { 
                                   e.stopPropagation();
-                                  if(window.confirm(t('accountPage.deleteConfirm'))) {
-                                    try {
-                                      const token = localStorage.getItem('token');
-                                      const response = await fetch(`${API_URL}/manage/courses/${c._id || c.id}`, {
-                                        method: 'DELETE',
-                                        headers: { 'Authorization': `Bearer ${token}` }
-                                      });
-
-                                      if (response.ok) {
-                                        setCreatedCourses(prev => prev.filter(item => (item._id || item.id) !== (c._id || c.id)));
-                                      } else {
-                                        const errorData = await response.json();
-                                        alert(`${t('accountPage.deleteFailed')} ${errorData.message || t('accountPage.accessDenied')}`);
-                                      }
-                                    } catch (error) {
-                                      console.error('Delete error:', error);
-                                      alert(t('accountPage.serverErrorDelete'));
-                                    }
-                                  }
+                                  setDeleteTarget(c);
                                 }}
                                 title={t('accountPage.deleteCourse')}
                               >
@@ -259,19 +265,19 @@ function AccountPage() {
                 ) : (
                   <div className="d-grid gap-3">
                     {enrollments.map(c => (
-                      <div className="card border-0 bg-light p-2 course-item-hover" key={c.id} style={{ transition: '0.2s', cursor: 'pointer' }} onClick={() => navigate(`/course/${c.id}`)}>
+                      <div className="card border-0 bg-light p-2 course-item-hover" key={c._id} style={{ transition: '0.2s', cursor: 'pointer' }} onClick={() => navigate(`/course/${c._id}`)}>
                         <div className="d-flex align-items-center">
                           <img 
-                            src={c.img || 'https://via.placeholder.com/80x60?text=Course'} 
+                            src={c.img || 'https://placehold.co/80x60?text=Course'} 
                             alt={c.title} 
                             className="rounded-3 shadow-sm me-3"
                             style={{ width: '80px', height: '60px', objectFit: 'cover' }} 
-                            onError={(e) => { e.target.src = 'https://via.placeholder.com/80x60?text=Course'; }}
+                            onError={(e) => { e.target.src = 'https://placehold.co/80x60?text=Course'; }}
                           />
                           <div className="flex-grow-1">
-                            <h6 className="fw-bold mb-1 text-truncate">{c.title}</h6>
+                            <h6 className="fw-bold mb-1 text-truncate">{c.trans[0].title}</h6>
                             <div className="text-muted small">
-                              <i className="bi bi-person me-1"></i> {c.author}
+                              <i className="bi bi-person me-1"></i> {c.userId}
                             </div>
                           </div>
                           <div className="ms-3 pe-2">
@@ -286,6 +292,24 @@ function AccountPage() {
           </div>
         </div>
       </div>
+      <UtilityModal
+        show={!!deleteTarget}
+        type="confirm"
+        danger
+        title={t('accountPage.deleteConfirm') || 'Delete course?'}
+        message={deleteTarget ? `"${deleteTarget.trans?.[0]?.title || deleteTarget.title}" will be permanently deleted.` : ''}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={() => handleDeleteCourse(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
+      <UtilityModal
+        show={infoModal.show}
+        type="info"
+        title={infoModal.title}
+        message={infoModal.message}
+        onClose={() => setInfoModal({ show: false, title: '', message: '' })}
+      />
     </div>
   );
 }

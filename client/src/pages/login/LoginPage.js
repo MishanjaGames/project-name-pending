@@ -69,16 +69,38 @@ function LoginPage() {
         else if (lowerLogin.includes('root')) userRole = 'root';
       }
 
-      const userData = {
-        id: jwtPayload.userId || jwtPayload._id,
-        email: jwtPayload.email || (isEmail ? loginId : ''),
-        role: userRole,
-        name: jwtPayload.nickname || loginId.split('@')[0], 
-        enrolled: []
-      };
+      const c = await fetch(`${API_URL}/users/c`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
 
-      setUser(userData, token);
-      navigate('/account'); 
+      let userData = {}
+
+      if (!c.ok) {
+        userData = {
+          id: jwtPayload.userId || jwtPayload._id,
+          email: jwtPayload.email || (isEmail ? loginId : ''),
+          role: userRole,
+          name: jwtPayload.nickname || loginId.split('@')[0], 
+          enrolled: []
+        };
+
+        setUser(userData, token);
+        navigate('/account');
+        return;
+      }
+      
+      const { user } = await c.json();
+        userData = {
+          id: jwtPayload.userId || jwtPayload._id,
+          email: jwtPayload.email || (isEmail ? loginId : ''),
+          role: userRole,
+          name: jwtPayload.nickname || loginId.split('@')[0], 
+          enrolled: user.courses
+        };
+
+        setUser(userData, token);
+        navigate('/account');
       
     } catch (error) {
       console.error('Login error:', error);

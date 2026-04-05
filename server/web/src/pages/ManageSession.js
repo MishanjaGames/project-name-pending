@@ -676,11 +676,11 @@ function ManageSession({ data, onLogout, startMeeting }) {
                             {session.restrictionIgnored && <span className="badge bg-info text-dark">Rank override active</span>}
                         </div>
                     </div>
-                    {isHost && (
+                   
                         <div className="d-flex gap-2 flex-wrap">
                             <button className="btn btn-success btn-sm d-flex align-items-center gap-1"
                                 onClick={() => startMeeting({ sessionId: id })}>
-                                <i className="bi bi-camera-video-fill"></i> Start Video
+                                <i className="bi bi-camera-video-fill"></i> {isHost?'Start Video':'Join Video'}
                             </button>
                             <button className="btn btn-outline-info btn-sm d-flex align-items-center gap-1"
                                 onClick={copyInviteLink}
@@ -688,39 +688,43 @@ function ManageSession({ data, onLogout, startMeeting }) {
                                 <i className={`bi ${inviteCopied ? "bi-check-lg" : "bi-link-45deg"}`}></i>
                                 {inviteCopied ? "Copied!" : "Invite link"}
                             </button>
-                            {session.status === "draft" && (
-                                <button className="btn btn-success btn-sm" disabled={saving} onClick={() => updateStatus("active")}>
-                                    <i className="bi bi-play-fill me-1"></i>Start Session
-                                </button>
-                            )}
-                            {session.status === "active" && (
-                                <button className="btn btn-primary btn-sm" disabled={saving} onClick={() => updateStatus("completed")}>
-                                    <i className="bi bi-check2-all me-1"></i>Complete
-                                </button>
-                            )}
-                            {!session.privateCopyId && (
-                                <button className="btn btn-outline-warning btn-sm" disabled={creatingCopy} onClick={handleCreatePrivateCopy}>
-                                    {creatingCopy ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="bi bi-files me-1"></i>}
-                                    Create Private Copy
-                                </button>
-                            )}
-                            {session.privateCopyId && (
-                                <button
-                                    className={`btn btn-sm ${session.copyEditAllowed ? "btn-warning" : "btn-outline-secondary"}`}
-                                    onClick={toggleCopyEdit}
-                                    title="Allow co-tutors to edit the private copy"
-                                >
-                                    <i className={`bi bi-pencil${session.copyEditAllowed ? "-fill" : ""} me-1`}></i>
-                                    Allow edit copy: {session.copyEditAllowed ? "ON" : "OFF"}
-                                </button>
-                            )}
-                            {!session.restrictionIgnored && (
-                                <button className="btn btn-outline-info btn-sm" onClick={overrideRank}>
-                                    <i className="bi bi-unlock me-1"></i>Override Rank
-                                </button>
+                            {isHost && (
+                                <>
+                                    {session.status === "draft" && (
+                                        <button className="btn btn-success btn-sm" disabled={saving} onClick={() => updateStatus("active")}>
+                                            <i className="bi bi-play-fill me-1"></i>Start Session
+                                        </button>
+                                    )}
+                                    {session.status === "active" && (
+                                        <button className="btn btn-primary btn-sm" disabled={saving} onClick={() => updateStatus("completed")}>
+                                            <i className="bi bi-check2-all me-1"></i>Complete
+                                        </button>
+                                    )}
+                                    {!session.privateCopyId && (
+                                        <button className="btn btn-outline-warning btn-sm" disabled={creatingCopy} onClick={handleCreatePrivateCopy}>
+                                            {creatingCopy ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="bi bi-files me-1"></i>}
+                                            Create Private Copy
+                                        </button>
+                                    )}
+                                    {session.privateCopyId && (
+                                        <button
+                                            className={`btn btn-sm ${session.copyEditAllowed ? "btn-warning" : "btn-outline-secondary"}`}
+                                            onClick={toggleCopyEdit}
+                                            title="Allow co-tutors to edit the private copy"
+                                        >
+                                            <i className={`bi bi-pencil${session.copyEditAllowed ? "-fill" : ""} me-1`}></i>
+                                            Allow edit copy: {session.copyEditAllowed ? "ON" : "OFF"}
+                                        </button>
+                                    )}
+                                    {!session.restrictionIgnored && (
+                                        <button className="btn btn-outline-info btn-sm" onClick={overrideRank}>
+                                            <i className="bi bi-unlock me-1"></i>Override Rank
+                                        </button>
+                                    )}
+                                </>
                             )}
                         </div>
-                    )}
+                    
                 </div>
 
                 {/* Course action links */}

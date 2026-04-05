@@ -2,6 +2,7 @@ import React, { useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
 import { SettingsContext } from '../../contexts/SettingsContext';
+import { UtilityModal } from '../../components/UtilityModal';
 
 function CartPage() {
   const navigate = useNavigate();
@@ -12,6 +13,8 @@ function CartPage() {
   const [promoCode, setPromoCode] = useState('');
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [promoMessage, setPromoMessage] = useState({ type: '', text: '' });
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [infoModal, setInfoModal] = useState({ show: false, title: '', message: '' });
 
   // Логика автоматической скидки (15% если товаров >= 10)
   const isAutoDiscountApplied = totalItems >= 10;
@@ -29,15 +32,9 @@ function CartPage() {
   };
 
   const checkoutHandler = () => {
-    const userData = prompt(`${t('cart.paymentPrompt')}${finalPrice.toFixed(2)}:`);
-    
-    if (userData) {
-      console.log("User entered:", userData);
-      alert(t('cart.paymentSuccess'));
-    }
-
     clearCart();
     navigate('/search');
+    setInfoModal({ show: true, title: t('cart.paymentSuccess') || 'Payment successful!', message: t('cart.paymentSuccessMsg') || 'Your purchase is complete. Enjoy your courses!' });
   };
   
   // Итоговая цена
@@ -65,7 +62,7 @@ function CartPage() {
         {totalItems > 0 && (
           <button 
             className="btn btn-outline-danger rounded-pill px-4" 
-            onClick={() => { if(window.confirm(t('cart.confirmClear'))) clearCart(); }}
+            onClick={() => setConfirmClear(true)}
           >
             <i className="bi bi-trash3 me-2"></i> {t('cart.clearCart')}
           </button>
@@ -247,6 +244,24 @@ function CartPage() {
 
         </div>
       )}
+      <UtilityModal
+        show={confirmClear}
+        type="confirm"
+        danger
+        title={t('cart.confirmClear') || 'Clear cart?'}
+        message={t('cart.confirmClearMsg') || 'Are you sure you want to remove all items from your cart?'}
+        confirmLabel={t('cart.clearCart') || 'Clear'}
+        cancelLabel={t('common.cancel') || 'Cancel'}
+        onConfirm={() => { clearCart(); setConfirmClear(false); }}
+        onCancel={() => setConfirmClear(false)}
+      />
+      <UtilityModal
+        show={infoModal.show}
+        type="info"
+        title={infoModal.title}
+        message={infoModal.message}
+        onClose={() => setInfoModal({ show: false, title: '', message: '' })}
+      />
     </div>
   );
 }

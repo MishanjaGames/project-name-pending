@@ -20,9 +20,10 @@ const NAV = [
         section: 'Learning',
         minLvl: 0,
         items: [
-        { to: '/my-courses',  icon: 'bi-collection-play',   label: 'My Courses' },
-        { to: '/my-grades',   icon: 'bi-award',              label: 'My Grades' },
-        { to: '/redeem',      icon: 'bi-key',                label: 'Redeem Key' },
+            { to: '/my-courses',  icon: 'bi-collection-play',   label: 'My Courses' },
+            { to: '/my-grades',   icon: 'bi-award',              label: 'My Grades' },
+            { to: '/redeem',      icon: 'bi-key',                label: 'Redeem Key' },
+            { to: '/chats', icon: 'bi-chat-dots-fill', label: 'Messages' },
         ],
     },
     {

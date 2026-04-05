@@ -2,6 +2,7 @@ import { useEffect, useState, useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import NavBar from "../../components/NavBar"; 
 import AuthImage from "../../components/AuthImage";
+import { UtilityModal } from '../../components/UtilityModal';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import config from '../../config/config';
 
@@ -38,6 +39,8 @@ function EditCoursePage() {
     const [courseFilesPreview, setCourseFilesPreview] = useState([]);
     const [existingFiles, setExistingFiles] = useState([]); 
     const [loadingFiles, setLoadingFiles] = useState(false);
+    const [deleteFileTarget, setDeleteFileTarget] = useState(null);
+    const [infoModal, setInfoModal] = useState({ show: false, title: '', message: '' });
 
     const token = localStorage.getItem('token');
     const authHeader = `Bearer ${token}`; 
@@ -57,9 +60,9 @@ function EditCoursePage() {
                 try {
                     const [courseRes, usersRes, directionsRes, levelsRes, filesRes] = await Promise.all([
                         fetch(`${API_URL}/manage/courses/${id}`, { method: 'GET', headers }),
-                        fetch('${API_URL}/manage/users', { method: 'GET', headers }),
-                        fetch('${API_URL}/directions', { method: 'GET', headers }),
-                        fetch('${API_URL}/levels', { method: 'GET', headers }),
+                        fetch(`${API_URL}/users`, { method: 'GET', headers }),
+                        fetch(`${API_URL}/directions`, { method: 'GET', headers }),
+                        fetch(`${API_URL}/levels`, { method: 'GET', headers }),
                         fetch(`${API_URL}/manage/courses/${id}/files`, { method: 'GET', headers })
                     ]);
 
@@ -70,9 +73,9 @@ function EditCoursePage() {
                         setFormData({
                             userId: course.userId || '',
                             status: course.status || '',
-                            title: course.title || '',
-                            description: course.description || '',
-                            skills: course.skills || [],
+                            title: course.trans[0].title || '',
+                            description: course.trans[0].description || '',
+                            skills: course.trans[0].skills || [],
                             direction: course.direction || '',
                             level: course.level || '',
                             price: course.price?.toString() || '',
@@ -179,23 +182,28 @@ function EditCoursePage() {
 
     const deleteExistingFile = async (fileIndex) => {
         const file = existingFiles[fileIndex];
-        if (!window.confirm(`${t('editCourse.confirmDeleteFile')} "${file.originalName || file.filename}"?`)) return;
+        setDeleteFileTarget({ fileIndex, name: file.originalName || file.filename });
+    };
 
+    const confirmDeleteFile = async () => {
+        if (!deleteFileTarget) return;
+        const { fileIndex } = deleteFileTarget;
+        const file = existingFiles[fileIndex];
         try {
             const fileIdentifier = file.filename || file.originalName;
             const response = await fetch(`${API_URL}/manage/courses/${id}/files/${fileIdentifier}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' }
             });
-
             if (response.ok) {
                 setExistingFiles(prev => prev.filter((_, i) => i !== fileIndex));
             } else {
-                alert(t('editCourse.alertDeleteFailed'));
+                setInfoModal({ show: true, title: 'Error', message: t('editCourse.alertDeleteFailed') || 'Failed to delete file.' });
             }
         } catch (error) {
             console.error('Error deleting file:', error);
         }
+        setDeleteFileTarget(null);
     };
 
     const validateForm = () => {
@@ -219,9 +227,11 @@ function EditCoursePage() {
             const updatePayload = {
                 userId: formData.userId,
                 status: formData.status,
-                title: formData.title,
-                description: formData.description,
-                skills: formData.skills,
+                trans: [{
+                    title: formData.title,
+                    description: formData.description,
+                    skills: formData.skills,
+                }],
                 direction: formData.direction,
                 level: formData.level,
                 price: formData.price ? parseFloat(formData.price) : 0
@@ -253,11 +263,11 @@ function EditCoursePage() {
                 });
             }
 
-            alert(t('editCourse.alertSuccess'));
-            navigate('/account'); 
+            setInfoModal({ show: true, title: '✓ Saved', message: t('editCourse.alertSuccess') || 'Course updated successfully.' });
+            setTimeout(() => navigate('/account'), 1200);
         } catch (error) {
             console.error('Error updating course:', error);
-            alert(t('editCourse.alertError'));
+            setInfoModal({ show: true, title: 'Error', message: t('editCourse.alertError') || 'Failed to update course.' });
         } finally {
             setSaving(false);
         }
@@ -281,6 +291,7 @@ function EditCoursePage() {
     }
 
     return (
+        <>
         <div className="page-bg min-vh-100">
             <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
                 <div className="row mb-4 justify-content-center">
@@ -433,6 +444,25 @@ function EditCoursePage() {
                 </div>
             </div>
         </div>
+        <UtilityModal
+            show={!!deleteFileTarget}
+            type="confirm"
+            danger
+            title={t('editCourse.confirmDeleteFile') || 'Delete file?'}
+            message={deleteFileTarget ? `"${deleteFileTarget.name}" will be permanently deleted.` : ''}
+            confirmLabel="Delete"
+            cancelLabel="Cancel"
+            onConfirm={confirmDeleteFile}
+            onCancel={() => setDeleteFileTarget(null)}
+        />
+        <UtilityModal
+            show={infoModal.show}
+            type="info"
+            title={infoModal.title}
+            message={infoModal.message}
+            onClose={() => setInfoModal({ show: false, title: '', message: '' })}
+        />
+        </>
     );
 }
 

@@ -6,7 +6,9 @@ import { getUser, setUser as setUserStorage } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import { useCart } from '../../contexts/CartContext';
 import { courseService } from '../../api/courseService'; 
-import CourseCard from '../../components/CourseCard'; // ИМПОРТИРУЕМ НАШУ КАРТОЧКУ
+import CourseCard from '../../components/CourseCard';
+import PaymentModal from '../../components/PaymentModal';
+import { UtilityModal } from '../../components/UtilityModal';
 import config from '../../config/config';
 
 const API_URL = config.API_URL;
@@ -15,6 +17,8 @@ const BASE_URL = (process.env.REACT_APP_API_URL || '${BASE_URL}/api').replace('/
 function SearchPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState(getUser());
+  const [paymentCourse, setPaymentCourse] = useState(null);
+  const [infoModal, setInfoModal] = useState({ show: false, title: '', message: '' });
   const { t } = useContext(SettingsContext);
   const { addItem } = useCart();
 
@@ -149,12 +153,9 @@ function SearchPage() {
     if (!u) { navigate('/login'); return; }
     u.enrolled = u.enrolled || [];
     if (!u.enrolled.find(x => String(x.id) === String(course.id))) {
-      u.enrolled.push({ id: course.id, title: course.title, author: course.author, img: course.img });
-      setUserStorage(u);
-      setUser(u);
-      alert(t('enrolledIn') + course.title);
+      setPaymentCourse(course);
     } else {
-      alert(t('alreadyEnrolled'));
+      setInfoModal({ show: true, title: t('alreadyEnrolled') || 'Already enrolled', message: t('alreadyEnrolledMsg') || `You already have access to "${course.title}".` });
     }
   };
 
@@ -324,6 +325,23 @@ function SearchPage() {
           </main>
         </div>
       </div>
+      {paymentCourse && (
+        <PaymentModal
+          course={paymentCourse}
+          onClose={() => setPaymentCourse(null)}
+          onSuccess={() => {
+            setPaymentCourse(null);
+            setInfoModal({ show: true, title: 'Enrolled!', message: `You now have access to "${paymentCourse.title}".` });
+          }}
+        />
+      )}
+      <UtilityModal
+        show={infoModal.show}
+        type="info"
+        title={infoModal.title}
+        message={infoModal.message}
+        onClose={() => setInfoModal({ show: false, title: '', message: '' })}
+      />
     </div>
   );
 }
