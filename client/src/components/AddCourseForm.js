@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SettingsContext } from '../contexts/SettingsContext';
 import { getUser } from '../utils/auth';
+import { UtilityModal } from './UtilityModal';
 import config from '../config/config';
 
 const API_URL = config.API_URL;
@@ -15,6 +16,7 @@ export default function AddCourseForm() {
     const [saving, setSaving] = useState(false);
     const [skillInput, setSkillInput] = useState('');
     const [errors, setErrors] = useState({});
+    const [infoModal, setInfoModal] = useState({ show: false, title: '', message: '', onClose: null });
 
     // Состояние формы с дефолтными значениями и АВТОМАТИЧЕСКОЙ подстановкой ID
     const [formData, setFormData] = useState({
@@ -61,7 +63,7 @@ export default function AddCourseForm() {
         const validFiles = [];
         for (const file of files) {
             if (file.size > 50 * 1024 * 1024) {
-                alert(t('addCourseForm.alertFileSize', { name: file.name }));
+                setInfoModal({ show: true, title: 'File too large', message: `"${file.name}" exceeds the 50MB limit and was skipped.`, onClose: null });
                 continue;
             }
             validFiles.push(file);
@@ -99,10 +101,8 @@ export default function AddCourseForm() {
 
     const validateForm = () => {
         const newErrors = {};
-        if (!formData.userId) newErrors.userId = t('addCourseForm.alertOwnerMissing');
         if (!formData.title.trim()) newErrors.title = t('addCourseForm.alertTitleReq');
         if (formData.price && isNaN(parseFloat(formData.price))) newErrors.price = t('addCourseForm.alertPriceInvalid');
-
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -114,76 +114,73 @@ export default function AddCourseForm() {
 
         try {
             const token = localStorage.getItem('token');
-            const authHeader = `Bearer ${token}`; 
+            const authHeader = `Bearer ${token}`;
 
-            // ЭТАП 1: Создаем курс
-            const response = await fetch('${API_URL}/manage/courses', {
+            // Stage 1: Create course with correct API shape
+            const response = await fetch(`${API_URL}/courses`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': authHeader,
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    userId: formData.userId,
-                    status: formData.status,
-                    title: formData.title,
-                    description: formData.description,
-                    skills: formData.skills,
-                    direction: formData.direction,
-                    level: formData.level,
-                    price: formData.price ? parseFloat(formData.price) : 0
+                    direction:  formData.direction,
+                    level:      formData.level,
+                    price:      formData.price ? parseFloat(formData.price) : 0,
+                    base_lang:  'en',
+                    courseType: 'SELF_TAUGHT',
+                    trans: [{
+                        title:       formData.title,
+                        description: formData.description,
+                        skills:      formData.skills,
+                    }],
+                    volumes: [],
+                    links:   [],
                 })
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                alert(`${t('addCourseForm.alertCreateFailed')} ${errorData.message || 'Unknown error'}`);
+                const errorData = await response.json().catch(() => ({}));
+                setInfoModal({ show: true, title: 'Create failed', message: errorData.message || t('addCourseForm.alertCreateFailed') || 'Failed to create course.', onClose: null });
                 setSaving(false);
                 return;
             }
 
             const { data: courseData } = await response.json();
-            const courseId = courseData._id || courseData.id; 
+            const courseId = courseData._id || courseData.id;
 
-            // ЭТАП 2: Загружаем обложку
+            // Stage 2: Upload thumbnail
             if (thumbnailFile && courseId) {
                 const fileExtension = thumbnailFile.name.split('.').pop();
                 const renamedFile = renameFile(thumbnailFile, `thumbnail.${fileExtension}`);
                 const thumbnailFormData = new FormData();
                 thumbnailFormData.append('file', renamedFile);
-
-                await fetch(`${API_URL}/manage/courses/${courseId}/files`, {
+                await fetch(`${API_URL}/courses/${courseId}/files?thumbnail=true`, {
                     method: 'POST',
                     headers: { 'Authorization': authHeader },
                     body: thumbnailFormData
                 });
             }
 
-            // ЭТАП 3: Загружаем материалы
+            // Stage 3: Upload content files
             if (contentFiles.length > 0 && courseId) {
                 const contentFormData = new FormData();
-                contentFiles.forEach(file => {
-                    contentFormData.append('files', file);
-                });
-
-                await fetch(`${API_URL}/manage/courses/${courseId}/files/multiple`, {
+                contentFiles.forEach(file => contentFormData.append('files', file));
+                await fetch(`${API_URL}/courses/${courseId}/files/multiple`, {
                     method: 'POST',
                     headers: { 'Authorization': authHeader },
                     body: contentFormData
                 });
             }
 
-            alert(t('addCourseForm.alertCreateSuccess'));
-            navigate('/account'); 
+            setInfoModal({ show: true, title: t('addCourseForm.alertCreateSuccess') || 'Course created!', message: 'Your course has been created successfully.', onClose: () => navigate('/account') });
         } catch (error) {
             console.error('Error creating course:', error);
-            alert(t('addCourseForm.alertCreateError'));
+            setInfoModal({ show: true, title: 'Error', message: t('addCourseForm.alertCreateError') || 'An error occurred while creating the course.', onClose: null });
         } finally {
             setSaving(false);
         }
     };
 
     return (
+        <>
         <form onSubmit={handleSubmit}>
             {/* Обложка курса */}
             <div className="text-center mb-4">
@@ -353,5 +350,13 @@ export default function AddCourseForm() {
                 </button>
             </div>
         </form>
+        <UtilityModal
+            show={infoModal.show}
+            type="info"
+            title={infoModal.title}
+            message={infoModal.message}
+            onClose={() => { setInfoModal({ show: false, title: '', message: '', onClose: null }); infoModal.onClose?.(); }}
+        />
+        </>
     );
 }

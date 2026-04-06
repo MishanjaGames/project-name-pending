@@ -1,7 +1,6 @@
 import { useEffect, useState, useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import NavBar from "../../components/NavBar"; 
-import AuthImage from "../../components/AuthImage";
+import NavBar from "../../components/NavBar";
 import { UtilityModal } from '../../components/UtilityModal';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import config from '../../config/config';
@@ -16,12 +15,9 @@ function EditCoursePage() {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [users, setUsers] = useState([]);
     const [directions, setDirections] = useState([]);
     const [levels, setLevels] = useState([]);
     const [formData, setFormData] = useState({
-        userId: '',
-        status: '',
         title: '',
         description: '',
         skills: [],
@@ -58,35 +54,29 @@ function EditCoursePage() {
 
             const fetchData = async () => {
                 try {
-                    const [courseRes, usersRes, directionsRes, levelsRes, filesRes] = await Promise.all([
-                        fetch(`${API_URL}/manage/courses/${id}`, { method: 'GET', headers }),
-                        fetch(`${API_URL}/users`, { method: 'GET', headers }),
+                    const [courseRes, directionsRes, levelsRes, filesRes] = await Promise.all([
+                        fetch(`${API_URL}/courses/${id}`, { method: 'GET', headers }),
                         fetch(`${API_URL}/directions`, { method: 'GET', headers }),
                         fetch(`${API_URL}/levels`, { method: 'GET', headers }),
-                        fetch(`${API_URL}/manage/courses/${id}/files`, { method: 'GET', headers })
+                        fetch(`${API_URL}/courses/${id}/files`, { method: 'GET', headers })
                     ]);
 
                     let course = {};
                     if (courseRes.ok) {
                         const res = await courseRes.json();
                         course = res.data || res;
+                        const t0 = course.trans?.[0] || {};
                         setFormData({
-                            userId: course.userId || '',
-                            status: course.status || '',
-                            title: course.trans[0].title || '',
-                            description: course.trans[0].description || '',
-                            skills: course.trans[0].skills || [],
-                            direction: course.direction || '',
-                            level: course.level || '',
-                            price: course.price?.toString() || '',
-                            links: course.links || []
+                            title:       t0.title       || course.title       || '',
+                            description: t0.description || course.description || '',
+                            skills:      t0.skills      || course.skills      || [],
+                            direction:   course.direction || '',
+                            level:       course.level     || '',
+                            price:       course.price?.toString() || '',
+                            links:       course.links || []
                         });
                     }
 
-                    if (usersRes.ok) {
-                        const res = await usersRes.json();
-                        setUsers(res.data || res);
-                    }
                     if (directionsRes.ok) {
                         const res = await directionsRes.json();
                         if (Array.isArray(res.data)) setDirections(res.data);
@@ -97,28 +87,23 @@ function EditCoursePage() {
                     }
 
                     let fetchedFiles = [];
+                    let thumbnailFromFiles = '';
                     if (filesRes.ok) {
                         const res = await filesRes.json();
-                        const allFiles = Array.isArray(res.data) ? res.data : (Array.isArray(res.files) ? res.files : (res.data?.files || []));
-                        
+                        const allFiles = Array.isArray(res.files) ? res.files : (Array.isArray(res.data) ? res.data : []);
+
+                        const thumbFile = allFiles.find(f => (f.filename || '').toLowerCase().includes('thumbnail'));
+                        if (thumbFile?.url) thumbnailFromFiles = `${BASE_URL}${thumbFile.url}`;
+
                         fetchedFiles = allFiles.filter((file) => {
                             const fileName = (file.originalName || file.filename || '').toLowerCase();
-                            const isThumbnail = fileName.includes('thumbnail') || 
-                                              (fileName.endsWith('.png') && allFiles.indexOf(file) === 0 && file.mimetype?.startsWith('image/'));
+                            const isThumbnail = fileName.includes('thumbnail');
                             const isSystemText = isSystemTextFile(file.originalName || file.filename || '');
                             return !isThumbnail && !isSystemText;
                         });
                     }
 
-                    if (fetchedFiles.length === 0 && course.links && course.links.length > 1) {
-                        fetchedFiles = course.links.slice(1).map(link => ({
-                            originalName: link.filename || link.url.split('/').pop(),
-                            filename: link.filename || link.url.split('/').pop(),
-                            url: link.url,
-                            mimetype: link.type === 'video' ? 'video/mp4' : (link.type === 'image' ? 'image/jpeg' : 'application/pdf'),
-                            size: null
-                        }));
-                    }
+                    if (thumbnailFromFiles) setThumbnailPreview(thumbnailFromFiles);
                     
                     setExistingFiles(fetchedFiles);
 
@@ -191,7 +176,7 @@ function EditCoursePage() {
         const file = existingFiles[fileIndex];
         try {
             const fileIdentifier = file.filename || file.originalName;
-            const response = await fetch(`${API_URL}/manage/courses/${id}/files/${fileIdentifier}`, {
+            const response = await fetch(`${API_URL}/courses/${id}/files/${fileIdentifier}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' }
             });
@@ -208,8 +193,6 @@ function EditCoursePage() {
 
     const validateForm = () => {
         const newErrors = {};
-        if (!formData.userId) newErrors.userId = t('editCourse.alertOwnerReq');
-        if (!formData.status) newErrors.status = t('editCourse.alertStatusReq');
         if (!formData.title.trim()) newErrors.title = t('editCourse.alertTitleReq');
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -225,19 +208,17 @@ function EditCoursePage() {
             const multipartHeaders = { 'Authorization': authHeader };
 
             const updatePayload = {
-                userId: formData.userId,
-                status: formData.status,
                 trans: [{
-                    title: formData.title,
+                    title:       formData.title,
                     description: formData.description,
-                    skills: formData.skills,
+                    skills:      formData.skills,
                 }],
                 direction: formData.direction,
-                level: formData.level,
-                price: formData.price ? parseFloat(formData.price) : 0
+                level:     formData.level,
+                price:     formData.price ? parseFloat(formData.price) : 0
             };
 
-            await fetch(`${API_URL}/manage/courses/${id}`, {
+            await fetch(`${API_URL}/courses/${id}`, {
                 method: 'PATCH',
                 headers: jsonHeaders,
                 body: JSON.stringify(updatePayload)
@@ -246,7 +227,7 @@ function EditCoursePage() {
             if (thumbnail) {
                 const thumbnailFormData = new FormData();
                 thumbnailFormData.append('file', thumbnail);
-                await fetch(`${API_URL}/manage/courses/${id}/files?thumbnail=true`, {
+                await fetch(`${API_URL}/courses/${id}/files?thumbnail=true`, {
                     method: 'POST',
                     headers: multipartHeaders,
                     body: thumbnailFormData
@@ -256,7 +237,7 @@ function EditCoursePage() {
             if (courseFiles.length > 0) {
                 const filesFormData = new FormData();
                 courseFiles.forEach(file => filesFormData.append('files', file));
-                await fetch(`${API_URL}/manage/courses/${id}/files/multiple`, {
+                await fetch(`${API_URL}/courses/${id}/files/multiple`, {
                     method: 'POST',
                     headers: multipartHeaders,
                     body: filesFormData
@@ -314,8 +295,6 @@ function EditCoursePage() {
                                         <label className="form-label fw-semibold d-block mb-3">{t('editCourse.courseThumbnail')}</label>
                                         {thumbnailPreview ? (
                                             <img src={thumbnailPreview} alt="preview" className="rounded mb-2" style={{ height: '150px', objectFit: 'cover' }} />
-                                        ) : formData.links && formData.links[0] && formData.links[0].url ? (
-                                            <AuthImage src={formData.links[0].url} className="rounded mb-2" style={{ height: '150px', objectFit: 'cover' }} />
                                         ) : (
                                             <div className="rounded bg-primary bg-opacity-10 d-flex justify-content-center align-items-center text-primary mx-auto mb-2" style={{ width: '150px', height: '150px' }}>
                                                 <i className="bi bi-image fs-1"></i>
@@ -327,31 +306,9 @@ function EditCoursePage() {
                                             <label htmlFor="thumbnail" className="btn btn-sm btn-warning"><i className="bi bi-pencil me-1"></i> {t('editCourse.change')}</label>
                                         </div>
                                         
-                                        {formData.status && (
-                                            <div className="mt-2">
-                                                <span className={`badge rounded-pill ${getStatusBadgeColor(formData.status)}`}>{formData.status.toUpperCase()}</span>
-                                            </div>
-                                        )}
                                     </div>
 
                                     <div className="row g-3">
-                                        <div className="col-12 col-md-6">
-                                            <label className="form-label fw-semibold">{t('editCourse.courseOwner')}</label>
-                                            <select className="form-select" name="userId" value={formData.userId} onChange={handleChange}>
-                                                <option value="">{t('editCourse.selectOwner')}</option>
-                                                {users.map((u) => <option key={u._id} value={u._id}>{u.nickname}</option>)}
-                                            </select>
-                                        </div>
-
-                                        <div className="col-12 col-md-6">
-                                            <label className="form-label fw-semibold">{t('editCourse.status')}</label>
-                                            <select className="form-select" name="status" value={formData.status} onChange={handleChange}>
-                                                <option value="editing">{t('editCourse.statusDraft')}</option>
-                                                <option value="on-check">{t('editCourse.statusCheck')}</option>
-                                                <option value="deployed">{t('editCourse.statusDeployed')}</option>
-                                            </select>
-                                        </div>
-
                                         <div className="col-12">
                                             <label className="form-label fw-semibold">{t('editCourse.courseTitle')}</label>
                                             <input type="text" className="form-control" name="title" value={formData.title} onChange={handleChange} />

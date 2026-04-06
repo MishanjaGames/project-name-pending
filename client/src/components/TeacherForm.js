@@ -2,6 +2,7 @@ import React, { useState, useContext, useRef } from 'react';
 import './TeacherForm.css';
 import { submitTeacherApplication } from '../utils/teacher';
 import { SettingsContext } from '../contexts/SettingsContext';
+import { UtilityModal } from './UtilityModal';
 
 export default function TeacherForm({ initialEmail = '' }) {
   const { t } = useContext(SettingsContext);
@@ -27,8 +28,7 @@ export default function TeacherForm({ initialEmail = '' }) {
 
   const [tempLink, setTempLink] = useState('');
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [infoModal, setInfoModal] = useState({ show: false, title: '', message: '' });
 
   const certInputRef = useRef(null);
   const exampleInputRef = useRef(null);
@@ -91,7 +91,7 @@ export default function TeacherForm({ initialEmail = '' }) {
 
   const saveSkill = () => {
     if (!currentSkill.type || !currentSkill.subject || !currentSkill.experience) {
-      alert(t('teacher.alertFillRequired'));
+      setInfoModal({ show: true, title: t('teacher.validationError') || 'Required fields missing', message: t('teacher.alertFillRequired') });
       return;
     }
 
@@ -118,43 +118,47 @@ export default function TeacherForm({ initialEmail = '' }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
     const v = validate();
-    if (v) return setError(v);
-    
+    if (v) {
+      setInfoModal({ show: true, title: t('teacher.validationError') || 'Validation error', message: v });
+      return;
+    }
+
     setSending(true);
 
     try {
       const fd = new FormData();
-      fd.append('firstName', form.firstName);
-      fd.append('lastName', form.lastName);
-      fd.append('email', initialEmail); 
-      fd.append('bio', form.bio);
+      fd.append('data', JSON.stringify({
+        firstName: form.firstName,
+        lastName:  form.lastName,
+        email:     initialEmail,
+        bio:       form.bio,
+      }));
 
       const skillsMetadata = skills.map(s => ({
         type: s.type, subject: s.subject, experience: s.experience, source: s.source,
         links: s.examples.filter(ex => ex.type === 'link').map(ex => ex.data)
       }));
-      fd.append('skillsData', JSON.stringify(skillsMetadata));
+      fd.append('skills', JSON.stringify(skillsMetadata));
 
-      skills.forEach((skill, skillIdx) => {
-        skill.certs.forEach((cert, certIdx) => {
-          fd.append(`cert_skill_${skillIdx}_${certIdx}`, cert);
+      let certIdx = 0;
+      let exIdx = 0;
+      skills.forEach((skill) => {
+        skill.certs.forEach((cert) => {
+          fd.append(`cert_${certIdx++}`, cert);
         });
-        const fileExamples = skill.examples.filter(ex => ex.type === 'file');
-        fileExamples.forEach((ex, exIdx) => {
-          fd.append(`example_skill_${skillIdx}_${exIdx}`, ex.data);
+        skill.examples.filter(ex => ex.type === 'file').forEach((ex) => {
+          fd.append(`example_${exIdx++}`, ex.data);
         });
       });
 
       const res = await submitTeacherApplication(fd);
-      setSuccess(res.message || t('teacher.alertSuccess'));
-      
+      setInfoModal({ show: true, title: t('teacher.successTitle') || 'Application submitted', message: res.message || t('teacher.alertSuccess') });
+
       setForm({ firstName: '', lastName: '', bio: '', agreement: false });
       setSkills([]);
     } catch (err) {
-      setError(err.message || t('teacher.alertError'));
+      setInfoModal({ show: true, title: t('teacher.errorTitle') || 'Submission failed', message: err.message || t('teacher.alertError') });
     } finally {
       setSending(false);
     }
@@ -163,8 +167,6 @@ export default function TeacherForm({ initialEmail = '' }) {
   return (
     <div className="teacher-form-container">
       <form onSubmit={handleSubmit} className="card p-4 border-0 shadow-sm bg-transparent">
-        {error && <div className="alert alert-danger">{error}</div>}
-        {success && <div className="alert alert-success">{success}</div>}
 
         <div className="mb-3">
           <label className="form-label">{t('teacher.firstName')} <span className="req-star">*</span></label>
@@ -325,6 +327,13 @@ export default function TeacherForm({ initialEmail = '' }) {
           </div>
         </div>
       )}
+      <UtilityModal
+        show={infoModal.show}
+        type="info"
+        title={infoModal.title}
+        message={infoModal.message}
+        onClose={() => setInfoModal({ show: false, title: '', message: '' })}
+      />
     </div>
   );
 }

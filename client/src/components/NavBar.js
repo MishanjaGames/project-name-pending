@@ -71,6 +71,11 @@ function NavBar() {
             )}
           </button> 
 
+          {/* CHATS */}
+          <button className="btn btn-outline-secondary me-2" onClick={() => navigate('/chats')} aria-label="Chats" title="Chats">
+            <i className="bi bi-chat-dots" aria-hidden="true"></i>
+          </button>
+
           {/* ИД 1: КОРЗИНА */}
           <button id="tour-cart" className="btn btn-outline-primary me-3 position-relative" onClick={() => navigate('/cart')} aria-label="Cart">
             <i className="bi bi-cart" aria-hidden="true"></i>
@@ -140,6 +145,16 @@ function NavBar() {
                         </button>
                       </li>
                       <li>
+                        <button className="dropdown-item py-2 d-flex align-items-center" onClick={() => { navigate('/my-learning'); setShowDropdown(false); }}>
+                          <i className="bi bi-journal-text me-3 text-muted fs-5"></i> <span className="fw-medium">My Learning</span>
+                        </button>
+                      </li>
+                      <li>
+                        <button className="dropdown-item py-2 d-flex align-items-center" onClick={() => { navigate('/my-sessions'); setShowDropdown(false); }}>
+                          <i className="bi bi-people me-3 text-muted fs-5"></i> <span className="fw-medium">My Sessions</span>
+                        </button>
+                      </li>
+                      <li>
                         <button className="dropdown-item py-2 d-flex align-items-center" onClick={() => { navigate('/settings'); setShowDropdown(false); }}>
                           <i className="bi bi-gear me-3 text-muted fs-5"></i> <span className="fw-medium">{t('settings')}</span>
                         </button>
@@ -150,6 +165,11 @@ function NavBar() {
                       <li>
                         <button className="dropdown-item py-2 d-flex align-items-center text-primary" onClick={() => { navigate('/redeem'); setShowDropdown(false); }}>
                           <i className="bi bi-key-fill me-3 fs-5"></i> <span className="fw-bold">{t('nav.redeem')}</span>
+                        </button>
+                      </li>
+                      <li>
+                        <button className="dropdown-item py-2 d-flex align-items-center" onClick={() => { navigate('/my-forms'); setShowDropdown(false); }}>
+                          <i className="bi bi-file-earmark-text me-3 text-muted fs-5"></i> <span className="fw-medium">My Forms</span>
                         </button>
                       </li>
 
@@ -166,8 +186,8 @@ function NavBar() {
                             </button>
                           </li>
                           <li>
-                            <button className="dropdown-item py-2 d-flex align-items-center" onClick={() => { navigate('/account'); setShowDropdown(false); }}>
-                              <i className="bi bi-kanban me-3 text-muted fs-5"></i> <span className="fw-medium">{t('nav.manageSessions')}</span>
+                            <button className="dropdown-item py-2 d-flex align-items-center" onClick={() => { navigate('/my-sessions/create'); setShowDropdown(false); }}>
+                              <i className="bi bi-kanban me-3 text-muted fs-5"></i> <span className="fw-medium">Manage Sessions</span>
                             </button>
                           </li>
                         </>

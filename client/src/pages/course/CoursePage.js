@@ -46,11 +46,12 @@ function CoursePage() {
   const [localTextContent, setLocalTextContent] = useState({});
   const [textRefreshKey, setTextRefreshKey] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [utilModal, setUtilModal] = useState(null); // { type, title, message, onConfirm?, onSubmit?, confirmToken? }
   const [infoModal, setInfoModal] = useState({ show: false, title: '', message: '' });
 
-  const isAdmin = currentUser && ['admin', 'root', 'manager', 'create', 'teacher'].includes(currentUser.role);
+  const isAdmin = currentUser && ['admin', 'root', 'manage', 'create'].includes(currentUser.role);
 
   useEffect(() => {
     fetchData();
@@ -71,13 +72,13 @@ function CoursePage() {
       return;
     }
     try {
-      const response = await fetch(`${API_URL}/users/${currentUser.id || currentUser._id}`, {
+      const response = await fetch(`${API_URL}/users/c`, {
         method: 'GET',
         headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
       });
       if (response.ok) {
         const resJson = await response.json();
-        const userData = resJson.data || resJson;
+        const userData = resJson.user || resJson.data || resJson;
         if (userData.courses) {
           const hasCourse = userData.courses.some((ch) => (ch._id || ch) === id);
           setLocked(!hasCourse);
@@ -93,13 +94,11 @@ function CoursePage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const courseEndpoint = isAdmin ? `/api/manage/courses/${id}` : `/api/courses/${id}`;
-
       const [courseRes, directionsRes, levelsRes, filesRes] = await Promise.all([
-        fetch(`${BASE_URL}${courseEndpoint}`, { headers: { 'Authorization': authHeader } }).catch(() => null),
-        fetch('${API_URL}/directions').catch(() => null),
-        fetch('${API_URL}/levels').catch(() => null),
-        fetch(`${API_URL}/manage/courses/${id}/files`, {
+        fetch(`${API_URL}/courses/${id}`, { headers: { 'Authorization': authHeader } }).catch(() => null),
+        fetch(`${API_URL}/directions`).catch(() => null),
+        fetch(`${API_URL}/levels`).catch(() => null),
+        fetch(`${API_URL}/courses/${id}/files`, {
           headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' }
         }).catch(() => null),
       ]);
@@ -108,9 +107,17 @@ function CoursePage() {
         const courseData = await courseRes.json();
         const dataToSet = courseData.data || courseData;
         if (dataToSet) {
-          setCourse(dataToSet);
-          setEditableCourse({ ...dataToSet });
-          setVolumes(dataToSet.volumes || []);
+          // Normalize: flatten trans[0] fields so the UI can read course.title etc.
+          const t0 = dataToSet.trans?.[0] || {};
+          const normalized = {
+            ...dataToSet,
+            title:       dataToSet.title       || t0.title       || '',
+            description: dataToSet.description || t0.description || '',
+            skills:      dataToSet.skills       || t0.skills      || [],
+          };
+          setCourse(normalized);
+          setEditableCourse({ ...normalized });
+          setVolumes(normalized.volumes || []);
         }
       }
 
@@ -126,10 +133,14 @@ function CoursePage() {
 
       if (filesRes && filesRes.ok) {
         const filesData = await filesRes.json();
-        const allFiles = filesData.data || filesData.files || [];
+        const allFiles = filesData.files || filesData.data || [];
+        const thumbnailFile = allFiles.find(f => (f.filename || '').toLowerCase().includes('thumbnail'));
+        if (thumbnailFile?.url) {
+          setThumbnailUrl(`${BASE_URL}${thumbnailFile.url}`);
+        }
         const contentFiles = allFiles.filter((file) => {
           const fileName = (file.originalName || file.filename || '').toLowerCase();
-          const isThumbnail = fileName.includes('thumbnail') || (fileName.endsWith('.png') && allFiles.indexOf(file) === 0 && file.mimetype?.startsWith('image/'));
+          const isThumbnail = fileName.includes('thumbnail');
           const isSystemText = isSystemTextFile(file.originalName || file.filename || '');
           return !isThumbnail && !isSystemText;
         });
@@ -156,7 +167,7 @@ function CoursePage() {
     if (!isAdmin) return;
     try {
       const uId = course.userId?._id || course.userId;
-      const response = await fetch(`${API_URL}/manage/users/${uId}`, {
+      const response = await fetch(`${API_URL}/users/${uId}`, {
         headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
       });
       if (response.ok) {
@@ -492,7 +503,7 @@ function CoursePage() {
             const formData = new FormData();
             formData.append('file', fileData.file);
             try {
-              const res = await fetch(`${API_URL}/manage/courses/${id}/files`, {
+              const res = await fetch(`${API_URL}/courses/${id}/files`, {
                 method: 'POST', headers: { 'Authorization': authHeader }, body: formData
               });
               if (res.ok) {
@@ -521,10 +532,25 @@ function CoursePage() {
         }))
       }));
 
-      const response = await fetch(`${API_URL}/manage/courses/${id}`, {
+      const savePayload = {
+        direction: editableCourse.direction,
+        level: editableCourse.level,
+        price: editableCourse.price,
+        base_lang: editableCourse.base_lang || 'en',
+        courseType: editableCourse.courseType || 'SELF_TAUGHT',
+        trans: [{
+          title: editableCourse.title || editableCourse.trans?.[0]?.title || '',
+          description: editableCourse.description || editableCourse.trans?.[0]?.description || '',
+          skills: editableCourse.skills || editableCourse.trans?.[0]?.skills || [],
+        }],
+        volumes: newVolumes,
+        links: editableCourse.links || [],
+      };
+
+      const response = await fetch(`${API_URL}/courses/${id}`, {
         method: 'PUT',
         headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...editableCourse, volumes: newVolumes })
+        body: JSON.stringify(savePayload)
       });
 
       if (response.ok) {
@@ -547,7 +573,7 @@ function CoursePage() {
 
   const handleAddToCart = () => {
     if (!currentUser) { navigate('/login'); return; }
-    addItem({ id: course._id, title: course.title, price: course.price || 0, img: courseImage, description: course.title }, 1);
+    addItem({ id: course._id || course.id, title: course.title, price: course.price || 0, img: courseImage, description: course.title }, 1);
     setInfoModal({ show: true, title: t('coursePage.addedToCart') || 'Added to cart', message: `"${course.title}" has been added to your cart.` });
   };
   const handleEnroll = () => {
@@ -591,7 +617,7 @@ function CoursePage() {
 
   const hasContent = volumes.length > 0;
   const displayAuthorName = author.firstName ? `${author.firstName} ${author.lastName || ''}` : (author.nickname || 'Unknown');
-  const courseImage = editableCourse?.links?.[0]?.url || '';
+  const courseImage = editableCourse?.thumbnail || thumbnailUrl || '';
 
   return (
     <>
@@ -696,7 +722,8 @@ function CoursePage() {
               </div>
 
               <div className="mobile-buttons">
-                {!locked && <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>{t('coursePage.addToCart')}</button>}
+                {!locked && <button className="btn btn-success btn-lg w-100 mb-2" onClick={() => navigate(`/learn/${id}`)}><i className="bi bi-play-circle me-2" />View Course</button>}
+                {locked && <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>{t('coursePage.addToCart')}</button>}
                 {locked && <button className="btn btn-outline-secondary btn-lg w-100" onClick={handleEnroll}>{t('coursePage.enrollNow')}</button>}
                 <p className="guarantee-text">{t('coursePage.guaranteeText')}</p>
               </div>
@@ -747,7 +774,8 @@ function CoursePage() {
                     </h2>
                   </div>
                   <div className="purchase-buttons">
-                    {!locked && <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>{t('coursePage.addToCart')}</button>}
+                    {!locked && <button className="btn btn-success btn-lg w-100 mb-2" onClick={() => navigate(`/learn/${id}`)}><i className="bi bi-play-circle me-2" />View Course</button>}
+                    {locked && <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>{t('coursePage.addToCart')}</button>}
                     {locked && <button className="btn btn-outline-secondary btn-lg w-100" onClick={handleEnroll}>{t('coursePage.enrollNow')}</button>}
                   </div>
                   <p className="guarantee-text">{t('coursePage.guaranteeText')}</p>

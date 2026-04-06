@@ -604,30 +604,50 @@ function ManageSession({ data, onLogout, startMeeting }) {
         return () => clearTimeout(t);
     }, [coTutorSearch]);
 
+    // Normalize coTutors: strip populated objects down to plain ID strings before patching
+    const normalizeCoTutors = (arr) =>
+        arr.map(({ userId, canGrade, canSchedule, canEditCopy }) => ({
+            userId: String(userId?._id || userId),
+            canGrade: !!canGrade,
+            canSchedule: !!canSchedule,
+            canEditCopy: !!canEditCopy,
+        }));
+
     const addCoTutor = async (userId) => {
         const existing = session.coTutors || [];
-        if (existing.some(ct => String(ct.userId?._id || ct.userId) === userId)) { showInfo("Info", "Already a co-tutor"); return; }
-        const newCoTutors = [...existing, { userId, canGrade: true, canSchedule: true, canEditCopy: false }];
+        if (existing.some(ct => String(ct.userId?._id || ct.userId) === String(userId))) {
+            showInfo("Info", "Already a co-tutor"); return;
+        }
+        const newCoTutors = normalizeCoTutors([
+            ...existing,
+            { userId, canGrade: true, canSchedule: true, canEditCopy: false },
+        ]);
         const res = await fetch(`${API}/sessions/${id}`, { method: "PATCH", headers: ah, body: JSON.stringify({ coTutors: newCoTutors }) });
         if (res.ok) { fetchSession(); setCoTutorResults([]); setCoTutorSearch(""); }
+        else { const d = await res.json(); showInfo("Error", d.message); }
     };
 
     const removeCoTutor = (userId) => {
         showConfirm("Remove Co-tutor", "Remove this co-tutor from the session?", async () => {
-            const newCoTutors = session.coTutors.filter(ct => String(ct.userId?._id || ct.userId) !== String(userId));
+            const newCoTutors = normalizeCoTutors(
+                session.coTutors.filter(ct => String(ct.userId?._id || ct.userId) !== String(userId))
+            );
             const res = await fetch(`${API}/sessions/${id}`, { method: "PATCH", headers: ah, body: JSON.stringify({ coTutors: newCoTutors }) });
             if (res.ok) fetchSession();
+            else { const d = await res.json(); showInfo("Error", d.message); }
         }, true);
     };
 
     const toggleCoTutorPerm = async (userId, perm) => {
-        const newCoTutors = session.coTutors.map(ct => {
-            const ctId = String(ct.userId?._id || ct.userId);
-            if (ctId === String(userId)) return { ...ct, [perm]: !ct[perm] };
-            return ct;
-        });
+        const newCoTutors = normalizeCoTutors(
+            session.coTutors.map(ct => {
+                const ctId = String(ct.userId?._id || ct.userId);
+                return ctId === String(userId) ? { ...ct, [perm]: !ct[perm] } : ct;
+            })
+        );
         const res = await fetch(`${API}/sessions/${id}`, { method: "PATCH", headers: ah, body: JSON.stringify({ coTutors: newCoTutors }) });
         if (res.ok) fetchSession();
+        else { const d = await res.json(); showInfo("Error", d.message); }
     };
 
     // ── Override rank restriction ───────────────────────────────────────────

@@ -316,6 +316,24 @@ function CreatorKeysPage() {
           <div className="modal-backdrop show" style={{ zIndex: 1050 }}></div>
         </>
       )}
+      <UtilityModal
+        show={!!deleteKeyTarget}
+        type="confirm"
+        danger
+        title="Delete key?"
+        message="This key will be permanently deleted and can no longer be redeemed."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={confirmDeleteKey}
+        onCancel={() => setDeleteKeyTarget(null)}
+      />
+      <UtilityModal
+        show={infoModal.show}
+        type="info"
+        title={infoModal.title}
+        message={infoModal.message}
+        onClose={() => setInfoModal({ show: false, title: '', message: '' })}
+      />
     </div>
   );
 }

@@ -1,4 +1,3 @@
-import { getUser } from './auth';
 
 /**
  * submitTeacherApplication
@@ -15,17 +14,16 @@ import { getUser } from './auth';
  */
 export async function submitTeacherApplication(formData) {
   const headers = {};
-  // добавляем авторизационный заголовок, если есть
   try {
-    const user = getUser();
-    if (user && user.token) headers['Authorization'] = `Bearer ${user.token}`;
+    const token = localStorage.getItem('token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
   } catch (e) {
-    // игнорируем ошибки чтения user
+    // ignore
   }
 
-  const res = await fetch('/api/teacher-applications', {
+  const res = await fetch('/api/forms/apply/creator', {
     method: 'POST',
-    headers, // Не устанавливаем Content-Type при отправке FormData
+    headers,
     body: formData,
   });
 
