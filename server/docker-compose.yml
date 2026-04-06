@@ -25,9 +25,14 @@ services:
       - .env
       - ./console/.env
     environment:
-      USE_HTTPS: ${USE_HTTPS:-false}
+      SERVER_HOST: ${SERVER_HOST:-localhost}
+      USE_HTTPS: ${USE_HTTPS}
       API_PORT_HTTP: ${API_PORT_HTTP:-4040}
       API_PORT_HTTPS: ${API_PORT_HTTPS:-4043}
+      WEB_PORT_HTTP: ${WEB_PORT_HTTP:-4000}
+      WEB_PORT_HTTPS: ${WEB_PORT_HTTPS:-4004}
+      RTC_PORT_HTTP: ${RTC_PORT_HTTP:-5050}
+      RTC_PORT_HTTPS: ${RTC_PORT_HTTPS:-5051}
       DB_URL: ${DB_URL}
       MONGODB_URI: ${MONGODB_URI}
       MONGO_URI: ${MONGO_URI}
@@ -35,16 +40,6 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       SECRET: ${SECRET}
       NODE_TLS_REJECT_UNAUTHORIZED: "0"
-      # CORS: allow both protocols on the actual server host + localhost fallback
-      ALLOWED_ORIGINS: >-
-        http://${SERVER_HOST:-localhost}:${WEB_PORT_HTTP:-4000},
-        https://${SERVER_HOST:-localhost}:${WEB_PORT_HTTPS:-4004},
-        http://${SERVER_HOST:-localhost}:${API_PORT_HTTP:-4040},
-        https://${SERVER_HOST:-localhost}:${API_PORT_HTTPS:-4043},
-        http://${SERVER_HOST:-localhost}:${RTC_PORT_HTTP:-5050},
-        https://${SERVER_HOST:-localhost}:${RTC_PORT_HTTPS:-5051},
-        http://localhost:3000,https://localhost:3000,
-        http://localhost:4000,https://localhost:4004
     volumes:
       - app_storage:/app/storage
     networks:
@@ -94,9 +89,14 @@ services:
       - .env
       - ./rtc/.env
     environment:
-      USE_HTTPS: ${USE_HTTPS:-false}
+      SERVER_HOST: ${SERVER_HOST:-localhost}
+      USE_HTTPS: ${USE_HTTPS}
+      API_PORT_HTTP: ${API_PORT_HTTP:-4040}
+      API_PORT_HTTPS: ${API_PORT_HTTPS:-4043}
       RTC_PORT_HTTP: ${RTC_PORT_HTTP:-5050}
       RTC_PORT_HTTPS: ${RTC_PORT_HTTPS:-5051}
+      WEB_PORT_HTTP: ${WEB_PORT_HTTP:-4000}
+      WEB_PORT_HTTPS: ${WEB_PORT_HTTPS:-4004}
       JWT_SECRET: ${JWT_SECRET}
       MONGO_URI: ${MONGO_URI}
       STUN_URLS: ${STUN_URLS:-stun:coturn:3478}
@@ -104,11 +104,6 @@ services:
       TURN_USERNAME: ${TURN_USERNAME:-rtcuser}
       TURN_CREDENTIAL: ${TURN_CREDENTIAL:-changeme}
       NODE_TLS_REJECT_UNAUTHORIZED: "0"
-      ALLOWED_ORIGINS: >-
-        http://${SERVER_HOST:-localhost}:${WEB_PORT_HTTP:-4000},
-        https://${SERVER_HOST:-localhost}:${WEB_PORT_HTTPS:-4004},
-        http://localhost:3000,https://localhost:3000,
-        http://localhost:4000,https://localhost:4004
     depends_on:
       - coturn
     networks:
@@ -158,17 +153,37 @@ services:
     ports:
       - "${WEB_PORT_HTTP:-4000}:80"
       - "${WEB_PORT_HTTPS:-4004}:443"
-    # URLs injected at RUNTIME by docker-entrypoint.sh.
-    # Set REACT_APP_API_URL and REACT_APP_RTC_URL in .env to match your server.
     environment:
-      REACT_APP_USE_HTTPS: ${USE_HTTPS:-false}
-      REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:4040/api}
-      REACT_APP_RTC_URL: ${REACT_APP_RTC_URL:-http://localhost:5050}
+      REACT_APP_USE_HTTPS: ${USE_HTTPS}
+      REACT_APP_API_URL: ${REACT_APP_API_URL}
+      REACT_APP_RTC_URL: ${REACT_APP_RTC_URL}
     networks:
       - app-network
     depends_on:
       - app
       - rtc
+
+  # ── CERTBOT for Let's Encrypt automatic renewal ────────────────────────────
+  # This service automatically renews SSL certificates before they expire (every 24h)
+  # Requires: USE_HTTPS=true and SERVER_HOST=your-domain.com (not IP)
+  # The certificate is stored in ./nginx-certs/ and shared with nginx containers
+  certbot:
+    image: certbot/certbot:latest
+    container_name: certbot-renewal
+    restart: unless-stopped
+    volumes:
+      - ./nginx-certs:/etc/letsencrypt:rw
+      - ./certbot-www:/var/www/certbot:rw
+    environment:
+      CERTBOT_EMAIL: ${ACME_EMAIL:-admin@${SERVER_HOST}}
+    # Run renewal check every 24 hours at 2 AM 
+    # Renews only if cert expires in < 30 days
+    entrypoint: /bin/sh -c "while true; do echo '[certbot] Checking for renewal...'; certbot renew --non-interactive --agree-tos --quiet || true; echo '[certbot] Next check in 24 hours'; sleep 86400; done"
+    networks:
+      - app-network
+    depends_on:
+      - nginx-api
+      - nginx-rtc
 
 volumes:
   mongo_data:

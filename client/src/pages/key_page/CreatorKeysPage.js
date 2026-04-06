@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import { getUser } from '../../utils/auth';
+import config from '../../config/config';
 
-// Убедись, что порт бэкенда совпадает с твоим
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4040/api';
+const API_URL = config.API_URL;
 
 function CreatorKeysPage() {
   const { theme, t } = useContext(SettingsContext);
@@ -246,7 +246,7 @@ function CreatorKeysPage() {
                         <option value="" disabled>Choose a course to unlock...</option>
                         {/* МАПИМ РЕАЛЬНЫЕ КУРСЫ ИЗ БАЗЫ */}
                         {myCourses.map(c => (
-                          <option key={c._id || c.id} value={c._id || c.id}>{c.title}</option>
+                          <option key={c._id || c.id} value={c._id || c.id}>{c.trans[0].title}</option>
                         ))}
                       </select>
                       {myCourses.length === 0 && (

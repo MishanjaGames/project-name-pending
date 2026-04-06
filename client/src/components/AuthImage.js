@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+const BASE_URL = (process.env.REACT_APP_API_URL || '${BASE_URL}/api').replace('/api', '');
+
 function AuthImage({ src, alt, className, style, fallback }) {
     const [imageSrc, setImageSrc] = useState(null);
     const [error, setError] = useState(false);
@@ -19,7 +21,7 @@ function AuthImage({ src, alt, className, style, fallback }) {
                     return;
                 }
 
-                // ИСПРАВЛЕНИЕ: Правильный формат токена для твоего проекта
+                // Правильный формат токена для заголовка Authorization
                 const headers = {
                     'Authorization': `Bearer ${token}`
                 };
@@ -28,9 +30,9 @@ function AuthImage({ src, alt, className, style, fallback }) {
                 if (src.startsWith('http://') || src.startsWith('https://')) {
                     imageUrl = src;
                 } else if (src.startsWith('/')) {
-                    imageUrl = `http://localhost:4040${src}`;
+                    imageUrl = `${BASE_URL}${src}`;
                 } else {
-                    imageUrl = `http://localhost:4040/${src}`;
+                    imageUrl = `${BASE_URL}/${src}`;
                 }
 
                 const response = await fetch(imageUrl, { headers });

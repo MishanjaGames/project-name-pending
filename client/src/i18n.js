@@ -182,6 +182,7 @@ const resources = {
         "regError": "Registration error:"
       },
       "accountPage": {
+        
         "title": "Account",
         "welcome": "Welcome back",
         "student": "Student",
@@ -224,7 +225,7 @@ const resources = {
         "havePromo": "Have a promo code?",
         "tryPromo": "Try 'REACT'",
         "apply": "Apply",
-        "promoApplied": "Promo code applied: -$10.00",
+        "promoApplied": "Promo code successfully applied!",
         "invalidPromo": "Invalid promo code",
         "addMore1": "Add",
         "addMore2": "more courses to get",
@@ -350,6 +351,7 @@ const resources = {
         "loadingContent": "Loading content...",
         "addToCart": "Add to Cart",
         "enrollNow": "Enroll Now",
+        "viewCourse": "View Course",
         "guaranteeText": "30-day money-back guarantee.",
         "selectDirection": "Select direction",
         "selectLevel": "Select level",
@@ -798,6 +800,7 @@ const resources = {
         "loadingContent": "Завантаження вмісту...",
         "addToCart": "Додати до кошика",
         "enrollNow": "Записатися зараз",
+        "viewCourse": "Переглянути курс",
         "guaranteeText": "30-денна гарантія повертання грошей.",
         "selectDirection": "Оберіть напрямок",
         "selectLevel": "Оберіть рівень",

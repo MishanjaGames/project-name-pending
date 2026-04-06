@@ -1,12 +1,18 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { SettingsContext } from '../../contexts/SettingsContext';
+import { useCart } from '../../contexts/CartContext';
 import AuthImage from '../../components/AuthImage';
 import { getUser } from '../../utils/auth';
 import './CoursePage.css';
+import config from '../../config/config';
+
+const API_URL = config.API_URL;
+const BASE_URL = API_URL.replace('/api', '');
 
 function CoursePage() {
   const { t } = useContext(SettingsContext);
+  const { addItem } = useCart();
   const { id } = useParams();
   const navigate = useNavigate();
   const currentUser = getUser();
@@ -24,6 +30,7 @@ function CoursePage() {
   const [hasChanges, setHasChanges] = useState(false);
   const [directions, setDirections] = useState([]);
   const [levels, setLevels] = useState([]);
+  const [userHasAccess, setUserHasAccess] = useState(false);
 
   const [draggedVolume, setDraggedVolume] = useState(null);
   const [draggedChapter, setDraggedChapter] = useState(null);
@@ -39,7 +46,7 @@ function CoursePage() {
   const [textRefreshKey, setTextRefreshKey] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
 
-  const isAdmin = currentUser && ['admin', 'root', 'manager', 'create', 'teacher'].includes(currentUser.role);
+  const isAdmin = currentUser && ['admin', 'root', 'manage', 'quality', 'create', 'tutor', 'teacher'].includes(currentUser.role);
 
   useEffect(() => {
     fetchData();
@@ -47,8 +54,38 @@ function CoursePage() {
   }, [id]);
 
   useEffect(() => {
-    if (course) fetchUserData();
+    if (course) {
+      fetchUserData();
+      checkUserAccess();
+    }
   }, [course?.userId]);
+
+  const checkUserAccess = async () => {
+    if (!currentUser) {
+      setUserHasAccess(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/users/c`, {
+        headers: { 'Authorization': authHeader },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const userData = data.user || data;
+        const courseIds = userData.enrolled || [];
+        const courseId = id;
+        const hasAccess = courseIds.some(cid => (cid._id || cid) === courseId || cid === courseId);
+        setUserHasAccess(hasAccess);
+      } else {
+        setUserHasAccess(false);
+      }
+    } catch (error) {
+      console.error('Error checking access:', error);
+      setUserHasAccess(false);
+    }
+  };
 
   const checkCCourse = async () => {
     if (!currentUser) {
@@ -60,7 +97,7 @@ function CoursePage() {
       return;
     }
     try {
-      const response = await fetch(`http://localhost:4040/api/users/${currentUser.id || currentUser._id}`, {
+      const response = await fetch(`${API_URL}/users/${currentUser.id || currentUser._id}`, {
         method: 'GET',
         headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
       });
@@ -85,44 +122,60 @@ function CoursePage() {
       const courseEndpoint = isAdmin ? `/api/manage/courses/${id}` : `/api/courses/${id}`;
 
       const [courseRes, directionsRes, levelsRes, filesRes] = await Promise.all([
-        fetch(`http://localhost:4040${courseEndpoint}`, { headers: { 'Authorization': authHeader } }).catch(() => null),
-        fetch('http://localhost:4040/api/directions').catch(() => null),
-        fetch('http://localhost:4040/api/levels').catch(() => null),
-        fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
+        fetch(`${BASE_URL}${courseEndpoint}`, { headers: { 'Authorization': authHeader } }).catch(() => null),
+        fetch(`${API_URL}/directions`).catch(() => null),
+        fetch(`${API_URL}/levels`).catch(() => null),
+        fetch(`${API_URL}/manage/courses/${id}/files`, {
           headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' }
         }).catch(() => null),
       ]);
 
       if (courseRes && courseRes.ok) {
-        const courseData = await courseRes.json();
-        const dataToSet = courseData.data || courseData;
-        if (dataToSet) {
-          setCourse(dataToSet);
-          setEditableCourse({ ...dataToSet });
-          setVolumes(dataToSet.volumes || []);
+        try {
+          const courseData = await courseRes.json();
+          const dataToSet = courseData.data || courseData;
+          if (dataToSet) {
+            setCourse(dataToSet);
+            setEditableCourse({ ...dataToSet });
+            setVolumes(dataToSet.volumes || []);
+          }
+        } catch (jsonErr) {
+          console.error('Failed to parse course response:', jsonErr);
         }
       }
 
       if (directionsRes && directionsRes.ok) {
-        const directionsData = await directionsRes.json();
-        if (Array.isArray(directionsData.data)) setDirections(directionsData.data);
+        try {
+          const directionsData = await directionsRes.json();
+          if (Array.isArray(directionsData.data)) setDirections(directionsData.data);
+        } catch (jsonErr) {
+          console.warn('Failed to parse directions response:', jsonErr);
+        }
       }
 
       if (levelsRes && levelsRes.ok) {
-        const levelsData = await levelsRes.json();
-        if (Array.isArray(levelsData.data)) setLevels(levelsData.data);
+        try {
+          const levelsData = await levelsRes.json();
+          if (Array.isArray(levelsData.data)) setLevels(levelsData.data);
+        } catch (jsonErr) {
+          console.warn('Failed to parse levels response:', jsonErr);
+        }
       }
 
       if (filesRes && filesRes.ok) {
-        const filesData = await filesRes.json();
-        const allFiles = filesData.data || filesData.files || [];
-        const contentFiles = allFiles.filter((file) => {
-          const fileName = (file.originalName || file.filename || '').toLowerCase();
-          const isThumbnail = fileName.includes('thumbnail') || (fileName.endsWith('.png') && allFiles.indexOf(file) === 0 && file.mimetype?.startsWith('image/'));
-          const isSystemText = isSystemTextFile(file.originalName || file.filename || '');
-          return !isThumbnail && !isSystemText;
-        });
-        setUploadedFiles(contentFiles);
+        try {
+          const filesData = await filesRes.json();
+          const allFiles = filesData.data || filesData.files || [];
+          const contentFiles = allFiles.filter((file) => {
+            const fileName = (file.originalName || file.filename || '').toLowerCase();
+            const isThumbnail = fileName.includes('thumbnail') || (fileName.endsWith('.png') && allFiles.indexOf(file) === 0 && file.mimetype?.startsWith('image/'));
+            const isSystemText = isSystemTextFile(file.originalName || file.filename || '');
+            return !isThumbnail && !isSystemText;
+          });
+          setUploadedFiles(contentFiles);
+        } catch (jsonErr) {
+          console.warn('Failed to parse files response:', jsonErr);
+        }
       }
 
     } catch (err) {
@@ -142,22 +195,39 @@ function CoursePage() {
       });
       return;
     }
-    if (!isAdmin) return;
+    
     try {
-      const uId = course.userId?._id || course.userId;
-      const response = await fetch(`http://localhost:4040/api/manage/users/${uId}`, {
+      const uId = course?.userId?._id || course?.userId;
+      if (!uId) return;
+      
+      // Try to use the standard /users/:id endpoint first (public with JWT)
+      const response = await fetch(`${API_URL}/users/${uId}`, {
         headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
-      });
-      if (response.ok) {
+      }).catch(() => null);
+      
+      if (response && response.ok) {
         const data = await response.json();
+        const userData = data.data || data;
         setAuthor({
-          nickname: data.data.nickname,
-          email: data.data.email,
-          firstName: data.data.firstName,
-          lastName: data.data.lastName
+          nickname: userData.nickname,
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName
         });
+      } else if (response && !response.ok) {
+        console.warn(`Failed to fetch user (${response.status}), using course data fallback`);
+        // Fallback: use whatever is in the course object
+        if (typeof course.userId === 'object' && course.userId) {
+          setAuthor(course.userId);
+        }
       }
-    } catch (error) { console.error('Error fetching user data:', error); }
+    } catch (error) { 
+      console.error('Error fetching user data:', error);
+      // Fallback: use whatever is in the course object
+      if (typeof course?.userId === 'object' && course.userId) {
+        setAuthor(course.userId);
+      }
+    }
   };
 
   useEffect(() => {
@@ -459,7 +529,7 @@ function CoursePage() {
             const formData = new FormData();
             formData.append('file', fileData.file);
             try {
-              const res = await fetch(`http://localhost:4040/api/manage/courses/${id}/files`, {
+              const res = await fetch(`${API_URL}/manage/courses/${id}/files`, {
                 method: 'POST', headers: { 'Authorization': authHeader }, body: formData
               });
               if (res.ok) {
@@ -488,7 +558,7 @@ function CoursePage() {
         }))
       }));
 
-      const response = await fetch(`http://localhost:4040/api/manage/courses/${id}`, {
+      const response = await fetch(`${API_URL}/manage/courses/${id}`, {
         method: 'PUT',
         headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...editableCourse, volumes: newVolumes })
@@ -512,8 +582,28 @@ function CoursePage() {
     } finally { setIsSaving(false); }
   };
 
-  const handleAddToCart = () => alert(`${t('coursePage.addedToCart')} "${course.title}"!`);
-  const handleEnroll = () => alert(`${t('coursePage.enrolledIn')} "${course.title}"!`);
+  const handleAddToCart = () => {
+    if (!course) return;
+    const productId = course._id || course.id;
+    const productPrice = course.price || course.trans?.[0]?.price || 0;
+    const productTitle = course.title || course.trans?.[0]?.title || 'Unknown';
+    const productImg = course.links?.[0]?.url || course.img || '';
+    
+    addItem({
+      id: productId,
+      title: productTitle,
+      price: productPrice,
+      img: productImg,
+      author: author.nickname || author.firstName || 'Unknown'
+    }, 1);
+    
+    alert(`${t('coursePage.addedToCart')} "${productTitle}"!`);
+    navigate('/cart');
+  };
+  
+  const handleEnroll = () => {
+    alert(`${t('coursePage.enrolledIn')} "${course.title || course.trans?.[0]?.title}"!`);
+  };
 
   const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -583,14 +673,14 @@ function CoursePage() {
 
               <div className="title-price-row">
                 {editMode ? (
-                  <input type="text" className="form-control course-title-input" value={editableCourse.title} onChange={(e) => handleCourseFieldChange('title', e.target.value)} />
+                  <input type="text" className="form-control course-title-input" value={editableCourse.trans[0].title} onChange={(e) => handleCourseFieldChange('title', e.target.value)} />
                 ) : (
-                  <h1 className="course-title">{course.title}</h1>
+                  <h1 className="course-title">{course.trans[0].title}</h1>
                 )}
                 <div className="mobile-price">
                   {editMode ? (
-                    <input type="number" className="form-control price-input" value={editableCourse.price} onChange={(e) => handleCourseFieldChange('price', parseFloat(e.target.value))} step="0.01" min="0" />
-                  ) : (course.price > 0) ? '$' + course.price : 'Free'}
+                    <input type="number" className="form-control price-input" value={editableCourse.price || editableCourse.trans?.[0]?.price || 0} onChange={(e) => handleCourseFieldChange('price', parseFloat(e.target.value))} step="0.01" min="0" />
+                  ) : (course.price || course.trans?.[0]?.price || 0) > 0 ? '$' + (course.price || course.trans?.[0]?.price) : 'Free'}
                 </div>
               </div>
 
@@ -618,7 +708,7 @@ function CoursePage() {
                 {editMode ? (
                   <textarea className="form-control" value={editableCourse.description} onChange={(e) => handleCourseFieldChange('description', e.target.value)} rows="3" />
                 ) : (
-                  <p>{course.description}</p>
+                  <p>{course.trans[0].description}</p>
                 )}
               </div>
 
@@ -636,7 +726,7 @@ function CoursePage() {
                       <button className="btn btn-sm btn-primary" onClick={addSkill}><i className="bi bi-plus"></i> {t('coursePage.addSkill')}</button>
                     </>
                   ) : (
-                    course.skills?.map((item, idx) => (
+                    course.trans[0].skills?.map((item, idx) => (
                       <div className="skill-item" key={idx}><i className="bi bi-check-circle-fill text-success"></i><span>{item}</span></div>
                     ))
                   )}
@@ -656,9 +746,20 @@ function CoursePage() {
               </div>
 
               <div className="mobile-buttons">
-                <button className="btn btn-primary btn-lg w-100 mb-2 disabled" onClick={handleAddToCart}>{t('coursePage.addToCart')}</button>
-                <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>{t('coursePage.enrollNow')}</button>
-                <p className="guarantee-text">{t('coursePage.guaranteeText')}</p>
+                {(userHasAccess || isAdmin) ? (
+                  <>
+                    <button className="btn btn-success btn-lg w-100 mb-2" onClick={() => navigate(`/view-course/${id}`)}>
+                      <i className="bi bi-play-circle me-2"></i>{t('coursePage.viewCourse')}
+                    </button>
+                    <p className="guarantee-text">{t('coursePage.guaranteeText')}</p>
+                  </>
+                ) : (
+                  <>
+                    <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>{t('coursePage.addToCart')}</button>
+                    <button className="btn btn-outline-secondary btn-lg w-100" onClick={handleEnroll}>{t('coursePage.enrollNow')}</button>
+                    <p className="guarantee-text">{t('coursePage.guaranteeText')}</p>
+                  </>
+                )}
               </div>
 
               <div className="desktop-skills section-card">
@@ -702,13 +803,23 @@ function CoursePage() {
                   <div className="price-section">
                     <h2 className="price">
                       {editMode ? (
-                        <input type="number" className="form-control price-input-desktop" value={editableCourse.price} onChange={(e) => handleCourseFieldChange('price', parseFloat(e.target.value))} step="0.01" min="0" />
-                      ) : (course.price > 0) ? '$' + course.price : 'Free'}
+                        <input type="number" className="form-control price-input-desktop" value={editableCourse.price || editableCourse.trans?.[0]?.price || 0} onChange={(e) => handleCourseFieldChange('price', parseFloat(e.target.value))} step="0.01" min="0" />
+                      ) : (course.price || course.trans?.[0]?.price || 0) > 0 ? '$' + (course.price || course.trans?.[0]?.price) : 'Free'}
                     </h2>
                   </div>
                   <div className="purchase-buttons">
-                    <button className="btn btn-primary btn-lg w-100 mb-2 disabled" onClick={handleAddToCart}>{t('coursePage.addToCart')}</button>
-                    <button className="btn btn-outline-secondary btn-lg w-100 disabled" onClick={handleEnroll}>{t('coursePage.enrollNow')}</button>
+                    {(userHasAccess || isAdmin) ? (
+                      <>
+                        <button className="btn btn-success btn-lg w-100 mb-2" onClick={() => navigate(`/view-course/${id}`)}>
+                          <i className="bi bi-play-circle me-2"></i>{t('coursePage.viewCourse')}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="btn btn-primary btn-lg w-100 mb-2" onClick={handleAddToCart}>{t('coursePage.addToCart')}</button>
+                        <button className="btn btn-outline-secondary btn-lg w-100" onClick={handleEnroll}>{t('coursePage.enrollNow')}</button>
+                      </>
+                    )}
                   </div>
                   <p className="guarantee-text">{t('coursePage.guaranteeText')}</p>
                 </div>
@@ -839,10 +950,10 @@ function CoursePage() {
       </div>
 
       {showAddItemModal && (
-        <AddItemModal type={showAddItemModal.type} onSave={(itemData) => saveContentItem(showAddItemModal.volumeIndex, showAddItemModal.chapterIndex, itemData)} onClose={() => setShowAddItemModal(null)} parseTextSyntax={parseTextSyntax} uploadedFiles={uploadedFiles} />
+        <AddItemModal type={showAddItemModal.type} onSave={(itemData) => saveContentItem(showAddItemModal.volumeIndex, showAddItemModal.chapterIndex, itemData)} onClose={() => setShowAddItemModal(null)} parseTextSyntax={parseTextSyntax} uploadedFiles={uploadedFiles} courseId={id} authHeader={authHeader} />
       )}
       {editingItem && (
-        <AddItemModal type={editingItem.item.type} isEditing={true} initialData={editingItem.item} onSave={(itemData) => updateContentItem(editingItem.volumeIndex, editingItem.chapterIndex, editingItem.itemIndex, itemData)} onClose={() => setEditingItem(null)} parseTextSyntax={parseTextSyntax} uploadedFiles={uploadedFiles} />
+        <AddItemModal type={editingItem.item.type} isEditing={true} initialData={editingItem.item} onSave={(itemData) => updateContentItem(editingItem.volumeIndex, editingItem.chapterIndex, editingItem.itemIndex, itemData)} onClose={() => setEditingItem(null)} parseTextSyntax={parseTextSyntax} uploadedFiles={uploadedFiles} courseId={id} authHeader={authHeader} />
       )}
     </>
   );
@@ -859,7 +970,7 @@ function TextItemDisplay({ url, parseTextSyntax, refreshKey, localContent }) {
     if (!url) { setLoading(false); return; }
     const fetchContent = async () => {
       try {
-        const response = await fetch(`http://localhost:4040${url}?_=${refreshKey || Date.now()}`, {
+        const response = await fetch(`${BASE_URL}${url}?_=${refreshKey || Date.now()}`, {
           headers: { 'Authorization': token ? `Bearer ${token}` : '' }
         });
         if (response.ok) setContent(await response.text());
@@ -872,40 +983,95 @@ function TextItemDisplay({ url, parseTextSyntax, refreshKey, localContent }) {
   return <div className="text-item"><div dangerouslySetInnerHTML={{ __html: parseTextSyntax(content) }} /></div>;
 }
 
-function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseTextSyntax, uploadedFiles = [] }) {
+function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseTextSyntax, uploadedFiles = [], courseId, authHeader }) {
   const { t } = useContext(SettingsContext);
-  const [title, setTitle] = useState(initialData?.title || '');
-  const [content, setContent] = useState(initialData?.content || '');
-  const [url, setUrl] = useState(initialData?.url || '');
-  const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState(initialData?.url || initialData?.content || '');
+  const [title, setTitle]               = useState(initialData?.title || '');
+  const [content, setContent]           = useState(initialData?.content || '');
+  const [url, setUrl]                   = useState(initialData?.url || '');
   const [selectedFileId, setSelectedFileId] = useState('');
+  const [uploading, setUploading]       = useState(false);
+  const [uploadError, setUploadError]   = useState('');
+  const [uploadedName, setUploadedName] = useState('');
 
-  const handleFileChange = (e) => {
+  // Определяем accept по типу
+  const acceptMap = {
+    video:    'video/*',
+    image:    'image/*',
+    document: 'application/pdf,.doc,.docx',
+    archive:  '.zip,.rar,.7z',
+    audio:    'audio/*',
+  };
+  const acceptAttr = acceptMap[type] || '*/*';
+
+  // Загружаем файл сразу на сервер и получаем URL
+  const handleFileChange = async (e) => {
     const selectedFile = e.target.files[0];
     if (!selectedFile) return;
-    setFile(selectedFile);
-    const reader = new FileReader();
-    reader.onloadend = () => { setPreview(reader.result); setUrl(''); };
-    reader.readAsDataURL(selectedFile);
+    e.target.value = '';
+
+    setUploading(true);
+    setUploadError('');
+    setUploadedName(selectedFile.name);
+
+    try {
+      const fd = new FormData();
+      fd.append('file', selectedFile);
+
+      const res = await fetch(`${API_URL}/manage/courses/${courseId}/files`, {
+        method: 'POST',
+        headers: { 'Authorization': authHeader },
+        body: fd,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `Upload failed: ${res.status}`);
+      }
+
+      const result = await res.json();
+      // Сервер возвращает url в разных форматах — пробуем все варианты
+      const serverUrl = result.data?.link?.url
+        || result.data?.url
+        || result.url
+        || result.data?.filename && `/api/files/courses/${courseId}/${result.data.filename}`;
+
+      if (!serverUrl) throw new Error('Server did not return a file URL');
+
+      const fullUrl = serverUrl.startsWith('http') ? serverUrl : `${BASE_URL}${serverUrl}`;
+      setUrl(fullUrl);
+      setSelectedFileId('');
+    } catch (err) {
+      setUploadError(err.message);
+      setUploadedName('');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleExistingFileSelect = (e) => {
     const fileId = e.target.value;
     setSelectedFileId(fileId);
+    setUploadError('');
     if (fileId) {
       const selectedFile = uploadedFiles.find(f => f.path === fileId || f.url === fileId);
       if (selectedFile) {
-        const fileUrl = (selectedFile.url || selectedFile.path).startsWith('http') ? selectedFile.url : `http://localhost:4040${selectedFile.url || selectedFile.path}`;
-        setUrl(fileUrl); setPreview(fileUrl); setFile(null);
+        const fileUrl = (selectedFile.url || selectedFile.path || '').startsWith('http')
+          ? (selectedFile.url || selectedFile.path)
+          : `${BASE_URL}${selectedFile.url || selectedFile.path}`;
+        setUrl(fileUrl);
+        setUploadedName(selectedFile.originalName || selectedFile.filename || '');
       }
-    } else { setUrl(''); setPreview(''); }
+    } else {
+      setUrl('');
+      setUploadedName('');
+    }
   };
 
   const handleSave = () => {
     if (!title.trim()) { alert(t('coursePage.alertNoTitle')); return; }
     if (type === 'text') { onSave({ type, title, content }); return; }
-    onSave({ type, title, url: url || preview || '', content: undefined });
+    if (!url) { alert('Please select or upload a file first.'); return; }
+    onSave({ type, title, url, content: undefined });
   };
 
   return (
@@ -916,10 +1082,12 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
           <button className="btn-close" onClick={onClose}></button>
         </div>
         <div className="modal-body">
+          {/* Заголовок */}
           <div className="mb-3">
             <label className="form-label">{t('coursePage.title')}</label>
             <input type="text" className="form-control" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
+
           {type === 'text' ? (
             <div className="mb-3">
               <label className="form-label">{t('coursePage.content')}</label>
@@ -927,23 +1095,90 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
             </div>
           ) : (
             <>
+              {/* Выбор из уже загруженных */}
+              {uploadedFiles.length > 0 && (
+                <div className="mb-3">
+                  <label className="form-label">{t('coursePage.selectFromUploaded')}</label>
+                  <select className="form-select" value={selectedFileId} onChange={handleExistingFileSelect}>
+                    <option value="">-- Choose a file --</option>
+                    {uploadedFiles.map(f => (
+                      <option key={f.url || f.path} value={f.url || f.path}>
+                        {f.originalName || f.filename}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Загрузка нового файла */}
               <div className="mb-3">
-                <label className="form-label">{t('coursePage.selectFromUploaded')}</label>
-                <select className="form-select" value={selectedFileId} onChange={handleExistingFileSelect}>
-                  <option value="">-- Choose a file --</option>
-                  {uploadedFiles.map(f => <option key={f.url || f.path} value={f.url || f.path}>{f.originalName || f.filename}</option>)}
-                </select>
-              </div>
-              <div className="file-upload-area mb-3">
-                <input type="file" onChange={handleFileChange} id="file-input" style={{ display: 'none' }} />
-                <label htmlFor="file-input" className="file-upload-label"><i className="bi bi-upload fs-1"></i><p>{t('coursePage.uploadNewFile')}</p></label>
+                <label className="form-label">{t('coursePage.uploadNewFile')}</label>
+                <div className="file-upload-area">
+                  <input
+                    type="file"
+                    accept={acceptAttr}
+                    onChange={handleFileChange}
+                    id="file-input"
+                    style={{ display: 'none' }}
+                    disabled={uploading}
+                  />
+                  <label
+                    htmlFor="file-input"
+                    className="file-upload-label"
+                    style={{ cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.7 : 1 }}
+                  >
+                    {uploading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status"/>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-upload fs-1"></i>
+                        <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                          {acceptAttr.replace(/\*/g, 'any').replace(/,/g, ', ')}
+                        </p>
+                      </>
+                    )}
+                  </label>
+                </div>
+
+                {/* Статус загруженного файла */}
+                {uploadError && (
+                  <div className="alert alert-danger py-2 mt-2 small">
+                    <i className="bi bi-exclamation-triangle me-1"/>
+                    {uploadError}
+                  </div>
+                )}
+                {url && !uploadError && (
+                  <div className="d-flex align-items-center gap-2 mt-2 p-2 rounded"
+                    style={{ background: 'rgba(16,185,129,.1)', border: '1px solid rgba(16,185,129,.3)' }}>
+                    <i className="bi bi-check-circle-fill text-success"/>
+                    <span className="small text-truncate" style={{ maxWidth: 300 }}>
+                      {uploadedName || url.split('/').pop()}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-link text-danger p-0 ms-auto"
+                      onClick={() => { setUrl(''); setUploadedName(''); setSelectedFileId(''); }}
+                    >
+                      <i className="bi bi-x-lg"/>
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>{t('coursePage.cancel')}</button>
-          <button className="btn btn-primary" onClick={handleSave}>{t('coursePage.save')}</button>
+          <button
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={uploading || (type !== 'text' && !url)}
+          >
+            {uploading ? <><span className="spinner-border spinner-border-sm me-1"/>Uploading…</> : t('coursePage.save')}
+          </button>
         </div>
       </div>
     </div>

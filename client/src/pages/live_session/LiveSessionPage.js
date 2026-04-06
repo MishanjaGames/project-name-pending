@@ -4,7 +4,7 @@ import io from 'socket.io-client';
 import { useTranslation } from 'react-i18next';
 import { SettingsContext } from '../../contexts/SettingsContext';
 
-const SOCKET_URL = 'http://localhost:5001';
+const SOCKET_URL = process.env.REACT_APP_WEBRTC_URL || 'http://localhost:5001';
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 const styles = `

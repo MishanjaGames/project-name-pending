@@ -19,4 +19,7 @@ router.post('/:id/private-copy',         auth, tutorVal, controller.createPrivat
 router.patch('/:id/archive',             auth, tutorVal, controller.archive)
 router.get('/:id/schedule/expanded',     auth, tutorVal, controller.getExpandedSchedule)
 
+// Pruning: bulk-delete archived/completed sessions older than N days
+router.post('/prune', auth, validate('manage'), controller.prune)
+
 module.exports = router

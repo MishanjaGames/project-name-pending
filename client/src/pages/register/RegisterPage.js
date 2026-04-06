@@ -2,6 +2,9 @@ import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { setUser } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
+import config from '../../config/config';
+
+const API_URL = config.API_URL;
 
 function SignUpPage() {
   const navigate = useNavigate();
@@ -20,7 +23,7 @@ function SignUpPage() {
 
     try {
       // 1. Отправляем данные на реальную регистрацию
-      const regResponse = await fetch('http://localhost:4040/api/auth/register', {
+      const regResponse = await fetch('${API_URL}/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -43,7 +46,7 @@ function SignUpPage() {
       }
 
       // 2. Регистрация прошла успешно! Теперь сразу делаем логин, чтобы получить ТОКЕН
-      const loginResponse = await fetch('http://localhost:4040/api/auth/login', {
+      const loginResponse = await fetch('${API_URL}/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })

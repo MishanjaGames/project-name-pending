@@ -175,7 +175,7 @@ module.exports.validate = async (req, res) => {
             promo.courseIds.some(id => id.toString() === courseId)
         const courseByCreator = course.userId.toString() === promo.createdBy.toString()
 
-        if (!appliesToCourse || !courseByCreator)
+        if (!appliesToCourse)
             return res.status(200).json({ valid: false, reason: 'This promo does not apply to this course' })
 
         const alreadyUsed = promo.usages.some(
