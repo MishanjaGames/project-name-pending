@@ -95,7 +95,7 @@ function App() {
               <Route
                 path="/manage/forms"
                 element={
-                  <ProtectedRoute allowedRoles={['quality', 'admin', 'root']}>
+                  <ProtectedRoute allowedRoles={['quality', 'admin', 'root', 'manage']}>
                     <FormsPage />
                   </ProtectedRoute>
                 }
