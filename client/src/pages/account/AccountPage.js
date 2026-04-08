@@ -16,6 +16,7 @@ function AccountPage() {
   const [createdCourses, setCreatedCourses] = useState([]);
   const [stats, setStats]         = useState({ courseCount: 0, linkCount: 0 });
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'updated' | 'error'
+  const [mySessions, setMySessions] = useState([]); // sessions student belongs to
 
   // --- использование useRef для предотвращения повторных запросов ---
   const syncInitDone = useRef(false);
@@ -146,6 +147,48 @@ function AccountPage() {
       })
       .catch(err => console.error('Error fetching courses:', err));
   }, [user?.id]); // Зависимость только от user.id, не от объекта
+
+  // ─── Загрузка сессий студента ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    const token = localStorage.getItem('token');
+    fetch(`${API_URL}/groups/my`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(async data => {
+        if (!data) return;
+        const groups = data.data || [];
+        // Dedupe by sessionId → one entry per session
+        const sessionMap = new Map();
+        groups.forEach(g => {
+          const sid = String(g.sessionId?._id || g.sessionId);
+          if (!sessionMap.has(sid)) {
+            sessionMap.set(sid, { sessionId: sid, groupName: g.name, courseId: g.courseId });
+          }
+        });
+        const sessions = [...sessionMap.values()];
+
+        // Try to resolve course titles
+        const withTitles = await Promise.all(sessions.map(async s => {
+          if (!s.courseId) return s;
+          try {
+            const cRes = await fetch(`${API_URL}/courses/${s.courseId}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (cRes.ok) {
+              const cData = await cRes.json();
+              const c = cData.data || cData;
+              return { ...s, courseTitle: c.trans?.[0]?.title || c.title || 'Session' };
+            }
+          } catch (_) {}
+          return s;
+        }));
+
+        setMySessions(withTitles);
+      })
+      .catch(() => {});
+  }, [user?.id]);
 
   if (!user) {
     setTimeout(() => navigate('/login'), 0);
@@ -438,6 +481,45 @@ function AccountPage() {
               )}
             </div>
           </div>
+
+          {/* My Sessions */}
+          {mySessions.length > 0 && (
+            <div className="card border-0 shadow-sm">
+              <div className="card-header bg-transparent border-0 pt-4 px-4 d-flex align-items-center gap-2">
+                <i className="bi bi-people-fill text-primary" />
+                <h5 className="fw-bold mb-0">{t('accountPage.mySessions')}</h5>
+              </div>
+              <div className="card-body p-4 d-grid gap-3">
+                {mySessions.map(s => (
+                  <div
+                    key={s.sessionId}
+                    className="card border-0 p-3"
+                    style={{ background: 'var(--card-bg, rgba(255,255,255,0.04))', borderRadius: 14, cursor: 'pointer', transition: '0.2s' }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.01)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    <div className="d-flex align-items-center justify-content-between">
+                      <div>
+                        <div className="fw-semibold" style={{ fontSize: '0.95rem' }}>
+                          {s.courseTitle || 'Course Session'}
+                        </div>
+                        <div className="text-muted small mt-1">
+                          <i className="bi bi-people me-1" /> Group: {s.groupName}
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-primary btn-sm rounded-pill px-3"
+                        style={{ whiteSpace: 'nowrap' }}
+                        onClick={() => navigate(`/session/${s.sessionId}`)}
+                      >
+                        <i className="bi bi-chat-dots me-1" /> {t('accountPage.joinChat')}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
         </div>
       </div>

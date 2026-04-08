@@ -173,7 +173,7 @@ export default function TeacherForm({ initialEmail = '' }) {
         });
       });
 
-      const res = await submitTeacherApplication(fd);
+      const res = await submitTeacherApplication(fd, 'tutor');
       setSuccess(res.message || t('teacher.alertSuccess'));
       setForm({ firstName: '', lastName: '', bio: '', agreement: false });
       setSkills([]);

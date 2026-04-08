@@ -146,7 +146,10 @@ function NavBar() {
                       </li>
                       <li>
                         <button className="dropdown-item py-2 d-flex align-items-center" onClick={() => { navigate('/apply-teacher'); setShowDropdown(false); }}>
-                          <i className="bi bi-file-earmark-person me-3 text-muted fs-5"></i> <span className="fw-medium">{t('nav.myApplications') || 'My Applications'}</span>
+                          <i className="bi bi-file-earmark-person me-3 text-muted fs-5"></i> <span className="fw-medium">{t('nav.applyNow')}</span>
+                        </button>
+                        <button className="dropdown-item py-2 d-flex align-items-center" onClick={() => { navigate('/account'); setShowDropdown(false); }}>
+                          <i className="bi bi-journal-bookmark me-3 text-muted fs-5"></i> <span className="fw-medium">{t('nav.mySessions')}</span>
                         </button>
                       </li>
                       

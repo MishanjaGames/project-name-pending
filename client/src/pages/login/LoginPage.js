@@ -31,6 +31,8 @@ function LoginPage() {
         body: JSON.stringify(requestBody) 
       });
 
+      
+
       if (!response.ok) {
         let errorMessage = t('common.loginFailed');
         const text = await response.text();

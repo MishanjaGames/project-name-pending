@@ -25,6 +25,7 @@ import ManageSessionPage from './pages/manage_page/ManageSessionPage';
 import LiveSessionPage from './pages/live_session/LiveSessionPage';
 import FormsPage from './pages/forms/FormsPage';
 import SessionsPage from './pages/sessions/SessionsPage';
+import StudentSessionPage from './pages/student_session/StudentSessionPage';
 
 function App() {
   return (
@@ -80,6 +81,7 @@ function App() {
                 }
               />
               <Route path="/live/:id" element={<LiveSessionPage />} />
+              <Route path="/session/:id" element={<StudentSessionPage />} />
 
               {/* ── Страница сессий ── */}
               <Route
