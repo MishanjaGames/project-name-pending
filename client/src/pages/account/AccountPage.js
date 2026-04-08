@@ -46,7 +46,41 @@ function AccountPage() {
 
       const roleChanged = serverRole !== storedRole;
 
-      // Обновляем пользователя в localStorage, сохраняя enrolled из локального кеша
+      // Загружаем детали курсов из user.courses (список {_id, process} с сервера)
+      const serverCourseIds = (serverUser.courses || []).map(c => c._id).filter(Boolean);
+      let enrolledCourses = currentStored?.enrolled || [];
+
+      if (serverCourseIds.length > 0) {
+        try {
+          const authHdr = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+          const courseResponses = await Promise.allSettled(
+            serverCourseIds.map(cid =>
+              fetch(`${API_URL}/courses/${cid}`, { headers: { 'Authorization': authHdr } })
+                .then(r => r.ok ? r.json() : null)
+                .catch(() => null)
+            )
+          );
+          enrolledCourses = courseResponses
+            .map(r => r.status === 'fulfilled' ? r.value : null)
+            .filter(Boolean)
+            .map(d => {
+              const c = d.data || d;
+              const BASE = API_URL.replace('/api', '');
+              const thumb = c.links?.find(l => l.type === 'image');
+              return {
+                id:    c._id,
+                _id:   c._id,
+                title: c.trans?.[0]?.title || c.title || '',
+                img:   thumb ? `${BASE}${thumb.url}` : null,
+                direction: c.direction,
+                level: c.level,
+              };
+            });
+        } catch (_) {
+          enrolledCourses = currentStored?.enrolled || [];
+        }
+      }
+
       const updatedUser = {
         ...currentStored,
         id:    serverUser._id || serverUser.id || currentStored?.id,
@@ -54,8 +88,7 @@ function AccountPage() {
         email: serverUser.email || currentStored?.email,
         name:  serverUser.nickname || currentStored?.name,
         role:  serverRole,
-        // enrolled хранится локально (сервер возвращает только ObjectId[] без деталей)
-        enrolled: currentStored?.enrolled || [],
+        enrolled: enrolledCourses,
       };
 
       setUser(updatedUser, token);

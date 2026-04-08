@@ -76,7 +76,7 @@ function CoursePage() {
         const userData = data.user || data;
         const courseIds = userData.enrolled || [];
         const courseId = id;
-        const hasAccess = courseIds.some(cid => (cid._id || cid) === courseId || cid === courseId);
+        const hasAccess = courseIds.some(cid => String(cid._id || cid.id || cid) === courseId);
         setUserHasAccess(hasAccess);
       } else {
         setUserHasAccess(false);

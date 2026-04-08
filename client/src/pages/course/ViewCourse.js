@@ -52,7 +52,10 @@ function ViewCourse() {
         const userData = data.user || data;
         const courseIds = userData.enrolled || [];
         const courseId = id;
-        const hasAccess = courseIds.some(cid => (cid._id || cid) === courseId || cid === courseId);
+        const hasAccess = courseIds.some(cid => {
+          const cIdStr = String(cid._id || cid.id || cid);
+          return cIdStr === courseId;
+        });
         setHasAccess(hasAccess);
       } else {
         setHasAccess(false);
@@ -308,6 +311,7 @@ function ViewCourse() {
             key={`${selected.vi}-${selected.ci}-${selected.ii}`}
             selected={selected}
             volumes={volumes}
+            courseId={id}
             hasPrev={currentFlatIdx > 0}
             hasNext={currentFlatIdx < flatItems.length - 1}
             onPrev={() => goTo(currentFlatIdx - 1)}
@@ -321,7 +325,8 @@ function ViewCourse() {
 }
 
 // ── Content Panel ──
-function ContentPanel({ selected, volumes, hasPrev, hasNext, onPrev, onNext, token }) {
+function ContentPanel({ selected, volumes, courseId, hasPrev, hasNext, onPrev, onNext, token }) {
+  const navigate = useNavigate();
   const { vi, ci, ii } = selected;
   const vol = volumes[vi];
   const ch = ci != null ? vol?.chapters[ci] : null;
@@ -366,9 +371,19 @@ function ContentPanel({ selected, volumes, hasPrev, hasNext, onPrev, onNext, tok
         <button className="btn btn-outline-secondary" onClick={onPrev} disabled={!hasPrev}>
           <i className="bi bi-arrow-left"></i> {hasPrev ? 'Previous' : ''}
         </button>
-        <button className="btn btn-outline-secondary" onClick={onNext} disabled={!hasNext}>
-          {hasNext ? 'Next' : ''} <i className="bi bi-arrow-right"></i>
-        </button>
+        {hasNext ? (
+          <button className="btn btn-outline-secondary" onClick={onNext}>
+            Next <i className="bi bi-arrow-right"></i>
+          </button>
+        ) : (
+          <button
+            className="btn btn-success"
+            style={{ padding: '8px 28px', fontWeight: 600, fontSize: '0.97rem' }}
+            onClick={() => navigate(`/course/${courseId}`)}
+          >
+            <i className="bi bi-check-circle-fill me-2"></i> Finish Course
+          </button>
+        )}
       </div>
     </div>
   );

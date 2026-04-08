@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import config from '../../config/config';
+import { getUser } from '../../utils/auth';
+import io from 'socket.io-client';
 
+const RTC_URL = config.RTC_URL;
 const API_URL = config.API_URL;
 
 function authHeader() {
@@ -47,6 +50,14 @@ function ManageSessionPage() {
     title: '', date: '', time: '', durationMin: 60, meetingLink: '',
   });
   const [newGroupData, setNewGroupData] = useState({ name: '' });
+  // Chat state
+  const [chatTab,       setChatTab]       = useState('general'); // 'general' | 'private'
+  const [chatMessages,  setChatMessages]  = useState([]);
+  const [chatInput,     setChatInput]     = useState('');
+  const [chatPrivateWith, setChatPrivateWith] = useState(null); // { userId, nickname }
+  const [chatPeers,     setChatPeers]     = useState([]); // other connected peers
+  const chatBottomRef = useRef(null);
+  const currentUser   = getUser();
 
   // ── notify ──────────────────────────────────────────────────
   const notify = (msg) => {
@@ -84,7 +95,74 @@ function ManageSessionPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // ── Derived values ───────────────────────────────────────────
+  // ── Chat via RTC socket ───────────────────────────────────────
+  const socketRef = useRef(null);
+
+  useEffect(() => {
+    if (activeTab !== 'chat') {
+      // Disconnect socket when leaving chat tab
+      if (socketRef.current) {
+        socketRef.current.emit('leave', { roomId: id });
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    const socket = io(RTC_URL, { auth: { token } });
+    socketRef.current = socket;
+
+    const nickname = currentUser?.name || currentUser?.email || 'User';
+    socket.emit('join', { roomId: id, nickname });
+
+    socket.on('joined', ({ peers = [], chatHistory = [] }) => {
+      setChatMessages(chatHistory);
+      setChatPeers(peers);
+    });
+
+    socket.on('peer-joined', ({ peer }) => {
+      setChatPeers(prev => [...prev.filter(p => p.socketId !== peer.socketId), peer]);
+    });
+
+    socket.on('peer-left', ({ socketId }) => {
+      setChatPeers(prev => prev.filter(p => p.socketId !== socketId));
+    });
+
+    socket.on('chat-message', (msg) => {
+      setChatMessages(prev => {
+        // avoid duplicates
+        if (prev.find(m => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    });
+
+    return () => {
+      socket.emit('leave', { roomId: id });
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [activeTab, id]);
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  const sendChatMessage = () => {
+    if (!chatInput.trim() || !socketRef.current) return;
+    const payload = { roomId: id, text: chatInput.trim() };
+    if (chatTab === 'private' && chatPrivateWith?.userId) {
+      // Find recipient's live socketId from chatPeers by userId
+      const recipientPeer = chatPeers.find(p => p.userId === chatPrivateWith.userId);
+      if (!recipientPeer) {
+        alert(`${chatPrivateWith.nickname} is not online right now. They need to have the Chat tab open.`);
+        return;
+      }
+      payload.to = recipientPeer.socketId;
+    }
+    socketRef.current.emit('chat-message', payload);
+    setChatInput('');
+  };
   const courseTitle = session?.courseId?.trans?.[0]?.title
     || session?.courseId?.title
     || session?.courseTitle
@@ -286,7 +364,7 @@ function ManageSessionPage() {
         <div className="card shadow-sm border-0 mb-4 overflow-hidden">
           <div className="card-header bg-transparent border-bottom-0 pt-3 pb-0 px-4">
             <ul className="nav nav-tabs border-bottom-0 gap-4" style={{ marginBottom: '-1px' }}>
-              {['overview', 'schedule', 'groups', 'members', 'settings'].map((tab) => (
+              {['overview', 'schedule', 'groups', 'members', 'chat', 'settings'].map((tab) => (
                 <li className="nav-item" key={tab}>
                   <button
                     className={`nav-link border-0 text-capitalize pb-3 px-1 ${activeTab === tab ? 'active fw-bold text-primary' : 'text-muted'}`}
@@ -582,6 +660,162 @@ function ManageSessionPage() {
         )}
 
         {/* ══════════════ SETTINGS ══════════════ */}
+        {activeTab === 'chat' && (
+          <div className="card shadow-sm border-0" style={{ height: 560, display: 'flex', flexDirection: 'column' }}>
+            {/* Chat sub-tabs */}
+            <div className="card-header border-0 pb-0 pt-3 px-4" style={{ background: 'transparent' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div className="nav nav-pills gap-1">
+                  <button
+                    className={`nav-link px-3 py-1 ${chatTab === 'general' ? 'active' : ''}`}
+                    style={{ fontSize: '0.85rem', borderRadius: 20 }}
+                    onClick={() => { setChatTab('general'); setChatPrivateWith(null); }}
+                  >
+                    <i className="bi bi-chat-dots me-1" /> General
+                  </button>
+                  <button
+                    className={`nav-link px-3 py-1 ${chatTab === 'private' ? 'active' : ''}`}
+                    style={{ fontSize: '0.85rem', borderRadius: 20 }}
+                    onClick={() => setChatTab('private')}
+                  >
+                    <i className="bi bi-lock me-1" /> Private
+                  </button>
+                </div>
+                {chatTab === 'private' && (() => {
+                  // Collect all unique members from groups, exclude self
+                  const myUserId = currentUser?._id || currentUser?.id;
+                  const allMembers = [];
+                  const seen = new Set();
+                  groups.forEach(g => {
+                    (g.members || []).forEach(m => {
+                      // members are populated: m.userId is an object with _id, nickname, email
+                      const userObj = m.userId;
+                      const uid = userObj?._id || userObj;
+                      const nick = userObj?.nickname || userObj?.email || String(uid);
+                      if (uid && String(uid) !== String(myUserId) && !seen.has(String(uid))) {
+                        seen.add(String(uid));
+                        allMembers.push({ userId: String(uid), nickname: nick });
+                      }
+                    });
+                  });
+                  return (
+                    <select
+                      className="form-select form-select-sm"
+                      style={{ maxWidth: 260, borderRadius: 12 }}
+                      value={chatPrivateWith?.userId || ''}
+                      onChange={e => {
+                        if (!e.target.value) { setChatPrivateWith(null); return; }
+                        const opt = e.target.options[e.target.selectedIndex];
+                        setChatPrivateWith({ userId: e.target.value, nickname: opt.dataset.nickname || opt.text.replace(' 🟢','').replace(' ⚫','') });
+                      }}
+                    >
+                      <option value="">— Select recipient —</option>
+                      {allMembers.map(m => {
+                        const isOnline = chatPeers.some(p => p.userId === m.userId);
+                        return (
+                          <option key={m.userId} value={m.userId} data-nickname={m.nickname}>
+                            {m.nickname} {isOnline ? '🟢' : '⚫'}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Messages area */}
+            <div style={{
+              flex: 1, overflowY: 'auto', padding: '12px 20px',
+              display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              {(() => {
+                const mySocketId = socketRef.current?.id;
+                const recipientPeer = chatPrivateWith?.userId
+                  ? chatPeers.find(p => p.userId === chatPrivateWith.userId)
+                  : null;
+                const visibleMessages = chatTab === 'general'
+                  ? chatMessages.filter(m => !m.to)
+                  : chatMessages.filter(m => {
+                      if (!m.to) return false;
+                      if (!recipientPeer) {
+                        // Show all private messages involving current chatPrivateWith nickname as fallback
+                        return m.fromNickname === chatPrivateWith?.nickname || m.to === mySocketId;
+                      }
+                      return (
+                        (m.from === mySocketId && m.to === recipientPeer.socketId) ||
+                        (m.from === recipientPeer.socketId && m.to === mySocketId)
+                      );
+                    });
+
+                if (visibleMessages.length === 0) return (
+                  <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--muted)' }}>
+                    <i className="bi bi-chat-square-dots" style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
+                    <span style={{ fontSize: '0.85rem' }}>No messages yet. Start the conversation!</span>
+                  </div>
+                );
+
+                return visibleMessages.map((msg, i) => {
+                const isMe = msg.from === mySocketId;
+                return (
+                  <div key={i} style={{
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: isMe ? 'flex-end' : 'flex-start',
+                  }}>
+                    {!isMe && (
+                      <span style={{ fontSize: '0.72rem', color: 'var(--muted)', marginBottom: 2, paddingLeft: 4 }}>
+                        {msg.fromNickname || 'User'}
+                      </span>
+                    )}
+                    <div style={{
+                      maxWidth: '70%', padding: '8px 14px', borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                      background: isMe ? 'var(--primary-color, #3b82f6)' : 'var(--input-bg, rgba(255,255,255,0.07))',
+                      color: isMe ? '#fff' : 'var(--text)',
+                      fontSize: '0.88rem', lineHeight: 1.45,
+                      wordBreak: 'break-word',
+                    }}>
+                      {msg.text}
+                    </div>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--muted)', marginTop: 2, paddingRight: 4 }}>
+                      {new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                );
+              });
+              })()}
+              <div ref={chatBottomRef} />
+            </div>
+
+            {/* Input */}
+            <div className="card-footer border-0 px-4 pb-4 pt-2" style={{ background: 'transparent' }}>
+              {chatTab === 'private' && !chatPrivateWith?.userId ? (
+                <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem', padding: '8px 0' }}>
+                  <i className="bi bi-person-check me-1" />
+                  Select a recipient above to start a private conversation
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    className="form-control"
+                    style={{ borderRadius: 22, padding: '8px 16px' }}
+                    placeholder={chatTab === 'private' ? `Message ${chatPrivateWith?.nickname || ''}…` : 'Message everyone…'}value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendChatMessage()}
+                  />
+                  <button
+                    className="btn btn-primary"
+                    style={{ borderRadius: 22, padding: '8px 18px' }}
+                    onClick={sendChatMessage}
+                    disabled={!chatInput.trim()}
+                  >
+                    <i className="bi bi-send-fill" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'settings' && (
           <div className="card shadow-sm border-0 p-4 p-md-5">
             <h4 className="fw-bold mb-4">Session Settings</h4>
