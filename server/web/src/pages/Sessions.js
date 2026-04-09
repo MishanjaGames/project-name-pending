@@ -195,7 +195,6 @@ function Sessions({ data, onLogout }) {
                                         <select className="ep-select" value={form.courseType} onChange={e=>setForm(p=>({...p,courseType:e.target.value}))}>
                                             <option value="HOSTED">HOSTED — no purchase required</option>
                                             <option value="MENTORED">MENTORED — must own course</option>
-                                            <option value="SELF_TAUGHT">SELF_TAUGHT — no session features</option>
                                         </select>
                                     </div>
                                     <div className="ep-form-group d-flex align-items-center gap-2" style={{ paddingTop:'1.4rem' }}>

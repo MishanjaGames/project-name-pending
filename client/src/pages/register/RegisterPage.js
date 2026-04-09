@@ -2,7 +2,6 @@ import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { setUser } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
-import { UtilityModal } from '../../components/UtilityModal';
 import config from '../../config/config';
 
 const API_URL = config.API_URL;
@@ -14,17 +13,17 @@ function SignUpPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [infoModal, setInfoModal] = useState({ show: false, title: '', message: '', onClose: null });
 
   const handleSignUp = async (e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      setInfoModal({ show: true, title: t('auth.passwordsNotMatch') || 'Passwords do not match', message: t('auth.passwordsNotMatchMsg') || 'Please make sure both passwords are identical.', onClose: null });
+      alert(t('auth.passwordsNotMatch'));
       return;
     }
 
     try {
-      const regResponse = await fetch(`${API_URL}/auth/register`, {
+      // 1. Отправляем данные на реальную регистрацию
+      const regResponse = await fetch('${API_URL}/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -46,7 +45,8 @@ function SignUpPage() {
         throw new Error(errorMsg);
       }
 
-      const loginResponse = await fetch(`${API_URL}/auth/login`, {
+      // 2. Регистрация прошла успешно! Теперь сразу делаем логин, чтобы получить ТОКЕН
+      const loginResponse = await fetch('${API_URL}/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -61,6 +61,7 @@ function SignUpPage() {
 
       if (!token) throw new Error(t('auth.noToken'));
 
+      // 3. Расшифровываем токен, чтобы достать данные юзера (id, email, роль)
       const base64Url = token.split('.')[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
       const jwtPayload = JSON.parse(window.atob(base64));
@@ -73,12 +74,15 @@ function SignUpPage() {
         enrolled: []
       };
 
+      // 4. Сохраняем настоящего юзера и НАСТОЯЩИЙ токен
       setUser(userData, token);
-      setInfoModal({ show: true, title: t('auth.regSuccess') || 'Account created!', message: t('auth.regSuccessMsg') || 'Welcome! Taking you to the course library.', onClose: () => navigate('/search') });
+      
+      alert(t('auth.regSuccess'));
+      navigate('/search');
 
     } catch (error) {
       console.error('Registration error:', error);
-      setInfoModal({ show: true, title: t('auth.regError') || 'Registration failed', message: error.message, onClose: null });
+      alert(`${t('auth.regError')} ${error.message}`);
     }
   };
 
@@ -197,13 +201,6 @@ function SignUpPage() {
           </div>
         </div>
       </div>
-      <UtilityModal
-        show={infoModal.show}
-        type="info"
-        title={infoModal.title}
-        message={infoModal.message}
-        onClose={() => { setInfoModal({ show: false, title: '', message: '', onClose: null }); infoModal.onClose?.(); }}
-      />
     </div>
   );
 }

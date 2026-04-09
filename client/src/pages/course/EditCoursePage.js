@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import NavBar from "../../components/NavBar";
-import { UtilityModal } from '../../components/UtilityModal';
+import NavBar from "../../components/NavBar"; 
+import AuthImage from "../../components/AuthImage";
 import { SettingsContext } from '../../contexts/SettingsContext';
 import config from '../../config/config';
 
@@ -15,9 +15,12 @@ function EditCoursePage() {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [users, setUsers] = useState([]);
     const [directions, setDirections] = useState([]);
     const [levels, setLevels] = useState([]);
     const [formData, setFormData] = useState({
+        userId: '',
+        status: '',
         title: '',
         description: '',
         skills: [],
@@ -35,8 +38,7 @@ function EditCoursePage() {
     const [courseFilesPreview, setCourseFilesPreview] = useState([]);
     const [existingFiles, setExistingFiles] = useState([]); 
     const [loadingFiles, setLoadingFiles] = useState(false);
-    const [deleteFileTarget, setDeleteFileTarget] = useState(null);
-    const [infoModal, setInfoModal] = useState({ show: false, title: '', message: '' });
+    const [fileTypeFilter, setFileTypeFilter] = useState('all'); // 'all' | 'video' | 'image' | 'document' | 'archive'
 
     const token = localStorage.getItem('token');
     const authHeader = `Bearer ${token}`; 
@@ -54,56 +56,92 @@ function EditCoursePage() {
 
             const fetchData = async () => {
                 try {
-                    const [courseRes, directionsRes, levelsRes, filesRes] = await Promise.all([
-                        fetch(`${API_URL}/courses/${id}`, { method: 'GET', headers }),
+                    const [courseRes, usersRes, directionsRes, levelsRes, filesRes] = await Promise.all([
+                        fetch(`${API_URL}/manage/courses/${id}`, { method: 'GET', headers }),
+                        fetch(`${API_URL}/manage/users`, { method: 'GET', headers }),
                         fetch(`${API_URL}/directions`, { method: 'GET', headers }),
                         fetch(`${API_URL}/levels`, { method: 'GET', headers }),
-                        fetch(`${API_URL}/courses/${id}/files`, { method: 'GET', headers })
+                        fetch(`${API_URL}/manage/courses/${id}/files`, { method: 'GET', headers })
                     ]);
 
                     let course = {};
                     if (courseRes.ok) {
-                        const res = await courseRes.json();
-                        course = res.data || res;
-                        const t0 = course.trans?.[0] || {};
-                        setFormData({
-                            title:       t0.title       || course.title       || '',
-                            description: t0.description || course.description || '',
-                            skills:      t0.skills      || course.skills      || [],
-                            direction:   course.direction || '',
-                            level:       course.level     || '',
-                            price:       course.price?.toString() || '',
-                            links:       course.links || []
-                        });
+                        try {
+                            const res = await courseRes.json();
+                            course = res.data || res;
+                            setFormData({
+                                userId: course.userId || '',
+                                status: course.status || '',
+                                // trans: [{
+                                //     title: formData.title || '',
+                                //     description: formData.description || '',
+                                //     skills: formData.skills || [],
+                                // }],
+                                title: course.trans[0].title || '',
+                                description: course.trans[0].description || '',
+                                skills: course.trans[0].skills || [],
+                                direction: course.direction || '',
+                                level: course.level || '',
+                                price: course.price?.toString() || '',
+                                links: course.links || []
+                            });
+                        } catch (jsonErr) {
+                            console.error('Failed to parse course response:', jsonErr);
+                        }
                     }
 
+                    if (usersRes.ok) {
+                        try {
+                            const res = await usersRes.json();
+                            setUsers(res.data || res);
+                        } catch (jsonErr) {
+                            console.warn('Failed to parse users response:', jsonErr);
+                        }
+                    }
                     if (directionsRes.ok) {
-                        const res = await directionsRes.json();
-                        if (Array.isArray(res.data)) setDirections(res.data);
+                        try {
+                            const res = await directionsRes.json();
+                            if (Array.isArray(res.data)) setDirections(res.data);
+                        } catch (jsonErr) {
+                            console.warn('Failed to parse directions response:', jsonErr);
+                        }
                     }
                     if (levelsRes.ok) {
-                        const res = await levelsRes.json();
-                        if (Array.isArray(res.data)) setLevels(res.data);
+                        try {
+                            const res = await levelsRes.json();
+                            if (Array.isArray(res.data)) setLevels(res.data);
+                        } catch (jsonErr) {
+                            console.warn('Failed to parse levels response:', jsonErr);
+                        }
                     }
 
                     let fetchedFiles = [];
-                    let thumbnailFromFiles = '';
                     if (filesRes.ok) {
-                        const res = await filesRes.json();
-                        const allFiles = Array.isArray(res.files) ? res.files : (Array.isArray(res.data) ? res.data : []);
-
-                        const thumbFile = allFiles.find(f => (f.filename || '').toLowerCase().includes('thumbnail'));
-                        if (thumbFile?.url) thumbnailFromFiles = `${BASE_URL}${thumbFile.url}`;
-
-                        fetchedFiles = allFiles.filter((file) => {
-                            const fileName = (file.originalName || file.filename || '').toLowerCase();
-                            const isThumbnail = fileName.includes('thumbnail');
-                            const isSystemText = isSystemTextFile(file.originalName || file.filename || '');
-                            return !isThumbnail && !isSystemText;
-                        });
+                        try {
+                            const res = await filesRes.json();
+                            const allFiles = Array.isArray(res.data) ? res.data : (Array.isArray(res.files) ? res.files : (res.data?.files || []));
+                            
+                            fetchedFiles = allFiles.filter((file) => {
+                                const fileName = (file.originalName || file.filename || '').toLowerCase();
+                                const isThumbnail = fileName.includes('thumbnail') || 
+                                                  (fileName.endsWith('.png') && allFiles.indexOf(file) === 0 && file.mimetype?.startsWith('image/'));
+                                const isSystemText = isSystemTextFile(file.originalName || file.filename || '');
+                                return !isThumbnail && !isSystemText;
+                            });
+                        } catch (jsonErr) {
+                            console.warn('Failed to parse files response:', jsonErr);
+                        }
                     }
 
-                    if (thumbnailFromFiles) setThumbnailPreview(thumbnailFromFiles);
+                    if (fetchedFiles.length === 0 && course.links && course.links.length > 1) {
+                        fetchedFiles = course.links.slice(1).map(link => ({
+                            originalName: link.filename || link.url.split('/').pop(),
+                            filename: link.filename || link.url.split('/').pop(),
+                            url: link.url,
+                            mimetype: link.type === 'video' ? 'video/mp4' : (link.type === 'image' ? 'image/jpeg' : 'application/pdf'),
+                            size: null
+                        }));
+                    }
                     
                     setExistingFiles(fetchedFiles);
 
@@ -167,32 +205,29 @@ function EditCoursePage() {
 
     const deleteExistingFile = async (fileIndex) => {
         const file = existingFiles[fileIndex];
-        setDeleteFileTarget({ fileIndex, name: file.originalName || file.filename });
-    };
+        if (!window.confirm(`${t('editCourse.confirmDeleteFile')} "${file.originalName || file.filename}"?`)) return;
 
-    const confirmDeleteFile = async () => {
-        if (!deleteFileTarget) return;
-        const { fileIndex } = deleteFileTarget;
-        const file = existingFiles[fileIndex];
         try {
             const fileIdentifier = file.filename || file.originalName;
-            const response = await fetch(`${API_URL}/courses/${id}/files/${fileIdentifier}`, {
+            const response = await fetch(`${API_URL}/manage/courses/${id}/files/${fileIdentifier}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' }
             });
+
             if (response.ok) {
                 setExistingFiles(prev => prev.filter((_, i) => i !== fileIndex));
             } else {
-                setInfoModal({ show: true, title: 'Error', message: t('editCourse.alertDeleteFailed') || 'Failed to delete file.' });
+                alert(t('editCourse.alertDeleteFailed'));
             }
         } catch (error) {
             console.error('Error deleting file:', error);
         }
-        setDeleteFileTarget(null);
     };
 
     const validateForm = () => {
         const newErrors = {};
+        if (!formData.userId) newErrors.userId = t('editCourse.alertOwnerReq');
+        if (!formData.status) newErrors.status = t('editCourse.alertStatusReq');
         if (!formData.title.trim()) newErrors.title = t('editCourse.alertTitleReq');
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -208,17 +243,19 @@ function EditCoursePage() {
             const multipartHeaders = { 'Authorization': authHeader };
 
             const updatePayload = {
+                userId: formData.userId,
+                status: formData.status,
                 trans: [{
-                    title:       formData.title,
+                    title: formData.title,
                     description: formData.description,
-                    skills:      formData.skills,
+                    skills: formData.skills,
                 }],
                 direction: formData.direction,
-                level:     formData.level,
-                price:     formData.price ? parseFloat(formData.price) : 0
+                level: formData.level,
+                price: formData.price ? parseFloat(formData.price) : 0
             };
 
-            await fetch(`${API_URL}/courses/${id}`, {
+            await fetch(`${API_URL}/manage/courses/${id}`, {
                 method: 'PATCH',
                 headers: jsonHeaders,
                 body: JSON.stringify(updatePayload)
@@ -227,7 +264,7 @@ function EditCoursePage() {
             if (thumbnail) {
                 const thumbnailFormData = new FormData();
                 thumbnailFormData.append('file', thumbnail);
-                await fetch(`${API_URL}/courses/${id}/files?thumbnail=true`, {
+                await fetch(`${API_URL}/manage/courses/${id}/files?thumbnail=true`, {
                     method: 'POST',
                     headers: multipartHeaders,
                     body: thumbnailFormData
@@ -237,18 +274,18 @@ function EditCoursePage() {
             if (courseFiles.length > 0) {
                 const filesFormData = new FormData();
                 courseFiles.forEach(file => filesFormData.append('files', file));
-                await fetch(`${API_URL}/courses/${id}/files/multiple`, {
+                await fetch(`${API_URL}/manage/courses/${id}/files/multiple`, {
                     method: 'POST',
                     headers: multipartHeaders,
                     body: filesFormData
                 });
             }
 
-            setInfoModal({ show: true, title: '✓ Saved', message: t('editCourse.alertSuccess') || 'Course updated successfully.' });
-            setTimeout(() => navigate('/account'), 1200);
+            alert(t('editCourse.alertSuccess'));
+            navigate('/account'); 
         } catch (error) {
             console.error('Error updating course:', error);
-            setInfoModal({ show: true, title: 'Error', message: t('editCourse.alertError') || 'Failed to update course.' });
+            alert(t('editCourse.alertError'));
         } finally {
             setSaving(false);
         }
@@ -272,7 +309,6 @@ function EditCoursePage() {
     }
 
     return (
-        <>
         <div className="page-bg min-vh-100">
             <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
                 <div className="row mb-4 justify-content-center">
@@ -295,6 +331,8 @@ function EditCoursePage() {
                                         <label className="form-label fw-semibold d-block mb-3">{t('editCourse.courseThumbnail')}</label>
                                         {thumbnailPreview ? (
                                             <img src={thumbnailPreview} alt="preview" className="rounded mb-2" style={{ height: '150px', objectFit: 'cover' }} />
+                                        ) : formData.links && formData.links[0] && formData.links[0].url ? (
+                                            <AuthImage src={formData.links[0].url} className="rounded mb-2" style={{ height: '150px', objectFit: 'cover' }} />
                                         ) : (
                                             <div className="rounded bg-primary bg-opacity-10 d-flex justify-content-center align-items-center text-primary mx-auto mb-2" style={{ width: '150px', height: '150px' }}>
                                                 <i className="bi bi-image fs-1"></i>
@@ -306,9 +344,31 @@ function EditCoursePage() {
                                             <label htmlFor="thumbnail" className="btn btn-sm btn-warning"><i className="bi bi-pencil me-1"></i> {t('editCourse.change')}</label>
                                         </div>
                                         
+                                        {formData.status && (
+                                            <div className="mt-2">
+                                                <span className={`badge rounded-pill ${getStatusBadgeColor(formData.status)}`}>{formData.status.toUpperCase()}</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="row g-3">
+                                        <div className="col-12 col-md-6">
+                                            <label className="form-label fw-semibold">{t('editCourse.courseOwner')}</label>
+                                            <select className="form-select" name="userId" value={formData.userId} onChange={handleChange}>
+                                                <option value="">{t('editCourse.selectOwner')}</option>
+                                                {users.map((u) => <option key={u._id} value={u._id}>{u.nickname}</option>)}
+                                            </select>
+                                        </div>
+
+                                        <div className="col-12 col-md-6">
+                                            <label className="form-label fw-semibold">{t('editCourse.status')}</label>
+                                            <select className="form-select" name="status" value={formData.status} onChange={handleChange}>
+                                                <option value="editing">{t('editCourse.statusDraft')}</option>
+                                                <option value="on-check">{t('editCourse.statusCheck')}</option>
+                                                <option value="deployed">{t('editCourse.statusDeployed')}</option>
+                                            </select>
+                                        </div>
+
                                         <div className="col-12">
                                             <label className="form-label fw-semibold">{t('editCourse.courseTitle')}</label>
                                             <input type="text" className="form-control" name="title" value={formData.title} onChange={handleChange} />
@@ -332,33 +392,182 @@ function EditCoursePage() {
 
                                         <div className="col-12">
                                             <label className="form-label fw-semibold mt-3">{t('editCourse.courseFiles')}</label>
-                                            
-                                            {existingFiles.length > 0 && (
-                                                <div className="mb-3 border rounded p-2 bg-light">
-                                                    <div className="small fw-semibold text-success mb-2"><i className="bi bi-check-circle me-1"></i> {t('editCourse.uploadedFiles')} ({existingFiles.length})</div>
-                                                    {existingFiles.map((file, idx) => (
-                                                        <div key={idx} className="d-flex justify-content-between align-items-center bg-white p-2 rounded mb-2 border shadow-sm">
-                                                            <div className="text-truncate small fw-semibold" style={{maxWidth: '70%'}}>
-                                                                <i className="bi bi-file-earmark me-2 text-primary"></i>
-                                                                {file.originalName || file.filename}
-                                                            </div>
-                                                            <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => deleteExistingFile(idx)}><i className="bi bi-trash"></i></button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
 
-                                            <div className="border rounded p-3 text-center bg-light">
-                                                <input type="file" id="courseFiles" className="d-none" multiple onChange={handleCourseFilesChange} />
-                                                <label htmlFor="courseFiles" className="btn btn-success"><i className="bi bi-upload me-2"></i> {t('editCourse.uploadMore')}</label>
-                                                
+                                            {/* ── Существующие файлы с фильтрацией ── */}
+                                            {existingFiles.length > 0 && (() => {
+                                                const getFileCategory = (file) => {
+                                                    const name = (file.originalName || file.filename || '').toLowerCase();
+                                                    const mime = (file.mimetype || '').toLowerCase();
+                                                    if (mime.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/.test(name)) return 'video';
+                                                    if (mime.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg)$/.test(name)) return 'image';
+                                                    if (mime === 'application/pdf' || /\.(pdf|doc|docx|ppt|pptx)$/.test(name)) return 'document';
+                                                    if (/\.(zip|rar|7z|tar|gz)$/.test(name)) return 'archive';
+                                                    return 'other';
+                                                };
+
+                                                const FILE_FILTERS = [
+                                                    { key: 'all',      label: 'All',       icon: 'bi-grid' },
+                                                    { key: 'video',    label: 'Videos',    icon: 'bi-camera-video' },
+                                                    { key: 'image',    label: 'Images',    icon: 'bi-image' },
+                                                    { key: 'document', label: 'Docs',      icon: 'bi-file-earmark-pdf' },
+                                                    { key: 'archive',  label: 'Archives',  icon: 'bi-file-zip' },
+                                                    { key: 'other',    label: 'Other',     icon: 'bi-file-earmark' },
+                                                ];
+
+                                                const FILE_ICONS = {
+                                                    video:    { icon: 'bi-camera-video-fill', color: '#ef4444' },
+                                                    image:    { icon: 'bi-image-fill',         color: '#3b82f6' },
+                                                    document: { icon: 'bi-file-earmark-pdf-fill', color: '#f59e0b' },
+                                                    archive:  { icon: 'bi-file-zip-fill',      color: '#8b5cf6' },
+                                                    other:    { icon: 'bi-file-earmark-fill',  color: '#6b7280' },
+                                                };
+
+                                                const categorized = existingFiles.map(f => ({ ...f, _cat: getFileCategory(f) }));
+                                                const filtered = fileTypeFilter === 'all'
+                                                    ? categorized
+                                                    : categorized.filter(f => f._cat === fileTypeFilter);
+
+                                                const counts = FILE_FILTERS.reduce((acc, { key }) => {
+                                                    acc[key] = key === 'all' ? existingFiles.length : categorized.filter(f => f._cat === key).length;
+                                                    return acc;
+                                                }, {});
+
+                                                return (
+                                                    <div className="mb-3 border rounded-3 overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+                                                        {/* Заголовок */}
+                                                        <div className="d-flex align-items-center justify-content-between px-3 py-2"
+                                                            style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border-color)' }}>
+                                                            <span className="small fw-semibold text-success">
+                                                                <i className="bi bi-check-circle me-1"></i>
+                                                                {t('editCourse.uploadedFiles')} ({existingFiles.length})
+                                                            </span>
+                                                        </div>
+
+                                                        {/* Фильтр-чипсы */}
+                                                        <div className="d-flex flex-wrap gap-1 px-3 py-2"
+                                                            style={{ background: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)' }}>
+                                                            {FILE_FILTERS.filter(f => f.key === 'all' || counts[f.key] > 0).map(({ key, label, icon }) => (
+                                                                <button
+                                                                    key={key}
+                                                                    type="button"
+                                                                    onClick={() => setFileTypeFilter(key)}
+                                                                    className="btn btn-sm"
+                                                                    style={{
+                                                                        borderRadius: 20,
+                                                                        padding: '2px 10px',
+                                                                        fontSize: 12,
+                                                                        fontWeight: 600,
+                                                                        border: `1.5px solid ${fileTypeFilter === key ? 'var(--primary-color)' : 'var(--border-color)'}`,
+                                                                        background: fileTypeFilter === key ? 'var(--primary-color)' : 'transparent',
+                                                                        color: fileTypeFilter === key ? '#fff' : 'var(--muted)',
+                                                                        transition: 'all .15s',
+                                                                    }}
+                                                                >
+                                                                    <i className={`bi ${icon} me-1`}></i>
+                                                                    {label}
+                                                                    <span className="ms-1 opacity-75">({counts[key]})</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+
+                                                        {/* Список файлов */}
+                                                        <div className="p-2" style={{ maxHeight: 280, overflowY: 'auto' }}>
+                                                            {filtered.length === 0 ? (
+                                                                <p className="text-muted small text-center py-3 mb-0">No files in this category</p>
+                                                            ) : (
+                                                                filtered.map((file, idx) => {
+                                                                    const fi = FILE_ICONS[file._cat] || FILE_ICONS.other;
+                                                                    const realIdx = existingFiles.findIndex(f =>
+                                                                        (f.originalName || f.filename) === (file.originalName || file.filename));
+                                                                    return (
+                                                                        <div key={idx}
+                                                                            className="d-flex align-items-center gap-2 p-2 rounded mb-1"
+                                                                            style={{ border: '1px solid var(--border-color)', background: 'var(--bg)' }}>
+                                                                            <i className={`bi ${fi.icon} fs-5 flex-shrink-0`} style={{ color: fi.color }}></i>
+                                                                            <span className="text-truncate small fw-semibold flex-grow-1" style={{ maxWidth: '65%' }}>
+                                                                                {file.originalName || file.filename}
+                                                                            </span>
+                                                                            {file.size && (
+                                                                                <span className="text-muted" style={{ fontSize: 11, flexShrink: 0 }}>
+                                                                                    {(file.size / (1024 * 1024)).toFixed(1)} MB
+                                                                                </span>
+                                                                            )}
+                                                                            <button
+                                                                                type="button"
+                                                                                className="btn btn-sm btn-outline-danger flex-shrink-0"
+                                                                                style={{ padding: '1px 7px' }}
+                                                                                onClick={() => deleteExistingFile(realIdx)}
+                                                                            >
+                                                                                <i className="bi bi-trash"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                    );
+                                                                })
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {/* ── Загрузка новых файлов ── */}
+                                            <div className="border rounded-3 p-3" style={{ borderColor: 'var(--border-color)', background: 'var(--bg)' }}>
+                                                {/* Разные кнопки по типу */}
+                                                <div className="d-flex flex-wrap gap-2 justify-content-center mb-2">
+                                                    {[
+                                                        { label: 'Videos',    accept: 'video/*',                              icon: 'bi-camera-video',        color: 'btn-outline-danger'   },
+                                                        { label: 'Images',    accept: 'image/*',                              icon: 'bi-image',               color: 'btn-outline-primary'  },
+                                                        { label: 'Documents', accept: 'application/pdf,.doc,.docx,.ppt,.pptx', icon: 'bi-file-earmark-pdf',    color: 'btn-outline-warning'  },
+                                                        { label: 'Archives',  accept: '.zip,.rar,.7z,.tar,.gz',               icon: 'bi-file-zip',            color: 'btn-outline-secondary' },
+                                                    ].map(({ label, accept, icon, color }) => (
+                                                        <label key={label} className={`btn btn-sm ${color} d-flex align-items-center gap-1`}
+                                                            style={{ cursor: 'pointer', borderRadius: 20, paddingInline: 14 }}>
+                                                            <i className={`bi ${icon}`}></i> {label}
+                                                            <input
+                                                                type="file"
+                                                                className="d-none"
+                                                                multiple
+                                                                accept={accept}
+                                                                onChange={handleCourseFilesChange}
+                                                            />
+                                                        </label>
+                                                    ))}
+                                                    {/* Кнопка загрузить всё */}
+                                                    <label className="btn btn-sm btn-success d-flex align-items-center gap-1"
+                                                        style={{ cursor: 'pointer', borderRadius: 20, paddingInline: 14 }}>
+                                                        <i className="bi bi-upload"></i> {t('editCourse.uploadMore')}
+                                                        <input
+                                                            type="file"
+                                                            id="courseFiles"
+                                                            className="d-none"
+                                                            multiple
+                                                            accept="video/*,image/*,application/pdf,.doc,.docx,.zip,.rar,.7z"
+                                                            onChange={handleCourseFilesChange}
+                                                        />
+                                                    </label>
+                                                </div>
+
+                                                {/* Новые файлы в очереди */}
                                                 {courseFilesPreview.length > 0 && (
-                                                    <div className="mt-3 text-start">
-                                                        <strong className="small text-primary">{t('editCourse.newFiles')}</strong>
+                                                    <div className="mt-2 text-start">
+                                                        <strong className="small text-primary d-block mb-1">
+                                                            <i className="bi bi-clock-history me-1"></i>
+                                                            {t('editCourse.newFiles')} ({courseFilesPreview.length})
+                                                        </strong>
                                                         {courseFilesPreview.map((f, idx) => (
-                                                            <div key={idx} className="d-flex justify-content-between align-items-center bg-white p-2 rounded mt-1 border">
-                                                                <span className="small">{f.name} ({f.size} MB)</span>
-                                                                <button type="button" className="btn btn-sm btn-outline-danger py-0 px-2" onClick={() => removeCourseFile(idx)}><i className="bi bi-x"></i></button>
+                                                            <div key={idx}
+                                                                className="d-flex align-items-center gap-2 p-2 rounded mb-1"
+                                                                style={{ border: '1px solid var(--border-color)', background: 'var(--card-bg)' }}>
+                                                                <i className="bi bi-file-earmark-plus text-success"></i>
+                                                                <span className="small text-truncate flex-grow-1">{f.name}</span>
+                                                                <span className="text-muted" style={{ fontSize: 11, flexShrink: 0 }}>{f.size} MB</span>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-sm btn-outline-danger flex-shrink-0"
+                                                                    style={{ padding: '1px 7px' }}
+                                                                    onClick={() => removeCourseFile(idx)}
+                                                                >
+                                                                    <i className="bi bi-x"></i>
+                                                                </button>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -390,7 +599,7 @@ function EditCoursePage() {
 
                                     <div className="d-flex gap-2 justify-content-end pt-4 mt-4 border-top">
                                         <button type="button" className="btn btn-light px-4" onClick={() => navigate('/account')} disabled={saving}>{t('editCourse.cancel')}</button>
-                                        <button type="submit" className="btn btn-primary px-4" disabled={saving}>
+                                        <button type="submit" className="btn btn-primary px-4" disabled={saving} onClick={handleSubmit}>
                                             {saving ? t('editCourse.saving') : t('editCourse.savePublish')}
                                         </button>
                                     </div>
@@ -401,25 +610,6 @@ function EditCoursePage() {
                 </div>
             </div>
         </div>
-        <UtilityModal
-            show={!!deleteFileTarget}
-            type="confirm"
-            danger
-            title={t('editCourse.confirmDeleteFile') || 'Delete file?'}
-            message={deleteFileTarget ? `"${deleteFileTarget.name}" will be permanently deleted.` : ''}
-            confirmLabel="Delete"
-            cancelLabel="Cancel"
-            onConfirm={confirmDeleteFile}
-            onCancel={() => setDeleteFileTarget(null)}
-        />
-        <UtilityModal
-            show={infoModal.show}
-            type="info"
-            title={infoModal.title}
-            message={infoModal.message}
-            onClose={() => setInfoModal({ show: false, title: '', message: '' })}
-        />
-        </>
     );
 }
 

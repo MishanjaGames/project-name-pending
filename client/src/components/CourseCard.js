@@ -1,7 +1,7 @@
 import { useWishlist } from '../contexts/WishlistContext';
-import config from '../config/config';
 
-const BASE_URL = config.API_URL;
+// ДОБАВЛЯЕМ ПРАВИЛЬНЫЙ БАЗОВЫЙ URL (как просил Миша в контракте)
+const BASE_URL = process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:4040';
 
 function CourseCard({ course, viewMode, onCardClick, onEnroll, onAddToCart, t }) {
   const gridImageStyle = { width: '100%', height: '160px', objectFit: 'cover' };

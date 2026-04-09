@@ -1,27 +1,28 @@
+import config from '../config/config';
+
+const API_URL = config.API_URL;
 
 /**
  * submitTeacherApplication
- * Ожидает FormData с полями/файлами формы.
- * POST /api/teacher-applications
- * Возвращает JSON при успехе, выбрасывает Error при ошибке.
- *
- * Заметки для интеграции с бэком:
- * - Принимать multipart/form-data
- * - Валидировать обязательные поля на сервере (name, email, bio, cert, id)
- * - Сохранять файлы в безопасное хранилище и хранить ссылки
- * - Устанавливать статус заявки: pending -> approved/rejected
- * - Возвращать понятные ошибки, например { message: 'File too large' }
+ * POST /forms/apply/tutor  (multipart/form-data)
+ * Поля FormData:
+ *   data       — JSON string { firstName, lastName, email, bio }
+ *   skills     — JSON string массив skill объектов
+ *   cert_N     — файлы сертификатов
+ *   example_N  — файлы примеров работ
  */
 export async function submitTeacherApplication(formData) {
-  const headers = {};
-  try {
-    const token = localStorage.getItem('token');
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-  } catch (e) {
-    // ignore
-  }
+  const token = localStorage.getItem('token');
 
-  const res = await fetch('/api/forms/apply/creator', {
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = token.startsWith('Bearer ')
+      ? token
+      : `Bearer ${token}`;
+  }
+  // Content-Type НЕ устанавливаем — браузер сам выставит boundary для multipart
+
+  const res = await fetch(`${API_URL}/forms/apply/tutor`, {
     method: 'POST',
     headers,
     body: formData,
@@ -29,7 +30,7 @@ export async function submitTeacherApplication(formData) {
 
   if (!res.ok) {
     let body = null;
-    try { body = await res.json(); } catch (e) { /* ignore */ }
+    try { body = await res.json(); } catch { /* ignore */ }
     throw new Error(body?.message || `Server error: ${res.status}`);
   }
 

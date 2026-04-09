@@ -156,6 +156,7 @@ module.exports.update = async (req, res) => {
             email:     req.body.email,
             phone:     req.body.phone,
             github:    req.body.github,
+            tutorRank: req.body.tutorRank,
             courses:   req.body.courses,
             updatedAt: Date.now()
         }

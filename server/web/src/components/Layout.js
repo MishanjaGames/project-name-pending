@@ -22,8 +22,8 @@ const NAV = [
         items: [
             { to: '/my-courses',  icon: 'bi-collection-play',   label: 'My Courses' },
             { to: '/my-grades',   icon: 'bi-award',              label: 'My Grades' },
-            { to: '/redeem',      icon: 'bi-key',                label: 'Redeem Key' },
             { to: '/chats', icon: 'bi-chat-dots-fill', label: 'Messages' },
+            { to: '/redeem',      icon: 'bi-key',                label: 'Redeem Key' },
         ],
     },
     {
@@ -59,6 +59,7 @@ const NAV = [
         section: 'System', minLvl: 4,
         items: [
             { to: '/manage/settings', icon: 'bi-gear', label: 'Settings & Logs' },
+            { to: '/admin/panel',     icon: 'bi-database-gear', label: 'Admin Panel' },
         ],
     },
 ];

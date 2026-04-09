@@ -5,13 +5,13 @@ import HomePage from './pages/home/HomePage';
 import SignUpPage from './pages/register/RegisterPage';
 import SearchPage from './pages/search/SearchPage';
 import TeacherRegisterPage from './pages/register/TeacherRegisterPage';
-import AddCoursePage from './pages/course/AddCoursePage';
+import AddCoursePage from './pages/instructor/AddCoursePage';
 import AccountPage from './pages/account/AccountPage';
 import CartPage from './pages/cart/CartPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import NavBar from './components/NavBar';
 import CoursePage from './pages/course/CoursePage';
-import ViewCoursePage from './pages/course/ViewCoursePage';
+import ViewCourse from './pages/course/ViewCourse';
 import EditCoursePage from './pages/course/EditCoursePage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -21,13 +21,10 @@ import { WishlistProvider } from './contexts/WishlistContext';
 import WishlistPage from './pages/wishlist/WishlistPage';
 import RedeemPage from './pages/redeem/RedeemPage';
 import CreatorKeysPage from './pages/key_page/CreatorKeysPage';
-import ManageSessionPage from './pages/sessions/ManageSessionPage';
+import ManageSessionPage from './pages/manage_page/ManageSessionPage';
 import LiveSessionPage from './pages/live_session/LiveSessionPage';
-import MyLearningsPage from './pages/account/MyLearningsPage';
-import MySessionsPage from './pages/account/MySessionsPage';
-import CreateSessionPage from './pages/sessions/CreateSessionPage';
-import MyFormsPage from './pages/account/MyFormsPage';
-import ChatsPage from './pages/account/ChatsPage';
+import FormsPage from './pages/forms/FormsPage';
+import SessionsPage from './pages/sessions/SessionsPage';
 
 function App() {
   return (
@@ -47,10 +44,6 @@ function App() {
               <Route path="/cart" element={<CartPage />} />
               <Route path="/wishlist" element={<WishlistPage />} />
               <Route path="/apply-teacher" element={<TeacherRegisterPage />} />
-              <Route path="/my-learning" element={<MyLearningsPage />} />
-              <Route path="/my-sessions" element={<MySessionsPage />} />
-              <Route path="/my-forms" element={<MyFormsPage />} />
-              <Route path="/chats" element={<ChatsPage />} />
               <Route
                 path="/add-course"
                 element={
@@ -59,17 +52,8 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/my-sessions/create"
-                element={
-                  <ProtectedRoute allowedRoles={['create', 'manage', 'admin', 'root']}>
-                    <CreateSessionPage />
-                  </ProtectedRoute>
-                }
-              />
               <Route path="/course/:id" element={<CoursePage />} />
-              <Route path="/learn/:id" element={<ViewCoursePage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="/view-course/:id" element={<ViewCourse />} />
               <Route
                 path="/instructor/edit-course/:id"
                 element={
@@ -79,19 +63,45 @@ function App() {
                 }
               />
               <Route path="/redeem" element={<RedeemPage />} />
-              <Route path="/manage/keys" element={
-                <ProtectedRoute allowedRoles={['create', 'manage', 'admin', 'root']}>
-                  <CreatorKeysPage />
-                </ProtectedRoute>
+              <Route
+                path="/manage/keys"
+                element={
+                  <ProtectedRoute allowedRoles={['create', 'manage', 'admin', 'root']}>
+                    <CreatorKeysPage />
+                  </ProtectedRoute>
                 }
               />
-              <Route path="/manage/session/:id" element={
-                <ProtectedRoute allowedRoles={['create', 'manage', 'admin', 'root']}>
-                  <ManageSessionPage />
-                </ProtectedRoute>
+              <Route
+                path="/manage/session/:id"
+                element={
+                  <ProtectedRoute allowedRoles={['create', 'manage', 'admin', 'root']}>
+                    <ManageSessionPage />
+                  </ProtectedRoute>
                 }
               />
               <Route path="/live/:id" element={<LiveSessionPage />} />
+
+              {/* ── Страница сессий ── */}
+              <Route
+                path="/manage/sessions"
+                element={
+                  <ProtectedRoute allowedRoles={['tutor', 'create', 'manage', 'quality', 'admin', 'root']}>
+                    <SessionsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* ── Страница заявок (quality+) ── */}
+              <Route
+                path="/manage/forms"
+                element={
+                  <ProtectedRoute allowedRoles={['quality', 'admin', 'root', 'manage']}>
+                    <FormsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
         </WishlistProvider>

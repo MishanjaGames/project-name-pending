@@ -2,13 +2,13 @@ import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, setUser as setUserStorage } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
-import { UtilityModal } from '../../components/UtilityModal';
 
 export default function SettingsPage() {
   const { t, theme } = useContext(SettingsContext);
   const navigate = useNavigate();
   const user = getUser();
 
+  // Инициализируем стейт полями из схемы mongo.users.js
   const [formData, setFormData] = useState({
     nickname: user?.name || '',
     email: user?.email || '',
@@ -17,7 +17,6 @@ export default function SettingsPage() {
     phone: user?.phone || '',
     github: user?.github || ''
   });
-  const [infoModal, setInfoModal] = useState({ show: false });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -26,9 +25,11 @@ export default function SettingsPage() {
 
   const handleSave = (e) => {
     e.preventDefault();
+    // Обновляем данные в localStorage
     const updatedUser = { ...user, ...formData, name: formData.nickname };
     setUserStorage(updatedUser);
-    setInfoModal({ show: true });
+    alert(t('common.profileUpdated'));
+    navigate('/account');
   };
 
   return (
@@ -70,13 +71,6 @@ export default function SettingsPage() {
         </form>
       </div>
       </div>
-      <UtilityModal
-        show={infoModal.show}
-        type="info"
-        title={t('common.profileUpdated') || 'Profile updated'}
-        message={t('common.profileUpdatedMsg') || 'Your profile has been saved.'}
-        onClose={() => { setInfoModal({ show: false }); navigate('/account'); }}
-      />
     </div>
   );
 }

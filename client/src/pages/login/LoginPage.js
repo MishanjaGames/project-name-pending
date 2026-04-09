@@ -2,7 +2,6 @@ import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { setUser } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
-import { UtilityModal } from '../../components/UtilityModal';
 import config from '../../config/config';
 
 const API_URL = config.API_URL;
@@ -11,9 +10,8 @@ function LoginPage() {
   const navigate = useNavigate();
   const { t } = useContext(SettingsContext);
   
-  const [loginId, setLoginId] = useState('');
+  const [loginId, setLoginId] = useState(''); 
   const [password, setPassword] = useState('');
-  const [errorModal, setErrorModal] = useState({ show: false, message: '' });
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -71,42 +69,20 @@ function LoginPage() {
         else if (lowerLogin.includes('root')) userRole = 'root';
       }
 
-      const c = await fetch(`${API_URL}/users/c`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
+      const userData = {
+        id: jwtPayload.userId || jwtPayload._id,
+        email: jwtPayload.email || (isEmail ? loginId : ''),
+        role: userRole,
+        name: jwtPayload.nickname || loginId.split('@')[0], 
+        enrolled: []
+      };
 
-      let userData = {}
-
-      if (!c.ok) {
-        userData = {
-          id: jwtPayload.userId || jwtPayload._id,
-          email: jwtPayload.email || (isEmail ? loginId : ''),
-          role: userRole,
-          name: jwtPayload.nickname || loginId.split('@')[0], 
-          enrolled: []
-        };
-
-        setUser(userData, token);
-        navigate('/account');
-        return;
-      }
-      
-      const { user } = await c.json();
-        userData = {
-          id: jwtPayload.userId || jwtPayload._id,
-          email: jwtPayload.email || (isEmail ? loginId : ''),
-          role: userRole,
-          name: jwtPayload.nickname || loginId.split('@')[0], 
-          enrolled: user.courses
-        };
-
-        setUser(userData, token);
-        navigate('/account');
+      setUser(userData, token);
+      navigate('/account'); 
       
     } catch (error) {
       console.error('Login error:', error);
-      setErrorModal({ show: true, message: `${t('auth.loginError')} ${error.message}` });
+      alert(`${t('auth.loginError')} ${error.message}`);
     }
   };
 
@@ -153,13 +129,6 @@ function LoginPage() {
           </button>
         </div>
       </div>
-      <UtilityModal
-        show={errorModal.show}
-        type="info"
-        title={t('auth.loginError') || 'Login failed'}
-        message={errorModal.message}
-        onClose={() => setErrorModal({ show: false, message: '' })}
-      />
     </div>
   );
 }

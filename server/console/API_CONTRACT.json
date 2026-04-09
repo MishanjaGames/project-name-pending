@@ -1,10 +1,17 @@
 {
   "_meta": {
     "baseUrl": "process.env.REACT_APP_API_URL  →  e.g. http://localhost:4040/api",
-    "auth": "All protected routes require header: Authorization: Bearer <token>",
-    "tokenStorage": "localStorage.getItem('token')  →  'Bearer eyJ...'",
-    "buildAuthHeader": "{ Authorization: token, 'Content-Type': 'application/json' }",
-    "note": "Routes marked [public] require no token. All others require Bearer token."
+    "auth": "Protected routes require header: Authorization: Bearer <token>",
+    "tokenStorage": "localStorage.getItem('token')  →  full 'Bearer eyJ...' string",
+    "buildAuthHeader": "{ Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' }",
+    "accessLevelHierarchy": ["default", "create", "tutor", "quality", "manage", "admin", "root"],
+    "tutorRankHierarchy": ["assistant", "teacher", "lecturer", "instructor", "tutor", "professor"],
+    "notes": [
+      "user.role stored in localStorage is a plain string (accessLevel), e.g. 'admin', 'create', 'tutor'",
+      "tutorRank is a separate field on the user, used for session rank gating",
+      "Chats use token from Authorization header extracted manually — same Bearer format",
+      "SSE streams require token as QUERY PARAM: ?token=<full-bearer-string-from-localStorage>"
+    ]
   },
 
   "AUTH": {
@@ -12,43 +19,31 @@
       "method": "POST",
       "url": "/auth/login",
       "access": "public",
-      "body": {
-        "email": "user@example.com",
-        "password": "secret123"
-      },
-      "response_200": {
-        "token": "eyJhbGci...",
-        "tokenType": "Bearer"
-      }
+      "body": { "email": "user@example.com", "password": "secret123" },
+      "response_200": { "token": "eyJhbGci...", "tokenType": "Bearer" },
+      "note": "Decode JWT payload to extract role.accessLevel for local storage"
     },
     "register": {
       "method": "POST",
       "url": "/auth/register",
       "access": "public",
-      "body": {
-        "email": "user@example.com",
-        "password": "secret123",
-        "nickname": "alice"
-      },
+      "body": { "email": "user@example.com", "password": "secret123", "nickname": "alice" },
       "response_201": "{ full user document }"
     },
     "validate": {
       "method": "POST",
       "url": "/auth/validate",
-      "access": "Bearer token in header",
+      "access": "Bearer",
       "body": {},
       "response_200": { "valid": true },
-      "note": "Used to check if the current token has manage+ access. Returns 403 if insufficient."
+      "note": "Checks token validity and access level"
     },
     "extendSession": {
       "method": "POST",
       "url": "/auth/ext-session",
-      "access": "Bearer token in header",
+      "access": "Bearer",
       "body": { "data": "{ any user data object }" },
-      "response_200": {
-        "token": "eyJhbGci...",
-        "tokenType": "Bearer"
-      }
+      "response_200": { "token": "eyJhbGci...", "tokenType": "Bearer" }
     }
   },
 
@@ -64,7 +59,7 @@
           "email": "alice@example.com",
           "role": { "_id": "...", "roleName": "admin", "accessLevel": "admin" },
           "tutorRank": null,
-          "courses": [],
+          "courses": [{ "_id": "courseId", "process": 0.5 }],
           "links": []
         }
       }
@@ -72,9 +67,9 @@
     "getAll": {
       "method": "GET",
       "url": "/users",
-      "access": "public (token optional, affects filtering)",
+      "access": "public (token optional)",
       "query": {
-        "search": "optional string — filters by nickname or email",
+        "search": "optional — filters by nickname or email",
         "tutorOnly": "true — returns only users with tutorRank set"
       },
       "response_200": { "data": ["...array of user objects..."] }
@@ -83,18 +78,13 @@
       "method": "GET",
       "url": "/users/:id",
       "access": "public",
-      "response_200": { "data": "{ user object with decrypted password token }" }
+      "response_200": { "data": "{ user object }" }
     },
     "create": {
       "method": "POST",
       "url": "/users",
       "access": "admin+",
-      "body": {
-        "email": "bob@example.com",
-        "password": "secret123",
-        "nickname": "bob",
-        "role": "roleObjectId"
-      },
+      "body": { "email": "bob@example.com", "password": "secret123", "nickname": "bob", "role": "roleObjectId" },
       "response_201": {
         "message": "User created successfully",
         "login": { "email": "bob@example.com", "password": "secret123" },
@@ -106,74 +96,59 @@
       "url": "/users/:id",
       "access": "admin+",
       "body": {
-        "nickname": "bob2",
-        "firstName": "Bob",
-        "lastName": "Smith",
-        "email": "bob@example.com",
-        "phone": "+380...",
-        "github": "bobsmith",
-        "role": "roleObjectId",
-        "password": "newpass (optional)",
-        "courses": []
+        "nickname": "bob2", "firstName": "Bob", "lastName": "Smith",
+        "email": "bob@example.com", "phone": "+380...", "github": "bobsmith",
+        "role": "roleObjectId", "password": "newpass (optional)",
+        "tutorRank": "instructor", "courses": []
       },
-      "response_200": {
-        "message": "User updated successfully",
-        "data": "{ updated user }"
-      }
+      "response_200": { "message": "User updated successfully", "data": "{ updated user }" }
     },
     "delete": {
       "method": "DELETE",
       "url": "/users/:id",
       "access": "admin+",
-      "response_200": {
-        "message": "User deleted successfully",
-        "data": { "_id": "..." }
-      }
+      "response_200": { "message": "User deleted successfully", "data": { "_id": "..." } }
+    },
+    "updateCourseProgress": {
+      "method": "PATCH",
+      "url": "/users/me/courses/:courseId/progress",
+      "access": "Bearer",
+      "body": { "process": 0.65 },
+      "response_200": { "message": "Progress updated", "data": { "process": 0.65 } },
+      "note": "process must be 0–1. Progress never decreases — ignored if new value is lower than current."
     },
     "finishCourse": {
       "method": "PATCH",
       "url": "/users/me/courses/:courseId/finish",
       "access": "Bearer",
       "body": {},
-      "response_200": {
-        "message": "Course marked as finished",
-        "data": { "process": 1 }
-      }
-    },
-    "uploadProfilePicture": {
-      "method": "POST",
-      "url": "/users/:id/profile-picture",
-      "access": "manage+",
-      "body": "multipart/form-data — field name: 'avatar' (image file)",
-      "response_200": {
-        "message": "Profile picture uploaded successfully",
-        "data": { "userId": "...", "filename": "avatar.jpg", "link": { "url": "/api/files/users/:id/avatar.jpg" } }
-      }
-    },
-    "updateProfilePicture": {
-      "method": "PUT",
-      "url": "/users/:id/profile-picture",
-      "access": "manage+",
-      "body": "multipart/form-data — field name: 'avatar' (image file)",
-      "response_200": {
-        "message": "Profile picture updated successfully",
-        "data": { "userId": "...", "filename": "avatar.jpg", "link": {} }
-      }
-    },
-    "deleteProfilePicture": {
-      "method": "DELETE",
-      "url": "/users/:id/profile-picture",
-      "access": "manage+",
-      "response_200": {
-        "message": "Profile picture deleted successfully",
-        "data": { "userId": "..." }
-      }
+      "response_200": { "message": "Course marked as finished", "data": { "process": 1 } }
     },
     "getProfilePicture": {
       "method": "GET",
       "url": "/users/:id/profile-picture/:filename",
       "access": "public",
       "response": "Binary image file"
+    },
+    "uploadProfilePicture": {
+      "method": "POST",
+      "url": "/users/:id/profile-picture",
+      "access": "manage+",
+      "body": "multipart/form-data — field: 'avatar' (image file)",
+      "response_200": { "message": "Profile picture uploaded successfully", "data": { "userId": "...", "filename": "avatar.jpg", "link": { "url": "/api/files/users/:id/avatar.jpg" } } }
+    },
+    "updateProfilePicture": {
+      "method": "PUT",
+      "url": "/users/:id/profile-picture",
+      "access": "manage+",
+      "body": "multipart/form-data — field: 'avatar' (image file)",
+      "response_200": { "message": "Profile picture updated successfully", "data": { "userId": "...", "filename": "avatar.jpg", "link": {} } }
+    },
+    "deleteProfilePicture": {
+      "method": "DELETE",
+      "url": "/users/:id/profile-picture",
+      "access": "manage+",
+      "response_200": { "message": "Profile picture deleted successfully", "data": { "userId": "..." } }
     }
   },
 
@@ -195,23 +170,18 @@
       "url": "/courses",
       "access": "create+",
       "body": {
-        "direction": "Web Development",
-        "level": "Beginner",
-        "price": 0,
-        "base_lang": "en",
-        "courseType": "SELF_TAUGHT",
-        "trans": [{ "title": "My Course", "description": "About this course", "skills": [] }],
-        "volumes": [],
-        "links": []
+        "title": "My Course", "description": "...", "direction": "Web Development",
+        "level": "Beginner", "price": 0, "courseType": "SELF_TAUGHT",
+        "base_lang": "en", "add_langs": [], "trans": [], "skills": []
       },
       "response_201": { "message": "Course created successfully", "data": "{ course }" }
     },
     "update": {
-      "method": "PUT or PATCH",
+      "method": "PATCH",
       "url": "/courses/:id",
       "access": "create+",
-      "body": "Same shape as create — all fields optional in PATCH",
-      "response_200": { "message": "Course updated successfully", "data": "{ course }" }
+      "body": "Same fields as create, send only changed fields",
+      "response_200": { "message": "Course updated successfully", "data": "{ updated course }" }
     },
     "delete": {
       "method": "DELETE",
@@ -219,341 +189,154 @@
       "access": "create+",
       "response_200": { "message": "Course deleted successfully", "data": { "_id": "..." } }
     },
-    "getRating": {
+    "getMyRating": {
       "method": "GET",
       "url": "/courses/:id/rating",
       "access": "Bearer",
-      "response_200": { "data": { "myRating": 4, "averageRating": 4.2 } }
+      "response_200": {
+        "data": { "courseId": "...", "avgRating": 4.2, "totalVotes": 18, "myRating": 5 }
+      },
+      "note": "myRating is null if the user hasn't rated yet"
     },
     "rateById": {
       "method": "POST",
       "url": "/courses/:id/rating",
+      "access": "Bearer (must own the course)",
+      "body": { "value": 4 },
+      "response_200": { "data": { "avgRating": 4.2, "totalVotes": 19, "myRating": 4 } },
+      "note": "value must be integer 1–5"
+    },
+    "purchase": {
+      "method": "POST",
+      "url": "/courses/:id/purchase",
       "access": "Bearer",
-      "body": { "value": 5 },
-      "response_200": { "message": "Rating submitted", "data": { "averageRating": 4.3 } }
+      "body": { "promoCode": "SAVE20 (optional)" },
+      "response_200": {
+        "message": "Course purchased successfully",
+        "data": { "courseId": "...", "finalPrice": 0 }
+      },
+      "note": "Returns 200 'Already owned' if user already has the course. HOSTED courses return 400."
     },
     "getComments": {
       "method": "GET",
       "url": "/courses/:id/comments",
       "access": "public",
-      "response_200": { "data": [{ "_id": "...", "userId": "...", "text": "Great course!", "date": "..." }] }
+      "response_200": { "data": ["...array of comment objects..."] }
     },
     "addComment": {
       "method": "POST",
       "url": "/courses/:id/comments",
       "access": "Bearer",
       "body": { "text": "Great course!" },
-      "response_201": { "message": "Comment added", "data": "{ comment }" }
+      "response_201": { "data": "{ comment object }" }
     },
     "deleteComment": {
       "method": "DELETE",
       "url": "/courses/:id/comments/:commentId",
-      "access": "Bearer",
+      "access": "Bearer (own comment or manage+)",
       "response_200": { "message": "Comment deleted" }
     },
-    "listFiles": {
+    "listCourseFiles": {
       "method": "GET",
       "url": "/courses/:id/files",
       "access": "public",
-      "response_200": {
-        "courseId": "...",
-        "count": 3,
-        "files": [{ "filename": "lecture1.pdf", "size": 12345, "url": "/api/files/courses/:id/lecture1.pdf" }]
-      }
+      "response_200": { "files": ["...array of file objects with url, filename, originalName..."] }
     },
-    "getFile": {
+    "getCourseFile": {
       "method": "GET",
       "url": "/courses/:id/files/:filename",
       "access": "public",
-      "query": { "download": "true — forces download disposition" },
-      "response": "Binary file"
+      "response": "Binary file stream"
     },
-    "uploadFile": {
+    "uploadCourseFile": {
       "method": "POST",
       "url": "/courses/:id/files",
       "access": "create+",
-      "body": "multipart/form-data — field: 'file'; optional query: ?thumbnail=true",
-      "response_201": { "message": "File uploaded", "data": { "url": "/api/files/courses/:id/filename.jpg", "filename": "..." } }
+      "body": "multipart/form-data — field: 'file'",
+      "response_200": { "message": "File uploaded", "data": { "filename": "...", "url": "..." } }
     },
-    "uploadMultipleFiles": {
+    "uploadCourseFiles": {
       "method": "POST",
       "url": "/courses/:id/files/multiple",
       "access": "create+",
       "body": "multipart/form-data — field: 'files' (multiple)",
-      "response_201": { "message": "Files uploaded", "data": [{ "url": "...", "filename": "..." }] }
+      "response_200": { "message": "Files uploaded", "data": ["..."] }
     },
-    "deleteFile": {
+    "deleteCourseFile": {
       "method": "DELETE",
       "url": "/courses/:id/files/:filename",
       "access": "create+",
-      "response_200": { "message": "File deleted successfully", "data": { "courseId": "...", "filename": "..." } }
+      "response_200": { "message": "File deleted" }
     }
   },
 
   "DIRECTIONS": {
-    "getAll": {
-      "method": "GET",
-      "url": "/directions",
-      "access": "public",
-      "response_200": { "data": [{ "_id": "...", "directionName": "Web Development" }] }
-    },
-    "getById": {
-      "method": "GET",
-      "url": "/directions/:id",
-      "access": "public",
-      "response_200": { "data": { "_id": "...", "directionName": "..." } }
-    },
-    "create": {
-      "method": "POST",
-      "url": "/directions",
-      "access": "manage+",
-      "body": { "directionName": "Data Science" },
-      "response_201": { "message": "Direction created successfully", "data": { "_id": "...", "directionName": "Data Science" } }
-    },
-    "update": {
-      "method": "PUT",
-      "url": "/directions/:id",
-      "access": "manage+",
-      "body": { "directionName": "Data Science (Updated)" },
-      "response_200": { "message": "Direction updated successfully", "data": { "_id": "...", "directionName": "..." } }
-    },
-    "delete": {
-      "method": "DELETE",
-      "url": "/directions/:id",
-      "access": "manage+",
-      "response_200": { "message": "Direction deleted successfully", "data": { "_id": "..." } }
-    }
+    "getAll": { "method": "GET", "url": "/directions", "access": "public", "response_200": { "data": ["..."] } },
+    "getById": { "method": "GET", "url": "/directions/:id", "access": "public", "response_200": { "data": "{ direction }" } },
+    "create": { "method": "POST", "url": "/directions", "access": "manage+", "body": { "name": "Web Development" }, "response_201": { "data": "{ direction }" } },
+    "update": { "method": "PUT", "url": "/directions/:id", "access": "manage+", "body": { "name": "Updated Name" }, "response_200": { "data": "{ direction }" } },
+    "delete": { "method": "DELETE", "url": "/directions/:id", "access": "manage+", "response_200": { "message": "Deleted" } }
   },
 
   "LEVELS": {
-    "getAll": {
-      "method": "GET",
-      "url": "/levels",
-      "access": "public",
-      "response_200": { "data": [{ "_id": "...", "levelName": "Beginner", "directionName": "Web", "minTutorRank": "assistant" }] }
-    },
-    "getById": {
-      "method": "GET",
-      "url": "/levels/:id",
-      "access": "public",
-      "response_200": { "data": { "_id": "...", "levelName": "..." } }
-    },
-    "create": {
-      "method": "POST",
-      "url": "/levels",
-      "access": "manage+",
-      "body": {
-        "levelName": "Intermediate",
-        "directionName": "Web Development",
-        "minTutorRank": "teacher"
-      },
-      "response_201": { "message": "Level created successfully", "data": { "_id": "...", "levelName": "..." } }
-    },
-    "update": {
-      "method": "PUT",
-      "url": "/levels/:id",
-      "access": "manage+",
-      "body": {
-        "levelName": "Intermediate",
-        "directionName": "Web Development",
-        "minTutorRank": "teacher"
-      },
-      "response_200": { "message": "Level updated successfully", "data": { "_id": "...", "levelName": "..." } }
-    },
-    "delete": {
-      "method": "DELETE",
-      "url": "/levels/:id",
-      "access": "manage+",
-      "response_200": { "message": "Level deleted successfully", "data": { "_id": "..." } }
-    }
+    "getAll": { "method": "GET", "url": "/levels", "access": "public", "response_200": { "data": ["..."] } },
+    "getById": { "method": "GET", "url": "/levels/:id", "access": "public", "response_200": { "data": "{ level }" } },
+    "create": { "method": "POST", "url": "/levels", "access": "manage+", "body": { "name": "Beginner" }, "response_201": { "data": "{ level }" } },
+    "update": { "method": "PUT", "url": "/levels/:id", "access": "manage+", "body": { "name": "Updated" }, "response_200": { "data": "{ level }" } },
+    "delete": { "method": "DELETE", "url": "/levels/:id", "access": "manage+", "response_200": { "message": "Deleted" } }
   },
 
   "ROLES": {
-    "getAll": {
-      "method": "GET",
-      "url": "/roles",
-      "access": "manage+",
-      "response_200": { "data": [{ "_id": "...", "roleName": "admin", "accessLevel": "admin" }] }
-    },
-    "getById": {
-      "method": "GET",
-      "url": "/roles/:id",
-      "access": "manage+",
-      "response_200": { "data": { "_id": "...", "roleName": "...", "accessLevel": "..." } }
-    },
-    "create": {
-      "method": "POST",
-      "url": "/roles",
-      "access": "manage+",
-      "body": { "roleName": "moderator", "accessLevel": "manage" },
-      "response_201": { "message": "Role created successfully", "data": { "_id": "...", "roleName": "..." } }
-    },
-    "update": {
-      "method": "PUT",
-      "url": "/roles/:id",
-      "access": "manage+",
-      "body": { "roleName": "moderator", "accessLevel": "manage" },
-      "response_200": { "message": "Role updated successfully", "data": { "_id": "...", "roleName": "..." } }
-    },
-    "delete": {
-      "method": "DELETE",
-      "url": "/roles/:id",
-      "access": "manage+",
-      "response_200": { "message": "Role deleted successfully", "data": { "_id": "..." } }
-    }
+    "note": "Managed via /manage route — requires manage+ access"
   },
 
   "KEYS": {
     "listAll": {
-      "method": "GET",
-      "url": "/keys",
-      "access": "manage+",
-      "response_200": {
-        "data": [{
-          "_id": "...",
-          "code": "ABCDE-FGHIJ-KLMNO",
-          "note": "Evening group batch",
-          "courses": [{ "_id": "...", "title": "React Course" }],
-          "createdBy": "alice",
-          "redeemedBy": null,
-          "redeemedAt": null,
-          "expiresAt": null,
-          "createdAt": "...",
-          "isRedeemed": false,
-          "isExpired": false
-        }]
-      }
+      "method": "GET", "url": "/keys", "access": "manage+",
+      "response_200": { "data": ["...array of key objects..."] }
     },
     "generate": {
-      "method": "POST",
-      "url": "/keys",
-      "access": "manage+",
-      "body": {
-        "courseIds": ["64b5c987e...", "64b5c988f..."],
-        "amount": 5,
-        "note": "Evening group batch",
-        "expiresAt": "2026-12-31T23:59:59.000Z"
-      },
-      "note": "amount defaults to 1, max 100. expiresAt is optional (null = no expiry).",
-      "response_201": {
-        "message": "5 key(s) generated",
-        "data": [{ "_id": "...", "code": "ABCDE-FGHIJ-KLMNO" }]
-      }
+      "method": "POST", "url": "/keys", "access": "manage+",
+      "body": { "courseIds": ["..."], "amount": 1, "note": "optional", "expiresAt": "ISO date (optional)" },
+      "response_201": { "message": "1 key(s) generated", "data": ["...array of key objects..."] }
     },
-    "delete": {
-      "method": "DELETE",
-      "url": "/keys/:id",
-      "access": "manage+",
-      "note": "Cannot delete already-redeemed keys.",
+    "deleteKey": {
+      "method": "DELETE", "url": "/keys/:id", "access": "manage+",
       "response_200": { "message": "Key deleted", "data": { "_id": "..." } }
     },
     "redeem": {
-      "method": "POST",
-      "url": "/keys/redeem",
-      "access": "Bearer",
-      "body": { "code": "ABCDE-FGHIJ-KLMNO" },
-      "response_200": {
-        "message": "Key redeemed — 2 course(s) added to your library",
-        "data": {
-          "alreadyOwned": 0,
-          "newlyUnlocked": 2,
-          "courses": [{ "_id": "...", "title": "React Course", "thumbnail": "/api/files/..." }]
-        }
-      }
+      "method": "POST", "url": "/keys/redeem", "access": "Bearer",
+      "body": { "code": "XXXX-XXXX-XXXX" },
+      "response_200": { "message": "Key redeemed", "data": { "courseId": "..." } }
     },
     "getMyKeys": {
-      "method": "GET",
-      "url": "/keys/mine",
-      "access": "Bearer",
-      "response_200": {
-        "data": [{ "_id": "...", "code": "ABCDE-FGHIJ-KLMNO", "courses": [], "redeemedAt": "..." }]
-      }
+      "method": "GET", "url": "/keys/mine", "access": "Bearer",
+      "response_200": { "data": ["...array of keys redeemed by current user..."] }
     }
   },
 
   "PROMOS": {
-    "listAll": {
-      "method": "GET",
-      "url": "/promos",
-      "access": "create+ (creators see only their own; manage+ sees all)",
-      "response_200": {
-        "data": [{
-          "_id": "...",
-          "code": "LAUNCH20",
-          "discountType": "percent",
-          "discountValue": 20,
-          "courses": [{ "_id": "...", "title": "React Course" }],
-          "createdBy": "alice",
-          "maxUses": 100,
-          "usedCount": 4,
-          "expiresAt": null,
-          "active": true,
-          "isExpired": false,
-          "isExhausted": false
-        }]
-      }
-    },
+    "listAll": { "method": "GET", "url": "/promos", "access": "create+", "response_200": { "data": ["..."] } },
     "create": {
-      "method": "POST",
-      "url": "/promos",
-      "access": "create+",
-      "body": {
-        "code": "LAUNCH20",
-        "courseIds": ["64b5c987e..."],
-        "discountType": "percent",
-        "discountValue": 20,
-        "maxUses": 100,
-        "expiresAt": "2026-12-31T23:59:59.000Z",
-        "note": "Launch promo"
-      },
-      "note": "discountType: 'percent' (0-100) or 'flat' (fixed amount). courseIds can be empty array = all courses by creator.",
-      "response_201": { "message": "Promo created", "data": { "_id": "...", "code": "LAUNCH20" } }
+      "method": "POST", "url": "/promos", "access": "create+",
+      "body": { "code": "SAVE20", "courseIds": ["..."], "discountType": "percent", "discountValue": 20, "maxUses": 100, "expiresAt": "ISO date", "note": "" },
+      "response_201": { "message": "Promo created", "data": { "_id": "...", "code": "SAVE20" } }
     },
     "toggle": {
-      "method": "PATCH",
-      "url": "/promos/:id/toggle",
-      "access": "create+ (owner) or manage+",
-      "body": {},
-      "response_200": { "message": "Promo enabled", "data": { "active": true } }
+      "method": "PATCH", "url": "/promos/:id/toggle", "access": "create+",
+      "response_200": { "message": "Promo enabled/disabled", "data": { "active": true } }
     },
-    "delete": {
-      "method": "DELETE",
-      "url": "/promos/:id",
-      "access": "create+ (owner) or manage+",
-      "response_200": { "message": "Promo deleted", "data": { "_id": "..." } }
-    },
+    "delete": { "method": "DELETE", "url": "/promos/:id", "access": "create+", "response_200": { "message": "Promo deleted", "data": { "_id": "..." } } },
     "validate": {
-      "method": "POST",
-      "url": "/promos/validate",
-      "access": "Bearer",
-      "body": { "code": "LAUNCH20", "courseId": "64b5c987e..." },
-      "response_200_valid": {
-        "valid": true,
-        "code": "LAUNCH20",
-        "discountType": "percent",
-        "discountValue": 20,
-        "originalPrice": 100,
-        "discount": 20,
-        "finalPrice": 80
-      },
+      "method": "POST", "url": "/promos/validate", "access": "Bearer",
+      "body": { "code": "SAVE20", "courseId": "..." },
+      "response_200": { "valid": true, "discount": 20, "discountType": "percent", "finalPrice": 80 },
       "response_200_invalid": { "valid": false, "reason": "This promo has expired" }
     },
     "apply": {
-      "method": "POST",
-      "url": "/promos/apply",
-      "access": "Bearer",
-      "body": { "code": "LAUNCH20", "courseId": "64b5c987e..." },
-      "response_200": {
-        "message": "Promo applied — course added to your library",
-        "data": {
-          "courseId": "...",
-          "courseTitle": "React Course",
-          "originalPrice": 100,
-          "discount": 20,
-          "finalPrice": 80,
-          "alreadyOwned": false
-        }
-      }
+      "method": "POST", "url": "/promos/apply", "access": "Bearer",
+      "body": { "code": "SAVE20", "courseId": "..." },
+      "response_200": { "message": "Promo applied", "data": { "finalPrice": 80 } }
     }
   },
 
@@ -580,8 +363,8 @@
         "coTutors": [{ "userId": "...", "canGrade": true, "canSchedule": true, "canEditCopy": false }],
         "restrictionIgnored": false
       },
-      "note": "courseType defaults to course's own courseType. restrictionIgnored bypasses minTutorRank check (requires manage+ to take effect).",
-      "response_201": { "message": "Session created", "data": "{ session object }" }
+      "response_201": { "message": "Session created", "data": "{ session object }" },
+      "note": "courseType defaults to the course's own courseType. restrictionIgnored requires manage+ to take effect."
     },
     "update": {
       "method": "PATCH",
@@ -589,14 +372,14 @@
       "access": "host tutor or manage+",
       "body": {
         "status": "active",
-        "schedule": [{ "title": "Lecture 1", "datetime": "2026-04-01T18:00:00.000Z", "durationMin": 90, "meetingLink": "https://meet.google.com/...", "notes": "", "isRecurring": false }],
+        "schedule": [{ "title": "Lecture 1", "datetime": "2026-04-01T18:00:00.000Z", "durationMin": 90, "meetingLink": "https://...", "notes": "", "isRecurring": false }],
         "deadlines": [{ "targetType": "chapter", "targetId": "ch-001", "dueAt": "2026-04-15T23:59:59.000Z", "lockAfterDue": false }],
         "coTutors": [{ "userId": "...", "canGrade": true, "canSchedule": true, "canEditCopy": false }],
         "copyEditAllowed": false,
         "courseType": "HOSTED"
       },
-      "note": "Only host or manage+ can update. Send only fields you want to change.",
-      "response_200": { "message": "Session updated", "data": "{ updated session }" }
+      "response_200": { "message": "Session updated", "data": "{ updated session }" },
+      "note": "Send only fields you want to change."
     },
     "delete": {
       "method": "DELETE",
@@ -630,14 +413,21 @@
       "method": "POST",
       "url": "/sessions/:id/revoke-rank-override",
       "access": "host tutor or manage+",
-      "body": { "tutorId": "userId of tutor to revoke" },
+      "body": { "tutorId": "userId of tutor" },
       "response_200": { "message": "Rank override revoked for tutor ..." }
     },
     "getExpandedSchedule": {
       "method": "GET",
       "url": "/sessions/:id/schedule/expanded",
-      "access": "host or co-tutor or manage+",
-      "response_200": { "data": ["...expanded occurrences with occurrenceDate field..."] }
+      "access": "tutor+ in session",
+      "response_200": { "data": ["...expanded recurring events as individual occurrences..."] }
+    },
+    "prune": {
+      "method": "POST",
+      "url": "/sessions/prune",
+      "access": "manage+",
+      "body": { "olderThanDays": 90, "statuses": ["archived", "completed"] },
+      "response_200": { "message": "Pruned N session(s)" }
     }
   },
 
@@ -648,10 +438,17 @@
       "access": "tutor in session or manage+",
       "response_200": { "data": ["...array of group objects with populated members and assignments..."] }
     },
+    "getMyGroups": {
+      "method": "GET",
+      "url": "/groups/my",
+      "access": "Bearer",
+      "response_200": { "data": ["...groups where current user is a member..."] },
+      "note": "Use this to find which sessions a student belongs to. Returns groups with sessionId populated."
+    },
     "getById": {
       "method": "GET",
       "url": "/groups/:id",
-      "access": "tutor in session, or member of group, or manage+",
+      "access": "tutor in session, member of group, or manage+",
       "response_200": { "data": "{ full group object }" }
     },
     "create": {
@@ -694,63 +491,58 @@
     "getByGroup": {
       "method": "GET",
       "url": "/assignments?groupId=:groupId",
-      "access": "tutor in session or group member",
+      "access": "tutor in session or manage+",
       "response_200": { "data": ["...array of assignment objects..."] }
     },
     "create": {
       "method": "POST",
       "url": "/assignments",
-      "access": "tutor+",
+      "access": "tutor in session or manage+",
       "body": "multipart/form-data",
       "fields": {
-        "sessionId": "ObjectId (required)",
-        "groupId": "ObjectId (required)",
-        "courseId": "ObjectId (required)",
-        "title": "string (required)",
+        "sessionId": "string",
+        "groupId": "string",
+        "courseId": "string",
+        "title": "string",
         "description": "string (optional)",
-        "dueAt": "ISO date string (required)",
-        "markScale": "'5' | '12' | '100' | 'custom' (required)",
-        "maxMark": "number (required)",
-        "customOverdueDeduction": "number (optional)",
-        "taskFiles": "files (optional, .txt/.pdf/.zip, max 50MB each)"
+        "dueAt": "ISO datetime string",
+        "markScale": "'5' | '12' | '100' | 'custom'",
+        "maxMark": "number",
+        "taskFiles": "file(s) — field name 'taskFiles' (array)"
       },
-      "response_201": { "message": "Assignment created", "data": "{ assignment object }" }
+      "response_201": { "message": "Assignment created", "data": "{ assignment }" }
     },
     "update": {
       "method": "PATCH",
       "url": "/assignments/:id",
       "access": "tutor in session or manage+",
-      "body": "multipart/form-data — same fields as create, all optional",
-      "note": "markScale and maxMark can only be changed if no submissions exist yet.",
+      "body": "multipart/form-data — same fields as create, all optional. Add 'removeFiles' as JSON array of filenames to remove.",
       "response_200": { "message": "Assignment updated", "data": "{ updated assignment }" }
     },
     "place": {
       "method": "PATCH",
       "url": "/assignments/:id/place",
-      "access": "tutor (rank: tutor/professor) or manage+",
-      "body": {
-        "type": "volume | chapter | item",
-        "targetId": "vid / cid / iid string"
-      },
+      "access": "tutor in session or manage+",
+      "body": { "type": "item", "targetId": "iid string" },
       "response_200": { "message": "Assignment placed in course content" }
     },
     "delete": {
       "method": "DELETE",
       "url": "/assignments/:id",
-      "access": "host tutor or manage+",
+      "access": "tutor in session or manage+",
       "response_200": { "message": "Assignment deleted", "data": { "_id": "..." } }
     },
     "removeTaskFile": {
       "method": "DELETE",
       "url": "/assignments/:id/files/:filename",
       "access": "tutor in session or manage+",
-      "response_200": { "message": "Task file removed", "data": "{ updated assignment }" }
+      "response_200": { "message": "File removed" }
     },
-    "downloadTaskFile": {
+    "getTaskFile": {
       "method": "GET",
       "url": "/assignments/files/:sessionId/:filename",
       "access": "Bearer",
-      "response": "Binary file download"
+      "response": "Binary file stream"
     }
   },
 
@@ -758,40 +550,29 @@
     "getSubmissions": {
       "method": "GET",
       "url": "/submissions/:groupId/:assignmentId",
-      "access": "Bearer (tutors see all; students see own only)",
+      "access": "tutor in session or manage+",
       "response_200": { "data": ["...array of submission objects..."] }
     },
     "submit": {
       "method": "POST",
       "url": "/submissions/:groupId/:assignmentId",
-      "access": "Bearer (active group member only)",
-      "body": "multipart/form-data — field: 'submission' (zip or txt file, max 200MB)",
-      "note": "Re-submission only allowed before deadline or if previous was declined.",
-      "response_201": {
-        "message": "Submitted successfully",
-        "data": { "filePath": "...", "isOverdue": false }
-      }
+      "access": "Bearer (student in group)",
+      "body": "multipart/form-data — field: 'submission' (single file: .zip or .txt)",
+      "response_201": { "message": "Submitted", "data": { "isOverdue": false } }
     },
     "grade": {
       "method": "PATCH",
       "url": "/submissions/:groupId/:assignmentId/:studentId/grade",
-      "access": "host tutor, co-tutor with canGrade, or manage+",
-      "body": {
-        "mark": 85,
-        "feedback": "Good work, but missing edge case handling.",
-        "status": "approved"
-      },
-      "note": "status: 'approved' | 'declined'. Overdue deduction applied automatically if submission.isOverdue and status='approved'.",
-      "response_200": {
-        "message": "Submission approved",
-        "data": { "mark": 83, "overdueDeduction": 2, "wasOverdue": true }
-      }
+      "access": "tutor in session with canGrade, or manage+",
+      "body": { "mark": 4, "feedback": "Good work!", "status": "approved" },
+      "note": "status: 'approved' | 'declined'. Overdue penalty applied automatically.",
+      "response_200": { "message": "Graded", "data": { "mark": 3, "status": "approved" } }
     },
     "downloadSubmission": {
       "method": "GET",
       "url": "/submissions/:groupId/:assignmentId/:studentId/file",
-      "access": "Bearer (tutor or the student themselves)",
-      "response": "Binary zip file download"
+      "access": "tutor in session or manage+",
+      "response": "Binary file stream (student's submitted file)"
     }
   },
 
@@ -802,11 +583,10 @@
       "access": "public (Bearer optional — attaches userId if present)",
       "body": "multipart/form-data",
       "fields": {
-        "data": "JSON string — { firstName, lastName, email, about, ... } (shape depends on formType)",
+        "data": "JSON string — { firstName, lastName, email, about, ... }",
         "skills": "JSON string — array of skill objects",
         "cert_0": "file — certificate for skills[0]",
-        "example_0": "file — example file for skills[0]",
-        "cert_1": "file — certificate for skills[1]"
+        "example_0": "file — example file for skills[0]"
       },
       "formTypes": ["creator", "tutor", "support-ticket"],
       "response_201": { "message": "Submission received", "data": { "_id": "...", "status": "pending" } }
@@ -814,9 +594,16 @@
     "getAll": {
       "method": "GET",
       "url": "/forms",
-      "access": "quality+ (manage+ recommended)",
+      "access": "quality+",
       "query": { "formType": "optional filter", "status": "pending|under-review|approved|rejected", "search": "text" },
       "response_200": { "count": 5, "data": ["...array of submission objects..."] }
+    },
+    "getByType": {
+      "method": "GET",
+      "url": "/forms/:formType",
+      "access": "quality+",
+      "query": { "status": "optional", "search": "optional" },
+      "response_200": { "count": 3, "data": ["..."] }
     },
     "getOneById": {
       "method": "GET",
@@ -828,10 +615,7 @@
       "method": "PATCH",
       "url": "/forms/detail/:id",
       "access": "quality+",
-      "body": {
-        "status": "approved",
-        "reviewNote": "Looks good!"
-      },
+      "body": { "status": "approved", "reviewNote": "Looks good!" },
       "note": "status: 'pending' | 'under-review' | 'approved' | 'rejected'",
       "response_200": { "message": "Submission updated", "data": "{ updated submission }" }
     },
@@ -840,106 +624,138 @@
       "url": "/forms/detail/:id",
       "access": "quality+",
       "response_200": { "message": "Submission deleted" }
+    },
+    "noUserSubmissionsEndpoint": {
+      "note": "There is NO endpoint to fetch a user's own past form submissions. The /forms routes are admin-only (quality+). Students cannot query their own submissions."
+    }
+  },
+
+  "CHATS": {
+    "auth_note": "Chats extract the token from Authorization header manually (no passport middleware). Pass the same 'Bearer ...' header as other routes.",
+    "getAll": {
+      "method": "GET",
+      "url": "/chats",
+      "access": "Bearer (extracts user from token)",
+      "response_200": {
+        "data": [{
+          "_id": "...",
+          "participants": [{ "_id": "...", "nickname": "alice", "firstName": "...", "lastName": "...", "links": [] }],
+          "lastMessage": { "_id": "...", "text": "hello", "senderNickname": "alice", "senderId": "...", "createdAt": "..." },
+          "lastActivity": "ISO date",
+          "unread": 2
+        }]
+      }
+    },
+    "create": {
+      "method": "POST",
+      "url": "/chats",
+      "access": "Bearer",
+      "body": { "userId": "targetUserId" },
+      "response_201": { "data": "{ populated chat object }" },
+      "note": "Returns existing chat if one already exists between the two users."
+    },
+    "getById": {
+      "method": "GET",
+      "url": "/chats/:id",
+      "access": "Bearer (must be participant)",
+      "response_200": { "data": "{ chat object }" }
+    },
+    "delete": {
+      "method": "DELETE",
+      "url": "/chats/:id",
+      "access": "Bearer (must be participant)",
+      "response_200": { "message": "Chat deleted" }
+    },
+    "getMessages": {
+      "method": "GET",
+      "url": "/chats/:id/messages",
+      "access": "Bearer (must be participant)",
+      "query": { "limit": "1–100, default 50", "before": "message _id — for pagination" },
+      "response_200": { "data": ["...messages in chronological order (oldest first)..."] }
+    },
+    "sendMessage": {
+      "method": "POST",
+      "url": "/chats/:id/messages",
+      "access": "Bearer (must be participant)",
+      "body": { "text": "Hello!" },
+      "response_201": { "data": "{ populated message object }" }
+    },
+    "deleteMessage": {
+      "method": "DELETE",
+      "url": "/chats/:id/messages/:msgId",
+      "access": "Bearer (must be participant and message sender)",
+      "response_200": { "message": "Message deleted" }
     }
   },
 
   "FILES": {
-    "getCourseFile": {
-      "method": "GET",
-      "url": "/files/courses/:courseId/:filename",
-      "access": "public",
-      "query": { "download": "true — forces download disposition" },
-      "response": "Binary file"
-    },
-    "getUserProfilePicture": {
-      "method": "GET",
-      "url": "/files/users/:userId/:filename",
-      "access": "public",
-      "response": "Binary image"
-    },
-    "getFormFile": {
-      "method": "GET",
-      "url": "/files/forms/:formType/:id/:subdir/:filename",
-      "access": "Bearer",
-      "response": "Binary file"
-    }
+    "note": "Course files served at /courses/:id/files/:filename. Profile pictures at /users/:id/profile-picture/:filename. Both are public GET endpoints."
   },
 
   "UTILS": {
-    "status": {
+    "getStatus": {
       "method": "GET",
       "url": "/utils/status",
       "access": "manage+",
-      "response_200": {
-        "status": "online",
-        "uptime": 86400,
-        "launchTime": "2026-03-27T10:00:00.000Z",
-        "db_status": "connected",
-        "courses": [],
-        "users": []
-      }
+      "response_200": { "data": { "userCount": 42, "courseCount": 10, "sessionCount": 5 } }
     },
     "statusStream": {
       "method": "GET",
-      "url": "/utils/status/stream?token=Bearer eyJ...",
-      "access": "token as query param",
-      "note": "Server-Sent Events. Sends status every 5s including counts and upcoming meetings.",
-      "event_data": {
-        "status": "online",
-        "db_status": "connected",
-        "uptime": 86400,
-        "launchTime": "...",
-        "userCount": 42,
-        "courseCount": 10,
-        "sessionCount": 3,
-        "activeSessionCount": 2,
-        "groupCount": 6,
-        "assignmentCount": 14,
-        "pendingSubmissionCount": 5,
-        "upcomingMeetings": [{ "title": "Lecture 1", "datetime": "...", "durationMin": 90, "meetingLink": "...", "courseTitle": "React" }]
-      }
+      "url": "/utils/status/stream?token=<bearer-token-string>",
+      "access": "manage+ via query param token",
+      "note": "SSE stream. Token must be the full Bearer string from localStorage. NOT an Authorization header — use ?token= query param.",
+      "response": "Server-Sent Events stream with status data"
     },
     "getLogs": {
       "method": "GET",
       "url": "/utils/logs",
       "access": "manage+",
-      "query": { "date": "today | 2026-03-27 (YYYY-MM-DD)", "lines": "100 (number)" },
-      "response_200": { "date": "today", "logs": ["...log lines..."] }
-    },
-    "getLogFiles": {
-      "method": "GET",
-      "url": "/utils/logs/files",
-      "access": "manage+",
-      "response_200": { "files": ["app-2026-03-26.log", "app-2026-03-27.log"] }
+      "query": { "date": "YYYY-MM-DD or 'today'", "lines": "number of lines" },
+      "response_200": { "data": "log file content" }
     },
     "logsStream": {
       "method": "GET",
-      "url": "/utils/logs/stream?token=Bearer eyJ...&date=today&lines=100",
-      "access": "token as query param",
-      "note": "Server-Sent Events. Sends latest log lines every 2s."
+      "url": "/utils/logs/stream?token=<bearer-token-string>",
+      "access": "manage+ via query param token",
+      "note": "SSE stream. Same token rule as statusStream.",
+      "response": "Server-Sent Events stream with live log lines"
     }
   },
 
-  "BROKEN_FETCHES_TO_FIX": {
+  "KNOWN_BUGS_AND_CORRECTIONS": {
     "ViewCourse_finishCourse": {
-      "current_wrong": "/users/me/courses/:id/finish",
-      "correct": "/users/me/courses/:courseId/finish",
-      "method": "PATCH"
+      "wrong": "PATCH /users/me/courses/:id/finish",
+      "correct": "PATCH /users/me/courses/:courseId/finish",
+      "note": "Param name must be :courseId not :id"
     },
-    "CoursePreview_doubleBaseUrl": {
-      "current_wrong": "BASE/api/courses/... (double /api prefix because BASE already has /api stripped)",
-      "correct": "process.env.REACT_APP_API_URL + '/courses/...' — just use the env var directly"
+    "ViewCourse_updateProgress": {
+      "endpoint": "PATCH /users/me/courses/:courseId/progress",
+      "body": "{ process: 0.65 }",
+      "note": "This endpoint DOES exist. Progress never decreases. Use this for incremental saves."
     },
-    "ViewCourse_CoursePreview1_brokenUrlReplace": {
-      "current_wrong": "Template literal contains raw JS expression as string: `(process.env...replace...)${url}`",
-      "correct": "Declare const BASE_URL = process.env.REACT_APP_API_URL?.replace('/api','') at top of file, then use `${BASE_URL}${url}`"
+    "SessionsArchive": {
+      "wrong": "DELETE /sessions/:id",
+      "correct": "PATCH /sessions/:id/archive",
+      "note": "DELETE requires status 'completed'. Use archive endpoint for soft-archiving active sessions."
+    },
+    "ChatsAuth": {
+      "note": "Chats controller extracts token from Authorization header manually — same Bearer format as all other routes. No special handling needed."
+    },
+    "SSE_Token": {
+      "note": "Status and logs SSE streams require token as QUERY PARAM ?token=..., not Authorization header. Pass full localStorage.getItem('token') value."
+    },
+    "Groups_my": {
+      "note": "GET /groups/my EXISTS. Returns groups where the current user is a member. Correct way to find student sessions."
+    },
+    "Forms_userSubmissions": {
+      "note": "NO endpoint exists for a user to fetch their own form submissions. /forms/* routes are all quality+ only."
+    },
+    "Sessions_chatEndpoint": {
+      "note": "NO /sessions/:id/chat endpoint exists. Session-level group chat is not implemented in the API. Use the /chats (direct message) system instead."
     },
     "ManageSession_overrideRank": {
-      "current_wrong": "fetch .../override-rank with no body",
-      "note": "Controller expects { tutorId } in body — front end omits it. Only works if frontend passes tutorId."
-    },
-    "Settings_SSE": {
-      "note": "SSE streams need token as query param, not in Authorization header. Use: /utils/status/stream?token=<full token string>"
+      "wrong": "fetch .../override-rank with no body",
+      "correct": "POST /sessions/:id/override-rank with body { tutorId: '<userId>' }"
     }
   }
 }
