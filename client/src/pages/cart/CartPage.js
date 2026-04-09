@@ -230,8 +230,26 @@ function CartPage() {
         }
       }
 
-      // 3. Получаем актуальные данные курсов из корзины через API
+      // 2b. Вызываем purchase API для каждого курса (добавляет в user.courses на сервере)
       const token = localStorage.getItem('token');
+      for (const item of items) {
+        const courseId = item.id || item.courseId;
+        if (!courseId) continue;
+        try {
+          await fetch(`${API_URL}/courses/${courseId}/purchase`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ promoCode: promoCode || undefined }),
+          });
+        } catch (e) {
+          console.warn('Purchase API call failed for', courseId, e);
+        }
+      }
+
+      // 3. Получаем актуальные данные курсов из корзины через API
       const fetchedCourses = await Promise.all(
         items.map(async (item) => {
           const courseId = item.id || item.courseId;
@@ -243,13 +261,15 @@ function CartPage() {
             if (!res.ok) return null;
             const data = await res.json();
             const c = data.data || data;
+            const BASE = API_URL.replace('/api', '');
+            const thumb = (c.links || []).find(l => l.type === 'image');
             // Нормализуем поля для совместимости с AccountPage
             return {
               id:     c._id || c.id || courseId,
               _id:    c._id || c.id || courseId,
-              title:  c.title || (c.trans?.[0]?.title) || item.title || 'Course',
-              img:    c.img   || item.img   || null,
-              author: c.author || c.userId?.nickname || item.author || 'Unknown',
+              title:  c.trans?.[0]?.title || c.title || item.title || 'Course',
+              img:    thumb ? `${BASE}${thumb.url}` : (item.img || null),
+              author: c.userId?.nickname || item.author || 'Unknown',
               price:  c.price || item.price || 0,
             };
           } catch {

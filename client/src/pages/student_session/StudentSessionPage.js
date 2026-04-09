@@ -198,13 +198,19 @@ export default function StudentSessionPage() {
               {statusMeta.label}
             </span>
           </div>
-          <div className="text-muted small mt-1">
-            <i className="bi bi-people me-1" /> Group: <strong>{myGroup.name}</strong>
+          <div className="d-flex align-items-center gap-3 flex-wrap mt-1">
+            <span className="text-muted small"><i className="bi bi-people me-1" /> Group: <strong>{myGroup.name}</strong></span>
             {session?.hostTutor && (
-              <span className="ms-3">
-                <i className="bi bi-person-video3 me-1" />
-                {session.hostTutor.nickname || session.hostTutor.email || 'Tutor'}
-              </span>
+              <span className="text-muted small"><i className="bi bi-person-video3 me-1" />{session.hostTutor.nickname || session.hostTutor.email || 'Tutor'}</span>
+            )}
+            {(myGroup.courseId?._id || myGroup.courseId) && (
+              <button
+                className="btn btn-sm btn-outline-primary rounded-pill px-3 py-0"
+                style={{ fontSize: '0.78rem' }}
+                onClick={() => navigate(`/course/${myGroup.courseId?._id || myGroup.courseId}`)}
+              >
+                <i className="bi bi-book me-1" /> View Course
+              </button>
             )}
           </div>
         </div>
