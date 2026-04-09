@@ -7,12 +7,12 @@ import io from 'socket.io-client';
 
 const API_URL = config.API_URL;
 const RTC_URL = config.RTC_URL;
+const BASE_URL = API_URL.replace('/api', '');
 
 function authHeader() {
   const token = localStorage.getItem('token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
-
 async function apiFetch(path, opts = {}) {
   return fetch(`${API_URL}${path}`, {
     ...opts,
@@ -20,92 +20,102 @@ async function apiFetch(path, opts = {}) {
   });
 }
 
+const STATUS_META = {
+  draft:     { label: 'Draft',     color: '#6b7280', bg: 'rgba(107,114,128,.12)' },
+  active:    { label: 'Active',    color: '#10b981', bg: 'rgba(16,185,129,.12)'  },
+  completed: { label: 'Completed', color: '#3b82f6', bg: 'rgba(59,130,246,.12)'  },
+  archived:  { label: 'Archived',  color: '#f59e0b', bg: 'rgba(245,158,11,.12)'  },
+};
+
 export default function StudentSessionPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useContext(SettingsContext);
   const currentUser = getUser();
 
-  const [session,  setSession]  = useState(null);
-  const [myGroup,  setMyGroup]  = useState(null);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState('');
+  const [session,   setSession]   = useState(null);
+  const [myGroup,   setMyGroup]   = useState(null);
+  const [allGroups, setAllGroups] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState('');
+  const [activeTab, setActiveTab] = useState('overview');
 
-  // Chat
-  const [chatTab,          setChatTab]          = useState('general');
-  const [chatMessages,     setChatMessages]     = useState([]);
-  const [chatInput,        setChatInput]        = useState('');
-  const [chatPeers,        setChatPeers]        = useState([]);
-  const [chatPrivateWith,  setChatPrivateWith]  = useState(null); // { userId, nickname }
+  // ── Chat state ──────────────────────────────────────────────
+  const [chatTab,         setChatTab]         = useState('general');
+  const [chatMessages,    setChatMessages]    = useState([]);
+  const [chatInput,       setChatInput]       = useState('');
+  const [chatPeers,       setChatPeers]       = useState([]);
+  const [chatPrivateWith, setChatPrivateWith] = useState(null);
   const chatBottomRef = useRef(null);
   const socketRef     = useRef(null);
 
-  // ── Load session + my group ──────────────────────────────────
-  useEffect(() => {
-    (async () => {
-      try {
-        const [sessionRes, groupsRes] = await Promise.all([
-          apiFetch(`/groups/my`),
-          apiFetch(`/groups/my`),
-        ]);
-
-        // Fetch session details using groups/my → get sessionId
-        const groupsData = await groupsRes.json();
-        const groups = groupsData.data || [];
-        const myGrp = groups.find(g => String(g.sessionId) === String(id) || String(g.sessionId?._id) === String(id));
-        setMyGroup(myGrp || null);
-
-        // Try to get session info (may fail if student has no direct route)
-        try {
-          const sRes = await apiFetch(`/sessions/${id}`);
-          if (sRes.ok) {
-            const sData = await sRes.json();
-            setSession(sData.data || sData);
-          }
-        } catch (_) {}
-      } catch (e) {
-        setError('Failed to load session');
-      } finally {
-        setLoading(false);
+  // ── Load data ───────────────────────────────────────────────
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const groupsRes = await apiFetch('/groups/my');
+      if (groupsRes.ok) {
+        const gd = await groupsRes.json();
+        const groups = gd.data || [];
+        const mine = groups.find(g =>
+          String(g.sessionId?._id || g.sessionId) === String(id)
+        );
+        setMyGroup(mine || null);
+        setAllGroups(mine ? [mine] : []);
       }
-    })();
+
+      // Try to load session (may succeed if student has access via group)
+      const sessRes = await apiFetch(`/groups/my`);
+      if (sessRes.ok) {
+        const sd = await sessRes.json();
+        const grps = sd.data || [];
+        const g = grps.find(g => String(g.sessionId?._id || g.sessionId) === String(id));
+        if (g?.sessionId && typeof g.sessionId === 'object') {
+          setSession(g.sessionId);
+        }
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
-  // ── Socket chat ──────────────────────────────────────────────
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // ── Socket chat ─────────────────────────────────────────────
   useEffect(() => {
+    if (activeTab !== 'chat') {
+      if (socketRef.current) {
+        socketRef.current.emit('leave', { roomId: id });
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+      return;
+    }
     const token = localStorage.getItem('token');
     const nickname = currentUser?.name || currentUser?.email || 'Student';
     const socket = io(RTC_URL, { auth: { token } });
     socketRef.current = socket;
-
     socket.emit('join', { roomId: id, nickname });
-
     socket.on('joined', ({ peers = [], chatHistory = [] }) => {
-      setChatMessages(chatHistory);
-      setChatPeers(peers);
+      setChatMessages(chatHistory); setChatPeers(peers);
     });
-
-    socket.on('peer-joined', ({ peer }) => {
-      setChatPeers(prev => [...prev.filter(p => p.socketId !== peer.socketId), peer]);
-    });
-
-    socket.on('peer-left', ({ socketId }) => {
-      setChatPeers(prev => prev.filter(p => p.socketId !== socketId));
-    });
-
-    socket.on('chat-message', (msg) => {
-      setChatMessages(prev => {
-        if (prev.find(m => m.id === msg.id)) return prev;
-        return [...prev, msg];
-      });
-    });
-
+    socket.on('peer-joined', ({ peer }) =>
+      setChatPeers(prev => [...prev.filter(p => p.socketId !== peer.socketId), peer])
+    );
+    socket.on('peer-left', ({ socketId }) =>
+      setChatPeers(prev => prev.filter(p => p.socketId !== socketId))
+    );
+    socket.on('chat-message', msg =>
+      setChatMessages(prev => prev.find(m => m.id === msg.id) ? prev : [...prev, msg])
+    );
     return () => {
       socket.emit('leave', { roomId: id });
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [id]);
+  }, [activeTab, id]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -116,17 +126,14 @@ export default function StudentSessionPage() {
     const payload = { roomId: id, text: chatInput.trim() };
     if (chatTab === 'private' && chatPrivateWith?.userId) {
       const peer = chatPeers.find(p => p.userId === chatPrivateWith.userId);
-      if (!peer) {
-        alert(`${chatPrivateWith.nickname} is not online right now.`);
-        return;
-      }
+      if (!peer) { alert(`${chatPrivateWith.nickname} is not online.`); return; }
       payload.to = peer.socketId;
     }
     socketRef.current.emit('chat-message', payload);
     setChatInput('');
   };
 
-  // ── Render ───────────────────────────────────────────────────
+  // ── Render helpers ──────────────────────────────────────────
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
       <div className="spinner-border text-primary" />
@@ -136,201 +143,367 @@ export default function StudentSessionPage() {
   if (error || !myGroup) return (
     <div style={{ maxWidth: 500, margin: '80px auto', textAlign: 'center' }}>
       <i className="bi bi-exclamation-circle" style={{ fontSize: 48, color: 'var(--muted)' }} />
-      <p style={{ color: 'var(--muted)', marginTop: 12 }}>
-        {error || "You don't have access to this session."}
-      </p>
+      <p className="mt-3 text-muted">{error || "You don't have access to this session."}</p>
       <button className="btn btn-outline-secondary mt-2" onClick={() => navigate('/account')}>
         ← Back to Account
       </button>
     </div>
   );
 
-  const courseTitle = session?.courseId?.trans?.[0]?.title || session?.courseId?.title || 'Session';
-  const myUserId    = String(currentUser?._id || currentUser?.id);
-  const mySocketId  = socketRef.current?.id;
+  const myUserId   = String(currentUser?._id || currentUser?.id);
+  const mySocketId = socketRef.current?.id;
+  const status     = session?.status || 'active';
+  const statusMeta = STATUS_META[status] || STATUS_META.active;
 
-  // All members except self for private chat
+  // All members across my group for private chat
   const allMembers = [];
   const seen = new Set();
   (myGroup.members || []).forEach(m => {
     const userObj = m.userId;
     const uid = String(userObj?._id || userObj);
     const nick = userObj?.nickname || userObj?.email || uid;
-    if (uid !== myUserId && !seen.has(uid)) {
-      seen.add(uid);
-      allMembers.push({ userId: uid, nickname: nick });
-    }
+    if (uid !== myUserId && !seen.has(uid)) { seen.add(uid); allMembers.push({ userId: uid, nickname: nick }); }
   });
 
-  // Filter visible messages
-  const recipientPeer = chatPrivateWith?.userId
-    ? chatPeers.find(p => p.userId === chatPrivateWith.userId)
-    : null;
-
+  // Filtered chat messages
+  const recipientPeer = chatPrivateWith?.userId ? chatPeers.find(p => p.userId === chatPrivateWith.userId) : null;
   const visibleMessages = chatTab === 'general'
     ? chatMessages.filter(m => !m.to)
     : chatMessages.filter(m => {
-        if (!m.to) return false;
-        if (!recipientPeer) return false;
-        return (
-          (m.from === mySocketId && m.to === recipientPeer.socketId) ||
-          (m.from === recipientPeer.socketId && m.to === mySocketId)
-        );
+        if (!m.to || !recipientPeer) return false;
+        return (m.from === mySocketId && m.to === recipientPeer.socketId) ||
+               (m.from === recipientPeer.socketId && m.to === mySocketId);
       });
 
+  const tabs = ['overview', 'schedule', 'members', 'chat'];
+
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px 16px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button className="btn btn-outline-secondary btn-sm" style={{ borderRadius: 20 }} onClick={() => navigate('/account')}>
+    <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px' }}>
+
+      {/* ── Header ── */}
+      <div className="d-flex align-items-start gap-3 mb-4">
+        <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => navigate('/account')}>
           <i className="bi bi-arrow-left" />
         </button>
-        <div>
-          <h4 style={{ margin: 0, fontWeight: 700 }}>{courseTitle}</h4>
-          <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-            Group: {myGroup.name} · {myGroup.members?.length || 0} members
-          </span>
-        </div>
-        <span style={{
-          marginLeft: 'auto', fontSize: '0.75rem', fontWeight: 600,
-          padding: '4px 12px', borderRadius: 20,
-          background: 'rgba(16,185,129,.15)', color: '#10b981',
-          border: '1px solid rgba(16,185,129,.3)',
-        }}>
-          <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#10b981', marginRight: 5 }} />
-          Connected
-        </span>
-      </div>
-
-      {/* Chat card */}
-      <div className="card border-0 shadow-sm" style={{ borderRadius: 16, overflow: 'hidden', height: 540, display: 'flex', flexDirection: 'column' }}>
-        {/* Sub-tabs */}
-        <div className="card-header border-0 pt-3 pb-0 px-4" style={{ background: 'transparent' }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div className="nav nav-pills gap-1">
-              <button
-                className={`nav-link px-3 py-1 ${chatTab === 'general' ? 'active' : ''}`}
-                style={{ fontSize: '0.85rem', borderRadius: 20 }}
-                onClick={() => { setChatTab('general'); setChatPrivateWith(null); }}
-              >
-                <i className="bi bi-chat-dots me-1" /> General
-              </button>
-              <button
-                className={`nav-link px-3 py-1 ${chatTab === 'private' ? 'active' : ''}`}
-                style={{ fontSize: '0.85rem', borderRadius: 20 }}
-                onClick={() => setChatTab('private')}
-              >
-                <i className="bi bi-lock me-1" /> Private
-              </button>
-            </div>
-
-            {chatTab === 'private' && (
-              <select
-                className="form-select form-select-sm"
-                style={{ maxWidth: 260, borderRadius: 12 }}
-                value={chatPrivateWith?.userId || ''}
-                onChange={e => {
-                  if (!e.target.value) { setChatPrivateWith(null); return; }
-                  const opt = e.target.options[e.target.selectedIndex];
-                  setChatPrivateWith({ userId: e.target.value, nickname: opt.dataset.nickname || opt.text.replace(' 🟢','').replace(' ⚫','') });
-                }}
-              >
-                <option value="">— Select recipient —</option>
-                {allMembers.map(m => {
-                  const isOnline = chatPeers.some(p => p.userId === m.userId);
-                  return (
-                    <option key={m.userId} value={m.userId} data-nickname={m.nickname}>
-                      {m.nickname} {isOnline ? '🟢' : '⚫'}
-                    </option>
-                  );
-                })}
-              </select>
+        <div className="flex-grow-1">
+          <div className="d-flex align-items-center gap-2 flex-wrap">
+            <h4 className="fw-bold mb-0">
+              {myGroup.courseId?.trans?.[0]?.title || myGroup.courseId?.title || 'Session'}
+            </h4>
+            <span style={{
+              fontSize: '0.75rem', fontWeight: 600, padding: '3px 10px',
+              borderRadius: 20, color: statusMeta.color, background: statusMeta.bg,
+              border: `1px solid ${statusMeta.color}33`,
+            }}>
+              {statusMeta.label}
+            </span>
+          </div>
+          <div className="text-muted small mt-1">
+            <i className="bi bi-people me-1" /> Group: <strong>{myGroup.name}</strong>
+            {session?.hostTutor && (
+              <span className="ms-3">
+                <i className="bi bi-person-video3 me-1" />
+                {session.hostTutor.nickname || session.hostTutor.email || 'Tutor'}
+              </span>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Messages */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {visibleMessages.length === 0 ? (
-            <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--muted)' }}>
-              <i className="bi bi-chat-square-dots" style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
-              <span style={{ fontSize: '0.85rem' }}>
-                {chatTab === 'private' && !chatPrivateWith
-                  ? 'Select a recipient above to start a private conversation'
-                  : 'No messages yet. Start the conversation!'}
-              </span>
+      {/* ── Tabs ── */}
+      <div className="d-flex gap-2 mb-4 border-bottom pb-0" style={{ overflowX: 'auto' }}>
+        {tabs.map(tab => (
+          <button
+            key={tab}
+            className={`btn btn-link text-capitalize px-3 py-2 text-decoration-none border-0 ${activeTab === tab ? 'fw-bold text-primary border-bottom border-primary border-2' : 'text-muted'}`}
+            style={{ borderBottom: activeTab === tab ? '2px solid var(--primary-color, #3b82f6)' : '2px solid transparent', borderRadius: 0, whiteSpace: 'nowrap' }}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab === 'chat' && <i className="bi bi-chat-dots me-1" />}
+            {tab === 'schedule' && <i className="bi bi-calendar3 me-1" />}
+            {tab === 'members' && <i className="bi bi-people me-1" />}
+            {tab === 'overview' && <i className="bi bi-grid me-1" />}
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Overview ── */}
+      {activeTab === 'overview' && (
+        <div className="row g-3">
+          {/* Course thumbnail */}
+          {myGroup.courseId?.links?.find(l => l.type === 'image') && (
+            <div className="col-12">
+              <img
+                src={`${BASE_URL}${myGroup.courseId.links.find(l => l.type === 'image').url}`}
+                alt="course"
+                style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 14 }}
+                onError={e => { e.target.style.display = 'none'; }}
+              />
             </div>
-          ) : (
-            visibleMessages.map((msg, i) => {
+          )}
+
+          {/* Stats */}
+          <div className="col-6 col-md-3">
+            <div className="card border-0 shadow-sm text-center p-3">
+              <div className="fw-bold fs-4">{myGroup.members?.length || 0}</div>
+              <div className="text-muted small">Members</div>
+            </div>
+          </div>
+          <div className="col-6 col-md-3">
+            <div className="card border-0 shadow-sm text-center p-3">
+              <div className="fw-bold fs-4">{session?.schedule?.length || 0}</div>
+              <div className="text-muted small">Classes</div>
+            </div>
+          </div>
+          <div className="col-6 col-md-3">
+            <div className="card border-0 shadow-sm text-center p-3">
+              <div className="fw-bold fs-4 text-capitalize" style={{ color: statusMeta.color }}>{status}</div>
+              <div className="text-muted small">Status</div>
+            </div>
+          </div>
+          <div className="col-6 col-md-3">
+            <div className="card border-0 shadow-sm text-center p-3">
+              <div className="fw-bold fs-4">
+                {chatPeers.length > 0
+                  ? <span style={{ color: '#10b981' }}>🟢 {chatPeers.length}</span>
+                  : <span className="text-muted">—</span>}
+              </div>
+              <div className="text-muted small">Online</div>
+            </div>
+          </div>
+
+          {/* Upcoming classes */}
+          {session?.schedule?.length > 0 && (() => {
+            const upcoming = session.schedule
+              .filter(c => new Date(c.datetime) > new Date())
+              .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
+              .slice(0, 3);
+            if (!upcoming.length) return null;
+            return (
+              <div className="col-12">
+                <div className="card border-0 shadow-sm p-3">
+                  <h6 className="fw-bold mb-3"><i className="bi bi-calendar-event me-2 text-primary" />Upcoming Classes</h6>
+                  {upcoming.map((cls, i) => (
+                    <div key={i} className="d-flex align-items-center gap-3 py-2 border-bottom last-no-border">
+                      <div style={{ background: 'rgba(59,130,246,.1)', borderRadius: 10, padding: '6px 12px', textAlign: 'center', minWidth: 54 }}>
+                        <div className="fw-bold text-primary" style={{ fontSize: '1rem' }}>{new Date(cls.datetime).getDate()}</div>
+                        <div className="text-muted" style={{ fontSize: '0.65rem' }}>{new Date(cls.datetime).toLocaleString('en', { month: 'short' })}</div>
+                      </div>
+                      <div>
+                        <div className="fw-semibold" style={{ fontSize: '0.9rem' }}>{cls.title}</div>
+                        <div className="text-muted small">
+                          {new Date(cls.datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {cls.durationMin && ` · ${cls.durationMin} min`}
+                          {cls.meetingLink && (
+                            <a href={cls.meetingLink} target="_blank" rel="noopener noreferrer" className="ms-2">
+                              <i className="bi bi-camera-video text-primary" /> Join
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ── Schedule ── */}
+      {activeTab === 'schedule' && (
+        <div className="card border-0 shadow-sm">
+          <div className="card-body p-0">
+            {!session?.schedule?.length ? (
+              <div className="text-center py-5 text-muted">
+                <i className="bi bi-calendar-x fs-1 d-block mb-2" />
+                No classes scheduled yet.
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-hover mb-0 align-middle">
+                  <thead style={{ background: 'rgba(0,0,0,0.05)' }}>
+                    <tr className="small text-uppercase text-muted">
+                      <th className="px-4 py-3">Topic</th>
+                      <th className="py-3">Date & Time</th>
+                      <th className="py-3">Duration</th>
+                      <th className="py-3">Link</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...session.schedule]
+                      .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
+                      .map((cls, i) => {
+                        const isPast = new Date(cls.datetime) < new Date();
+                        return (
+                          <tr key={i} style={{ opacity: isPast ? 0.55 : 1 }}>
+                            <td className="px-4 py-3">
+                              <div className="fw-semibold">{cls.title}</div>
+                              {cls.notes && <div className="text-muted small">{cls.notes}</div>}
+                            </td>
+                            <td className="py-3">
+                              <div>{new Date(cls.datetime).toLocaleDateString()}</div>
+                              <div className="text-muted small">{new Date(cls.datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                            </td>
+                            <td className="py-3 text-muted">{cls.durationMin ? `${cls.durationMin} min` : '—'}</td>
+                            <td className="py-3">
+                              {cls.meetingLink ? (
+                                <a href={cls.meetingLink} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-primary rounded-pill px-3">
+                                  <i className="bi bi-camera-video me-1" /> Join
+                                </a>
+                              ) : <span className="text-muted">—</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Members ── */}
+      {activeTab === 'members' && (
+        <div className="card border-0 shadow-sm">
+          <div className="card-header bg-transparent border-0 px-4 pt-4">
+            <h6 className="fw-bold mb-0">Group: {myGroup.name} · {myGroup.members?.length || 0} member{myGroup.members?.length !== 1 ? 's' : ''}</h6>
+          </div>
+          <div className="card-body p-0">
+            <div className="table-responsive">
+              <table className="table mb-0 align-middle">
+                <thead style={{ background: 'rgba(0,0,0,0.05)' }}>
+                  <tr className="small text-uppercase text-muted">
+                    <th className="px-4 py-3">Member</th>
+                    <th className="py-3">Online</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(myGroup.members || []).map((m, i) => {
+                    const userObj = m.userId;
+                    const uid = String(userObj?._id || userObj);
+                    const nick = userObj?.nickname || userObj?.email || uid;
+                    const isMe = uid === myUserId;
+                    const isOnline = chatPeers.some(p => p.userId === uid);
+                    return (
+                      <tr key={i}>
+                        <td className="px-4 py-3">
+                          <div className="d-flex align-items-center gap-2">
+                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--primary-color, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.8rem', fontWeight: 700, flexShrink: 0 }}>
+                              {nick.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="fw-semibold" style={{ fontSize: '0.9rem' }}>
+                                {nick} {isMe && <span className="badge bg-secondary ms-1" style={{ fontSize: '0.65rem' }}>You</span>}
+                              </div>
+                              {userObj?.email && <div className="text-muted small">{userObj.email}</div>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3">
+                          {isOnline
+                            ? <span style={{ color: '#10b981', fontSize: '0.8rem' }}>🟢 Online</span>
+                            : <span className="text-muted" style={{ fontSize: '0.8rem' }}>⚫ Offline</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Chat ── */}
+      {activeTab === 'chat' && (
+        <div className="card border-0 shadow-sm" style={{ height: 520, display: 'flex', flexDirection: 'column' }}>
+          {/* Sub-tabs */}
+          <div className="card-header border-0 pt-3 pb-0 px-4" style={{ background: 'transparent' }}>
+            <div className="d-flex gap-2 align-items-center flex-wrap">
+              <div className="nav nav-pills gap-1">
+                {['general', 'private'].map(sub => (
+                  <button
+                    key={sub}
+                    className={`nav-link px-3 py-1 ${chatTab === sub ? 'active' : ''}`}
+                    style={{ fontSize: '0.85rem', borderRadius: 20 }}
+                    onClick={() => { setChatTab(sub); if (sub === 'general') setChatPrivateWith(null); }}
+                  >
+                    <i className={`bi ${sub === 'general' ? 'bi-chat-dots' : 'bi-lock'} me-1`} />
+                    {sub === 'general' ? 'General' : 'Private'}
+                  </button>
+                ))}
+              </div>
+              {chatTab === 'private' && (
+                <select
+                  className="form-select form-select-sm"
+                  style={{ maxWidth: 240, borderRadius: 12 }}
+                  value={chatPrivateWith?.userId || ''}
+                  onChange={e => {
+                    if (!e.target.value) { setChatPrivateWith(null); return; }
+                    const opt = e.target.options[e.target.selectedIndex];
+                    setChatPrivateWith({ userId: e.target.value, nickname: opt.dataset.nickname || opt.text.replace(/ [🟢⚫].*/,'') });
+                  }}
+                >
+                  <option value="">— Select recipient —</option>
+                  {allMembers.map(m => {
+                    const online = chatPeers.some(p => p.userId === m.userId);
+                    return <option key={m.userId} value={m.userId} data-nickname={m.nickname}>{m.nickname} {online ? '🟢' : '⚫'}</option>;
+                  })}
+                </select>
+              )}
+              {chatPeers.length > 0 && (
+                <span className="ms-auto text-muted small"><i className="bi bi-circle-fill me-1" style={{ color: '#10b981', fontSize: '0.5rem' }} />{chatPeers.length} online</span>
+              )}
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {visibleMessages.length === 0 ? (
+              <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--muted)' }}>
+                <i className="bi bi-chat-square-dots" style={{ fontSize: 32, display: 'block', marginBottom: 8 }} />
+                <span style={{ fontSize: '0.85rem' }}>
+                  {chatTab === 'private' && !chatPrivateWith ? 'Select a recipient above' : 'No messages yet.'}
+                </span>
+              </div>
+            ) : visibleMessages.map((msg, i) => {
               const isMe = msg.from === mySocketId;
               return (
                 <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
-                  {!isMe && (
-                    <span style={{ fontSize: '0.72rem', color: 'var(--muted)', marginBottom: 2, paddingLeft: 4 }}>
-                      {msg.fromNickname || 'User'}
-                    </span>
-                  )}
-                  <div style={{
-                    maxWidth: '70%', padding: '8px 14px',
-                    borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                    background: isMe ? 'var(--primary-color, #3b82f6)' : 'var(--input-bg, rgba(255,255,255,0.07))',
-                    color: isMe ? '#fff' : 'var(--text)',
-                    fontSize: '0.88rem', lineHeight: 1.45, wordBreak: 'break-word',
-                  }}>
+                  {!isMe && <span style={{ fontSize: '0.72rem', color: 'var(--muted)', marginBottom: 2, paddingLeft: 4 }}>{msg.fromNickname || 'User'}</span>}
+                  <div style={{ maxWidth: '70%', padding: '8px 14px', borderRadius: isMe ? '18px 18px 4px 18px' : '18px 18px 18px 4px', background: isMe ? 'var(--primary-color, #3b82f6)' : 'var(--input-bg, rgba(255,255,255,0.07))', color: isMe ? '#fff' : 'var(--text)', fontSize: '0.88rem', lineHeight: 1.45, wordBreak: 'break-word' }}>
                     {msg.text}
                   </div>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--muted)', marginTop: 2 }}>
-                    {new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--muted)', marginTop: 2 }}>{new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
               );
-            })
-          )}
-          <div ref={chatBottomRef} />
-        </div>
+            })}
+            <div ref={chatBottomRef} />
+          </div>
 
-        {/* Input */}
-        <div className="card-footer border-0 px-4 pb-4 pt-2" style={{ background: 'transparent' }}>
-          {chatTab === 'private' && !chatPrivateWith ? (
-            <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem', padding: '8px 0' }}>
-              <i className="bi bi-person-check me-1" /> Select a recipient above
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                className="form-control"
-                style={{ borderRadius: 22, padding: '8px 16px' }}
-                placeholder={chatTab === 'private' ? `Message ${chatPrivateWith?.nickname || ''}…` : 'Message everyone…'}
-                value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-              />
-              <button
-                className="btn btn-primary"
-                style={{ borderRadius: 22, padding: '8px 18px' }}
-                onClick={sendMessage}
-                disabled={!chatInput.trim()}
-              >
-                <i className="bi bi-send-fill" />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Online peers */}
-      {chatPeers.length > 0 && (
-        <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Online now:</span>
-          {chatPeers.map(p => (
-            <span key={p.socketId} style={{
-              fontSize: '0.75rem', padding: '2px 10px', borderRadius: 20,
-              background: 'rgba(16,185,129,.12)', color: '#10b981',
-              border: '1px solid rgba(16,185,129,.25)',
-            }}>
-              🟢 {p.nickname}
-            </span>
-          ))}
+          {/* Input */}
+          <div className="card-footer border-0 px-4 pb-4 pt-2" style={{ background: 'transparent' }}>
+            {chatTab === 'private' && !chatPrivateWith ? (
+              <div className="text-center text-muted small py-2"><i className="bi bi-person-check me-1" />Select a recipient above</div>
+            ) : (
+              <div className="d-flex gap-2">
+                <input
+                  className="form-control"
+                  style={{ borderRadius: 22, padding: '8px 16px' }}
+                  placeholder={chatTab === 'private' ? `Message ${chatPrivateWith?.nickname || ''}…` : 'Message everyone…'}
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                />
+                <button className="btn btn-primary" style={{ borderRadius: 22, padding: '8px 18px' }} onClick={sendMessage} disabled={!chatInput.trim()}>
+                  <i className="bi bi-send-fill" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

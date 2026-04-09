@@ -179,7 +179,13 @@ function AccountPage() {
             if (cRes.ok) {
               const cData = await cRes.json();
               const c = cData.data || cData;
-              return { ...s, courseTitle: c.trans?.[0]?.title || c.title || 'Session' };
+              const BASE = API_URL.replace('/api', '');
+              const thumb = (c.links || []).find(l => l.type === 'image');
+              return {
+                ...s,
+                courseTitle: c.trans?.[0]?.title || c.title || 'Session',
+                courseImg: thumb ? `${BASE}${thumb.url}` : null,
+              };
             }
           } catch (_) {}
           return s;
@@ -493,27 +499,31 @@ function AccountPage() {
                 {mySessions.map(s => (
                   <div
                     key={s.sessionId}
-                    className="card border-0 p-3"
-                    style={{ background: 'var(--card-bg, rgba(255,255,255,0.04))', borderRadius: 14, cursor: 'pointer', transition: '0.2s' }}
-                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.01)'}
-                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                    className="card border-0 p-0 overflow-hidden"
+                    style={{ background: 'var(--card-bg, rgba(255,255,255,0.04))', borderRadius: 14, cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
+                    onClick={() => navigate(`/session/${s.sessionId}`)}
+                    onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.01)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; }}
                   >
-                    <div className="d-flex align-items-center justify-content-between">
-                      <div>
-                        <div className="fw-semibold" style={{ fontSize: '0.95rem' }}>
+                    <div className="d-flex align-items-center p-3 gap-3">
+                      {/* Thumbnail */}
+                      <img
+                        src={s.courseImg || 'https://via.placeholder.com/72x54?text=📚'}
+                        alt={s.courseTitle}
+                        style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }}
+                        onError={e => { e.target.src = 'https://via.placeholder.com/72x54?text=📚'; }}
+                      />
+                      {/* Info */}
+                      <div className="flex-grow-1 min-width-0">
+                        <div className="fw-semibold text-truncate" style={{ fontSize: '0.95rem' }}>
                           {s.courseTitle || 'Course Session'}
                         </div>
                         <div className="text-muted small mt-1">
-                          <i className="bi bi-people me-1" /> Group: {s.groupName}
+                          <i className="bi bi-people me-1" /> {s.groupName}
                         </div>
                       </div>
-                      <button
-                        className="btn btn-primary btn-sm rounded-pill px-3"
-                        style={{ whiteSpace: 'nowrap' }}
-                        onClick={() => navigate(`/session/${s.sessionId}`)}
-                      >
-                        <i className="bi bi-chat-dots me-1" /> {t('accountPage.joinChat')}
-                      </button>
+                      {/* Arrow */}
+                      <i className="bi bi-chat-dots-fill text-primary fs-5 flex-shrink-0" />
                     </div>
                   </div>
                 ))}
