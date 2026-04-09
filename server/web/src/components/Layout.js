@@ -122,7 +122,7 @@ function Sidebar({ data, onLogout, mobileOpen, onClose, collapsed, onCollapseCli
                     {!collapsed && (
                         <div className="sidebar-user-info">
                             <div className="sidebar-user-name">{data?.nickname || data?.email || 'User'}</div>
-                            <div className="sidebar-user-role" style={{ color:roleColor }}>{data?.accessLevel}{data?.tutorRank?` · ${data.tutorRank}`:''}</div>
+                            <div className="sidebar-user-role" style={{ color:roleColor }}>{data?.accessLevel}</div>
                         </div>
                     )}
                 </div>

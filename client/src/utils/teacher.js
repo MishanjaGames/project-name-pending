@@ -11,7 +11,7 @@ const API_URL = config.API_URL;
  *   cert_N     — файлы сертификатов
  *   example_N  — файлы примеров работ
  */
-export async function submitTeacherApplication(formData) {
+export async function submitTeacherApplication(formData, formType = 'tutor') {
   const token = localStorage.getItem('token');
 
   const headers = {};
@@ -22,7 +22,7 @@ export async function submitTeacherApplication(formData) {
   }
   // Content-Type НЕ устанавливаем — браузер сам выставит boundary для multipart
 
-  const res = await fetch(`${API_URL}/forms/apply/tutor`, {
+  const res = await fetch(`${API_URL}/forms/apply/${formType}`, {
     method: 'POST',
     headers,
     body: formData,

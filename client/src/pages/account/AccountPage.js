@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getUser, setUser, clearUser } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import config from '../../config/config';
+import { UtilityModal } from '../../components/UtilityModal';
 
 const API_URL = config.API_URL;
 const BASE_URL = API_URL.replace('/api', '');
@@ -16,6 +17,8 @@ function AccountPage() {
   const [createdCourses, setCreatedCourses] = useState([]);
   const [stats, setStats]         = useState({ courseCount: 0, linkCount: 0 });
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'updated' | 'error'
+  const [mySessions, setMySessions] = useState([]); // sessions student belongs to
+  const [modal, setModal] = useState({ show: false, title: '', message: '' });
 
   // --- использование useRef для предотвращения повторных запросов ---
   const syncInitDone = useRef(false);
@@ -146,6 +149,77 @@ function AccountPage() {
       })
       .catch(err => console.error('Error fetching courses:', err));
   }, [user?.id]); // Зависимость только от user.id, не от объекта
+
+  // ─── Загрузка сессий студента ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    const token = localStorage.getItem('token');
+    fetch(`${API_URL}/groups/my`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(async data => {
+        if (!data) return;
+        const groups = data.data || [];
+        // Dedupe by sessionId → one entry per session
+        const sessionMap = new Map();
+        groups.forEach(g => {
+          const sid = String(g.sessionId?._id || g.sessionId);
+          if (!sessionMap.has(sid)) {
+            sessionMap.set(sid, { sessionId: sid, groupName: g.name, courseId: g.courseId });
+          }
+        });
+        const sessions = [...sessionMap.values()];
+
+        // Try to resolve course titles
+        const withTitles = await Promise.all(sessions.map(async s => {
+          if (!s.courseId) return s;
+          try {
+            const cRes = await fetch(`${API_URL}/courses/${s.courseId}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (cRes.ok) {
+              const cData = await cRes.json();
+              const c = cData.data || cData;
+              const BASE = API_URL.replace('/api', '');
+              const thumb = (c.links || []).find(l => l.type === 'image');
+              return {
+                ...s,
+                courseTitle: c.trans?.[0]?.title || c.title || 'Session',
+                courseImg: thumb ? `${BASE}${thumb.url}` : null,
+              };
+            }
+          } catch (_) {}
+          return s;
+        }));
+
+        setMySessions(withTitles);
+      })
+      .catch(() => {});
+  }, [user?.id]);
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const handleDeleteCourse = async () => {
+    if (!deleteTarget) return;
+    const cId = deleteTarget._id || deleteTarget.id;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/manage/courses/${cId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setCreatedCourses(prev => prev.filter(item => (item._id || item.id) !== cId));
+      } else {
+        const err = await res.json();
+        setModal({ show: true, title: 'Error', message: `${t('accountPage.deleteFailed')} ${err.message || ''}` });
+      }
+    } catch {
+      setModal({ show: true, title: 'Error', message: t('accountPage.serverErrorDelete') });
+    }
+    setDeleteTarget(null);
+  };
 
   if (!user) {
     setTimeout(() => navigate('/login'), 0);
@@ -291,7 +365,7 @@ function AccountPage() {
                 ) : (
                   <div className="d-grid gap-3">
                     {createdCourses.map(c => {
-                      let imgSrc = 'https://via.placeholder.com/60x45?text=No+Img';
+                      let imgSrc = 'https://placehold.co/60x45?text=No+Img';
                       if (c.links?.length > 0 && c.links[0].url) {
                         let cleanUrl = c.links[0].url.replace(/\\/g, '/').replace('/api/manage/courses', '/api/courses');
                         imgSrc = cleanUrl.startsWith('http') ? cleanUrl : `${BASE_URL}${cleanUrl}`;
@@ -314,7 +388,7 @@ function AccountPage() {
                               alt={c.title || c.trans?.[0]?.title || 'Course'}
                               className="rounded-3 shadow-sm me-3"
                               style={{ width: '60px', height: '45px', objectFit: 'cover' }}
-                              onError={e => { e.target.src = 'https://via.placeholder.com/60x45?text=No+Img'; }}
+                              onError={e => { e.target.src = 'https://placehold.com/60x45?text=No+Img'; }}
                             />
                             <div className="flex-grow-1">
                               <h6 className="fw-bold mb-0 text-truncate">{c.title || c.trans?.[0]?.title || 'Untitled Course'}</h6>
@@ -340,25 +414,7 @@ function AccountPage() {
                               </button>
                               <button
                                 className="btn btn-sm btn-outline-danger"
-                                onClick={async e => {
-                                  e.stopPropagation();
-                                  if (!window.confirm(t('accountPage.deleteConfirm'))) return;
-                                  try {
-                                    const token = localStorage.getItem('token');
-                                    const res = await fetch(`${API_URL}/manage/courses/${c._id || c.id}`, {
-                                      method: 'DELETE',
-                                      headers: { 'Authorization': `Bearer ${token}` },
-                                    });
-                                    if (res.ok) {
-                                      setCreatedCourses(prev => prev.filter(item => (item._id || item.id) !== (c._id || c.id)));
-                                    } else {
-                                      const err = await res.json();
-                                      alert(`${t('accountPage.deleteFailed')} ${err.message || ''}`);
-                                    }
-                                  } catch {
-                                    alert(t('accountPage.serverErrorDelete'));
-                                  }
-                                }}
+                                onClick={e => { e.stopPropagation(); setDeleteTarget(c); }}
                               >
                                 <i className="bi bi-trash"></i>
                               </button>
@@ -416,11 +472,11 @@ function AccountPage() {
                     >
                       <div className="d-flex align-items-center">
                         <img
-                          src={c.img || 'https://via.placeholder.com/80x60?text=Course'}
+                          src={c.img || 'https://placehold.co/80x60?text=Course'}
                           alt={c.title}
                           className="rounded-3 shadow-sm me-3"
                           style={{ width: '80px', height: '60px', objectFit: 'cover' }}
-                          onError={e => { e.target.src = 'https://via.placeholder.com/80x60?text=Course'; }}
+                          onError={e => { e.target.src = 'https://placehold.co/80x60?text=Course'; }}
                         />
                         <div className="flex-grow-1">
                           <h6 className="fw-bold mb-1 text-truncate">{c.title || c.trans?.[0]?.title || 'Untitled Course'}</h6>
@@ -439,8 +495,69 @@ function AccountPage() {
             </div>
           </div>
 
+          {/* My Sessions */}
+          {mySessions.length > 0 && (
+            <div className="card border-0 shadow-sm">
+              <div className="card-header bg-transparent border-0 pt-4 px-4 d-flex align-items-center gap-2">
+                <i className="bi bi-people-fill text-primary" />
+                <h5 className="fw-bold mb-0">{t('accountPage.mySessions')}</h5>
+              </div>
+              <div className="card-body p-4 d-grid gap-3">
+                {mySessions.map(s => (
+                  <div
+                    key={s.sessionId}
+                    className="card border-0 p-0 overflow-hidden"
+                    style={{ background: 'var(--card-bg, rgba(255,255,255,0.04))', borderRadius: 14, cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
+                    onClick={() => navigate(`/session/${s.sessionId}`)}
+                    onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.01)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; }}
+                  >
+                    <div className="d-flex align-items-center p-3 gap-3">
+                      {/* Thumbnail */}
+                      <img
+                        src={s.courseImg || 'https://placehold.co/72x54?text=📚'}
+                        alt={s.courseTitle}
+                        style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }}
+                        onError={e => { e.target.src = 'https://placehold.co/72x54?text=📚'; }}
+                      />
+                      {/* Info */}
+                      <div className="flex-grow-1 min-width-0">
+                        <div className="fw-semibold text-truncate" style={{ fontSize: '0.95rem' }}>
+                          {s.courseTitle || 'Course Session'}
+                        </div>
+                        <div className="text-muted small mt-1">
+                          <i className="bi bi-people me-1" /> {s.groupName}
+                        </div>
+                      </div>
+                      {/* Arrow */}
+                      <i className="bi bi-chat-dots-fill text-primary fs-5 flex-shrink-0" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
+      <UtilityModal
+        show={!!deleteTarget}
+        type="confirm"
+        danger
+        title={t('accountPage.deleteConfirm') || 'Delete course?'}
+        message={deleteTarget ? `"${deleteTarget.title || deleteTarget.trans?.[0]?.title}" will be permanently deleted.` : ''}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={handleDeleteCourse}
+        onCancel={() => setDeleteTarget(null)}
+      />
+      <UtilityModal
+        show={modal.show}
+        type="info"
+        title={modal.title}
+        message={modal.message}
+        onClose={() => setModal({ show: false, title: '', message: '' })}
+      />
     </div>
   );
 }

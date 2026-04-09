@@ -38,7 +38,9 @@ function EditCoursePage() {
     const [courseFilesPreview, setCourseFilesPreview] = useState([]);
     const [existingFiles, setExistingFiles] = useState([]); 
     const [loadingFiles, setLoadingFiles] = useState(false);
-    const [fileTypeFilter, setFileTypeFilter] = useState('all'); // 'all' | 'video' | 'image' | 'document' | 'archive'
+    const [fileTypeFilter, setFileTypeFilter] = useState('all');
+    const [deleteFileTarget, setDeleteFileTarget] = useState(null); // { fileIndex, name }
+    const [modal, setModal] = useState({ show: false, title: '', message: '', onClose: null });
 
     const token = localStorage.getItem('token');
     const authHeader = `Bearer ${token}`; 
@@ -203,25 +205,30 @@ function EditCoursePage() {
         setCourseFilesPreview(prev => prev.filter((_, i) => i !== index));
     };
 
-    const deleteExistingFile = async (fileIndex) => {
+    const deleteExistingFile = (fileIndex) => {
         const file = existingFiles[fileIndex];
-        if (!window.confirm(`${t('editCourse.confirmDeleteFile')} "${file.originalName || file.filename}"?`)) return;
+        setDeleteFileTarget({ fileIndex, name: file.originalName || file.filename });
+    };
 
+    const confirmDeleteFile = async () => {
+        if (!deleteFileTarget) return;
+        const { fileIndex } = deleteFileTarget;
+        const file = existingFiles[fileIndex];
         try {
             const fileIdentifier = file.filename || file.originalName;
             const response = await fetch(`${API_URL}/manage/courses/${id}/files/${fileIdentifier}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' }
             });
-
             if (response.ok) {
                 setExistingFiles(prev => prev.filter((_, i) => i !== fileIndex));
             } else {
-                alert(t('editCourse.alertDeleteFailed'));
+                setModal({ show: true, title: 'Error', message: t('editCourse.alertDeleteFailed'), onClose: null });
             }
         } catch (error) {
             console.error('Error deleting file:', error);
         }
+        setDeleteFileTarget(null);
     };
 
     const validateForm = () => {
@@ -281,11 +288,10 @@ function EditCoursePage() {
                 });
             }
 
-            alert(t('editCourse.alertSuccess'));
-            navigate('/account'); 
+            setModal({ show: true, title: '✓ Saved', message: t('editCourse.alertSuccess'), onClose: () => navigate('/account') });
         } catch (error) {
             console.error('Error updating course:', error);
-            alert(t('editCourse.alertError'));
+            setModal({ show: true, title: 'Error', message: t('editCourse.alertError'), onClose: null });
         } finally {
             setSaving(false);
         }
@@ -609,6 +615,24 @@ function EditCoursePage() {
                     </div>
                 </div>
             </div>
+        <UtilityModal
+            show={!!deleteFileTarget}
+            type="confirm"
+            danger
+            title={t('editCourse.confirmDeleteFile') || 'Delete file?'}
+            message={deleteFileTarget ? `"${deleteFileTarget.name}" will be permanently removed.` : ''}
+            confirmLabel="Delete"
+            cancelLabel="Cancel"
+            onConfirm={confirmDeleteFile}
+            onCancel={() => setDeleteFileTarget(null)}
+        />
+        <UtilityModal
+            show={modal.show}
+            type="info"
+            title={modal.title}
+            message={modal.message}
+            onClose={() => { setModal({ show: false, title: '', message: '', onClose: null }); modal.onClose?.(); }}
+        />
         </div>
     );
 }

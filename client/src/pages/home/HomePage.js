@@ -22,7 +22,7 @@ function HomePage() {
         const data = await courseService.getAll();
         
         const latest = data.slice(0, 4).map(c => {
-          let imgSrc = 'https://placehold.co/400x250/21262d/e6edf3?text=No+Image';
+          let imgSrc = 'https://placehold.co/400x250?text=No+Img';
           if (c.links && c.links.length > 0) {
             const imageLink = c.links.find(l => l.type === 'image') || c.links[0];
             if (imageLink && imageLink.url) {

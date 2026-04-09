@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { setUser } from '../../utils/auth';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import config from '../../config/config';
+import { UtilityModal } from '../../components/UtilityModal';
 
 const API_URL = config.API_URL;
 
@@ -12,6 +13,8 @@ function LoginPage() {
   
   const [loginId, setLoginId] = useState(''); 
   const [password, setPassword] = useState('');
+  const [errorModal, setErrorModal] = useState({ show: false, message: '' });
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -30,6 +33,8 @@ function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody) 
       });
+
+      
 
       if (!response.ok) {
         let errorMessage = t('common.loginFailed');
@@ -82,7 +87,7 @@ function LoginPage() {
       
     } catch (error) {
       console.error('Login error:', error);
-      alert(`${t('auth.loginError')} ${error.message}`);
+      setErrorModal({ show: true, message: `${t('auth.loginError')} ${error.message}` });
     }
   };
 
@@ -110,14 +115,24 @@ function LoginPage() {
 
           <div className="mb-3">
             <label htmlFor="password" className="form-label">{t('auth.password')}</label>
-            <input
-              type="password"
-              className="form-control form-control-lg"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div className="input-group">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="form-control form-control-lg"
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={() => setShowPassword(v => !v)}
+                tabIndex={-1}
+              >
+                <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} />
+              </button>
+            </div>
           </div>
 
           <button
@@ -129,6 +144,13 @@ function LoginPage() {
           </button>
         </div>
       </div>
+      <UtilityModal
+        show={errorModal.show}
+        type="info"
+        title={t('auth.loginError') || 'Login failed'}
+        message={errorModal.message}
+        onClose={() => setErrorModal({ show: false, message: '' })}
+      />
     </div>
   );
 }

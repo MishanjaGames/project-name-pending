@@ -4,6 +4,7 @@ import { useCart } from '../../contexts/CartContext';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import { promoService } from '../../api/promoService';
 import { getUser, setUser } from '../../utils/auth';
+import { UtilityModal } from '../../components/UtilityModal';
 import config from '../../config/config';
 
 const API_URL = config.API_URL;
@@ -109,6 +110,7 @@ function CartPage() {
   const [checkoutStep, setCheckoutStep]           = useState(1);
   const [isProcessing, setIsProcessing]           = useState(false);
   const [paymentSuccess, setPaymentSuccess]       = useState(false);
+  const [errModal, setErrModal]                   = useState({ show: false, message: '' });
 
   /* --- payment form --- */
   const [paymentData, setPaymentData] = useState({
@@ -230,8 +232,26 @@ function CartPage() {
         }
       }
 
-      // 3. Получаем актуальные данные курсов из корзины через API
+      // 2b. Вызываем purchase API для каждого курса (добавляет в user.courses на сервере)
       const token = localStorage.getItem('token');
+      for (const item of items) {
+        const courseId = item.id || item.courseId;
+        if (!courseId) continue;
+        try {
+          await fetch(`${API_URL}/courses/${courseId}/purchase`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ promoCode: promoCode || undefined }),
+          });
+        } catch (e) {
+          console.warn('Purchase API call failed for', courseId, e);
+        }
+      }
+
+      // 3. Получаем актуальные данные курсов из корзины через API
       const fetchedCourses = await Promise.all(
         items.map(async (item) => {
           const courseId = item.id || item.courseId;
@@ -243,13 +263,15 @@ function CartPage() {
             if (!res.ok) return null;
             const data = await res.json();
             const c = data.data || data;
+            const BASE = API_URL.replace('/api', '');
+            const thumb = (c.links || []).find(l => l.type === 'image');
             // Нормализуем поля для совместимости с AccountPage
             return {
               id:     c._id || c.id || courseId,
               _id:    c._id || c.id || courseId,
-              title:  c.title || (c.trans?.[0]?.title) || item.title || 'Course',
-              img:    c.img   || item.img   || null,
-              author: c.author || c.userId?.nickname || item.author || 'Unknown',
+              title:  c.trans?.[0]?.title || c.title || item.title || 'Course',
+              img:    thumb ? `${BASE}${thumb.url}` : (item.img || null),
+              author: c.userId?.nickname || item.author || 'Unknown',
               price:  c.price || item.price || 0,
             };
           } catch {
@@ -290,7 +312,7 @@ function CartPage() {
 
     } catch (err) {
       console.error('Payment error:', err);
-      alert('Payment failed: ' + err.message);
+      setErrModal({ show: true, message: 'Payment failed: ' + err.message });
     } finally {
       setIsProcessing(false);
     }
@@ -321,7 +343,7 @@ function CartPage() {
           {totalItems > 0 && (
             <button
               className="btn btn-outline-danger rounded-pill px-4"
-              onClick={() => { if (window.confirm(t('cart.confirmClear'))) clearCart(); }}
+              onClick={() => clearCart()}
             >
               <i className="bi bi-trash3 me-2"></i> {t('cart.clearCart')}
             </button>
@@ -851,6 +873,13 @@ function CartPage() {
           </div>
         </>
       )}
+      <UtilityModal
+        show={errModal.show}
+        type="info"
+        title="Payment Error"
+        message={errModal.message}
+        onClose={() => setErrModal({ show: false, message: '' })}
+      />
     </div>
   );
 }

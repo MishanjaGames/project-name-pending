@@ -8,6 +8,7 @@ import { useCart } from '../../contexts/CartContext';
 import { courseService } from '../../api/courseService'; 
 import CourseCard from '../../components/CourseCard'; // ИМПОРТИРУЕМ НАШУ КАРТОЧКУ
 import config from '../../config/config';
+import { UtilityModal } from '../../components/UtilityModal';
 
 const API_URL = config.API_URL;
 const BASE_URL = (process.env.REACT_APP_API_URL || '${BASE_URL}/api').replace('/api', '');
@@ -21,6 +22,7 @@ function SearchPage() {
   const [viewMode, setViewMode] = useState('grid');
   const [allCourses, setAllCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [infoModal, setInfoModal] = useState({ show: false, title: '', message: '' });
 
   useEffect(() => {
     const u = getUser();
@@ -152,9 +154,9 @@ function SearchPage() {
       u.enrolled.push({ id: course.id, title: course.title, author: course.author, img: course.img });
       setUserStorage(u);
       setUser(u);
-      alert(t('enrolledIn') + course.title);
+      setInfoModal({ show: true, title: '✓ Enrolled', message: t('enrolledIn') + course.title });
     } else {
-      alert(t('alreadyEnrolled'));
+      setInfoModal({ show: true, title: 'Already enrolled', message: t('alreadyEnrolled') });
     }
   };
 
@@ -324,6 +326,13 @@ function SearchPage() {
           </main>
         </div>
       </div>
+      <UtilityModal
+        show={infoModal.show}
+        type="info"
+        title={infoModal.title}
+        message={infoModal.message}
+        onClose={() => setInfoModal({ show: false, title: '', message: '' })}
+      />
     </div>
   );
 }

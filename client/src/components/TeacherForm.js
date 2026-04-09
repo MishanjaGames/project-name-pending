@@ -2,6 +2,7 @@ import React, { useState, useContext, useRef } from 'react';
 import './TeacherForm.css';
 import { submitTeacherApplication } from '../utils/teacher';
 import { SettingsContext } from '../contexts/SettingsContext';
+import { UtilityModal } from './UtilityModal';
 
 export default function TeacherForm({ initialEmail = '' }) {
   const { t } = useContext(SettingsContext);
@@ -24,6 +25,7 @@ export default function TeacherForm({ initialEmail = '' }) {
   const [sending, setSending]   = useState(false);
   const [error, setError]       = useState('');
   const [success, setSuccess]   = useState('');
+  const [modal, setModal]       = useState({ show: false, title: '', message: '' });
 
   // ─── Refs для hidden file inputs ─────────────────────────────────────────
   // ВАЖНО: оба input живут вне модалки — всегда в DOM, refs всегда валидны
@@ -109,7 +111,7 @@ export default function TeacherForm({ initialEmail = '' }) {
   // ─── Сохранение навыка ───────────────────────────────────────────────────
   const saveSkill = () => {
     if (!currentSkill.type || !currentSkill.subject || !currentSkill.experience) {
-      alert(t('teacher.alertFillRequired'));
+      setModal({ show: true, title: 'Required fields', message: t('teacher.alertFillRequired') });
       return;
     }
     if (editingSkillIndex !== null) {
@@ -173,7 +175,7 @@ export default function TeacherForm({ initialEmail = '' }) {
         });
       });
 
-      const res = await submitTeacherApplication(fd);
+      const res = await submitTeacherApplication(fd, 'tutor');
       setSuccess(res.message || t('teacher.alertSuccess'));
       setForm({ firstName: '', lastName: '', bio: '', agreement: false });
       setSkills([]);
@@ -443,6 +445,13 @@ export default function TeacherForm({ initialEmail = '' }) {
           </div>
         </div>
       )}
+      <UtilityModal
+        show={modal.show}
+        type="info"
+        title={modal.title}
+        message={modal.message}
+        onClose={() => setModal({ show: false, title: '', message: '' })}
+      />
     </div>
   );
 }

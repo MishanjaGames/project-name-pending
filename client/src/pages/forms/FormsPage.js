@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import { getUser } from '../../utils/auth';
 import config from '../../config/config';
+import { UtilityModal } from '../../components/UtilityModal';
 
 const API_URL = config.API_URL;
 
@@ -376,6 +377,8 @@ export default function FormsPage() {
   const [error, setError]         = useState('');
   const [selected, setSelected]   = useState(null); // открытая заявка
   const [updating, setUpdating]   = useState(false);
+  const [modal, setModal]         = useState({ show: false, title: '', message: '' });
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   // Фильтры
   const [filterType,   setFilterType]   = useState('');
@@ -429,15 +432,20 @@ export default function FormsPage() {
       setForms(prev => prev.map(f => f._id === id ? { ...f, ...data.data, status } : f));
       setSelected(prev => prev?._id === id ? { ...prev, ...data.data, status } : prev);
     } catch (err) {
-      alert('Failed to update: ' + err.message);
+      setModal({ show: true, title: 'Error', message: 'Failed to update: ' + err.message });
     } finally {
       setUpdating(false);
     }
   };
 
   /* ── Удаление ─────────────────────────────────────────────── */
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this submission? This cannot be undone.')) return;
+  const handleDelete = (id) => {
+    setDeleteConfirm(id);
+  };
+
+  const confirmDelete = async () => {
+    const id = deleteConfirm;
+    setDeleteConfirm(null);
     setUpdating(true);
     try {
       const token = localStorage.getItem('token');
@@ -452,7 +460,7 @@ export default function FormsPage() {
       setForms(prev => prev.filter(f => f._id !== id));
       setSelected(null);
     } catch (err) {
-      alert('Failed to delete: ' + err.message);
+      setModal({ show: true, title: 'Error', message: 'Failed to delete: ' + err.message });
     } finally {
       setUpdating(false);
     }

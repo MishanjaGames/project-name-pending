@@ -3,6 +3,7 @@ import config from '../config/config';
 import { useNavigate } from 'react-router-dom';
 import { SettingsContext } from '../contexts/SettingsContext';
 import { getUser } from '../utils/auth';
+import { UtilityModal } from './UtilityModal';
 
 const API_URL = config.API_URL;
 
@@ -28,6 +29,9 @@ export default function AddCourseForm() {
     const [thumbnailFile, setThumbnailFile] = useState(null);
     const [thumbnailPreview, setThumbnailPreview] = useState(null);
     const [contentFiles, setContentFiles] = useState([]);
+    const [modal, setModal] = useState({ show: false, title: '', message: '', onClose: null });
+
+    const showModal = (title, message, onClose = null) => setModal({ show: true, title, message, onClose });
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -144,7 +148,7 @@ export default function AddCourseForm() {
             const userId = currentUser?._id || currentUser?.id;
 
             if (!userId) {
-                alert(t('addCourseForm.alertAuthRequired') || 'You must be logged in to create a course');
+                showModal('Error', t('addCourseForm.alertAuthRequired') || 'You must be logged in to create a course');
                 setSaving(false);
                 return;
             }
@@ -179,7 +183,7 @@ export default function AddCourseForm() {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                alert(`${t('addCourseForm.alertCreateFailed')} ${errorData.message || 'Unknown error'}`);
+                showModal('Error', `${t('addCourseForm.alertCreateFailed')} ${errorData.message || 'Unknown error'}`);
                 setSaving(false);
                 return;
             }
@@ -223,21 +227,21 @@ export default function AddCourseForm() {
                         console.error('Content files upload response:', text);
                     }
                     console.error('Content files upload error (status ' + filesRes.status + '):', errData);
-                    alert(`File upload failed: ${errData.message || filesRes.statusText}`);
+                    showModal('Upload Error', `File upload failed: ${errData.message || filesRes.statusText}`);
                 }
             }
 
-            alert(t('addCourseForm.alertCreateSuccess'));
-            navigate('/account');
+            showModal('✓ Success', t('addCourseForm.alertCreateSuccess'), () => navigate('/account'));
         } catch (error) {
             console.error('Error creating course:', error);
-            alert(t('addCourseForm.alertCreateError'));
+            showModal('Error', t('addCourseForm.alertCreateError'));
         } finally {
             setSaving(false);
         }
     };
 
     return (
+        <>
         <form onSubmit={handleSubmit}>
             {/* Обложка курса */}
             <div className="text-center mb-4">
@@ -379,5 +383,13 @@ export default function AddCourseForm() {
                 </button>
             </div>
         </form>
+        <UtilityModal
+            show={modal.show}
+            type="info"
+            title={modal.title}
+            message={modal.message}
+            onClose={() => { setModal({ show: false, title: '', message: '', onClose: null }); modal.onClose?.(); }}
+        />
+        </>
     );
 }

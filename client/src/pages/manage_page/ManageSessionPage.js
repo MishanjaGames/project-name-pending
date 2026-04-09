@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useContext, useRef } from 'rea
 import { useNavigate, useParams } from 'react-router-dom';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import config from '../../config/config';
+import { UtilityModal } from '../../components/UtilityModal';
 import { getUser } from '../../utils/auth';
 import io from 'socket.io-client';
 
@@ -38,6 +39,7 @@ function ManageSessionPage() {
   const [loading,   setLoading]     = useState(true);
   const [error,     setError]       = useState('');
   const [toast,     setToast]       = useState('');
+  const [chatModal, setChatModal]   = useState('');
   const [saving,    setSaving]      = useState(false);
 
   // Modal states
@@ -155,7 +157,8 @@ function ManageSessionPage() {
       // Find recipient's live socketId from chatPeers by userId
       const recipientPeer = chatPeers.find(p => p.userId === chatPrivateWith.userId);
       if (!recipientPeer) {
-        alert(`${chatPrivateWith.nickname} is not online right now. They need to have the Chat tab open.`);
+        setChatModal(`${chatPrivateWith.nickname} is not online right now. They need to have the Chat tab open.`);
+        return;
         return;
       }
       payload.to = recipientPeer.socketId;
@@ -1018,6 +1021,13 @@ function ManageSessionPage() {
         </>
       )}
 
+      <UtilityModal
+        show={!!chatModal}
+        type="info"
+        title="User offline"
+        message={chatModal}
+        onClose={() => setChatModal('')}
+      />
     </div>
   );
 }

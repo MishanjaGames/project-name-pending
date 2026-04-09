@@ -51,7 +51,7 @@ function WishlistPage() {
                     {/* Картинка курса */}
                     <div className="position-relative">
                       <img 
-                        src={displayImg || 'https://placehold.co/400x250/21262d/e6edf3?text=No+Image'} 
+                        src={displayImg || 'https://placehold.co/400x250?text=No+Img'} 
                         className="card-img-top" 
                         alt={course.title} 
                         style={{ height: '180px', objectFit: 'cover' }}

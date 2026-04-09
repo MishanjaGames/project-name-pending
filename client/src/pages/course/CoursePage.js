@@ -5,6 +5,7 @@ import { useCart } from '../../contexts/CartContext';
 import AuthImage from '../../components/AuthImage';
 import { getUser } from '../../utils/auth';
 import './CoursePage.css';
+import { UtilityModal } from '../../components/UtilityModal';
 import config from '../../config/config';
 
 const API_URL = config.API_URL;
@@ -542,7 +543,7 @@ function CoursePage() {
           })
         );
         if (uploadResults.some(ok => !ok)) {
-          alert(t('coursePage.alertUploadFailed'));
+          setInfoModal({ show: true, title: 'Upload Error', message: t('coursePage.alertUploadFailed') || 'Some files failed to upload.', onClose: null });
           resetUnsavedState(); await fetchData(); return;
         }
       }
@@ -571,13 +572,13 @@ function CoursePage() {
         resetUnsavedState();
         setEditMode(false);
         await fetchData();
-        alert(t('coursePage.alertSaveSuccess'));
+        setInfoModal({ show: true, title: '✓ Saved', message: t('coursePage.alertSaveSuccess') || 'Changes saved successfully.', onClose: null });
       } else {
-        alert(t('coursePage.alertSaveFailed'));
+        setInfoModal({ show: true, title: 'Save failed', message: t('coursePage.alertSaveFailed') || 'Could not save changes.', onClose: null });
         resetUnsavedState(); await fetchData();
       }
     } catch (err) {
-      alert(`${t('coursePage.alertError')} ${err.message}.`);
+      setInfoModal({ show: true, title: 'Error', message: `${t('coursePage.alertError') || 'Error:'} ${err.message}.`, onClose: null });
       resetUnsavedState(); await fetchData();
     } finally { setIsSaving(false); }
   };
@@ -597,12 +598,12 @@ function CoursePage() {
       author: author.nickname || author.firstName || 'Unknown'
     }, 1);
     
-    alert(`${t('coursePage.addedToCart')} "${productTitle}"!`);
+    setInfoModal({ show: true, title: t('coursePage.addedToCart') || 'Added to cart', message: `"${productTitle}" has been added to your cart.`, onClose: null });
     navigate('/cart');
   };
   
   const handleEnroll = () => {
-    alert(`${t('coursePage.enrolledIn')} "${course.title || course.trans?.[0]?.title}"!`);
+    setInfoModal({ show: true, title: '✓ Enrolled', message: `${t('coursePage.enrolledIn') || 'Enrolled in'} "${course.title || course.trans?.[0]?.title}"!`, onClose: null });
   };
 
   const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -1068,9 +1069,9 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
   };
 
   const handleSave = () => {
-    if (!title.trim()) { alert(t('coursePage.alertNoTitle')); return; }
+    if (!title.trim()) { setTitleError(true); return; }
     if (type === 'text') { onSave({ type, title, content }); return; }
-    if (!url) { alert('Please select or upload a file first.'); return; }
+    if (!url) { setUrlError(true); return; }
     onSave({ type, title, url, content: undefined });
   };
 
