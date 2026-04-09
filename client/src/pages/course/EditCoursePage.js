@@ -4,6 +4,7 @@ import NavBar from "../../components/NavBar";
 import AuthImage from "../../components/AuthImage";
 import { SettingsContext } from '../../contexts/SettingsContext';
 import config from '../../config/config';
+import { UtilityModal } from '../../components/UtilityModal';
 
 const API_URL = config.API_URL;
 const BASE_URL = API_URL.replace('/api', '');

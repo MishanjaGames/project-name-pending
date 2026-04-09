@@ -46,6 +46,7 @@ function CoursePage() {
   const [localTextContent, setLocalTextContent] = useState({});
   const [textRefreshKey, setTextRefreshKey] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [infoModal, setInfoModal] = useState({ show: false, title: '', message: '', onClose: null });
 
   const isAdmin = currentUser && ['admin', 'root', 'manage', 'quality', 'create', 'tutor', 'teacher'].includes(currentUser.role);
 
@@ -956,6 +957,13 @@ function CoursePage() {
       {editingItem && (
         <AddItemModal type={editingItem.item.type} isEditing={true} initialData={editingItem.item} onSave={(itemData) => updateContentItem(editingItem.volumeIndex, editingItem.chapterIndex, editingItem.itemIndex, itemData)} onClose={() => setEditingItem(null)} parseTextSyntax={parseTextSyntax} uploadedFiles={uploadedFiles} courseId={id} authHeader={authHeader} />
       )}
+      <UtilityModal
+        show={infoModal.show}
+        type="info"
+        title={infoModal.title}
+        message={infoModal.message}
+        onClose={() => { setInfoModal({ show: false, title: '', message: '', onClose: null }); infoModal.onClose?.(); }}
+      />
     </>
   );
 }
@@ -993,6 +1001,8 @@ function AddItemModal({ type, isEditing, initialData, onSave, onClose, parseText
   const [uploading, setUploading]       = useState(false);
   const [uploadError, setUploadError]   = useState('');
   const [uploadedName, setUploadedName] = useState('');
+  const [titleError, setTitleError]     = useState(false);
+  const [urlError, setUrlError]         = useState(false);
 
   // Определяем accept по типу
   const acceptMap = {
